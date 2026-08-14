@@ -76,21 +76,33 @@ object TelegramRepository {
                         )
                     }
                     is TdApi.MessageDocument -> {
-                        fileList.add(
-                            VaultMediaItem(
-                                id = "doc_${msg.id}",
-                                title = content.document.fileName.ifBlank { "File_${msg.date}" },
-                                sizeBytes = content.document.document.size.toLong(),
-                                formattedSize = formatSize(content.document.document.size.toLong()),
-                                mimeType = content.document.mimeType.ifBlank { "application/octet-stream" },
-                                type = MediaType.DOCUMENT,
-                                chatId = msg.chatId,
-                                messageId = msg.id,
-                                fileId = content.document.document.id,
-                                thumbnailFileId = content.document.thumbnail?.file?.id ?: 0,
-                                dateAdded = msg.date.toLong()
-                            )
+                        val doc = content.document
+                        val mime = doc.mimeType.ifBlank { "application/octet-stream" }
+                        val isVideoDoc = mime.startsWith("video/", ignoreCase = true) ||
+                                doc.fileName.endsWith(".mp4", ignoreCase = true) ||
+                                doc.fileName.endsWith(".mkv", ignoreCase = true) ||
+                                doc.fileName.endsWith(".mov", ignoreCase = true) ||
+                                doc.fileName.endsWith(".avi", ignoreCase = true)
+
+                        val item = VaultMediaItem(
+                            id = "doc_${msg.id}",
+                            title = doc.fileName.ifBlank { "File_${msg.date}" },
+                            sizeBytes = doc.document.size.toLong(),
+                            formattedSize = formatSize(doc.document.size.toLong()),
+                            mimeType = mime,
+                            type = if (isVideoDoc) MediaType.VIDEO else MediaType.DOCUMENT,
+                            chatId = msg.chatId,
+                            messageId = msg.id,
+                            fileId = doc.document.id,
+                            thumbnailFileId = doc.thumbnail?.file?.id ?: 0,
+                            dateAdded = msg.date.toLong()
                         )
+
+                        if (isVideoDoc) {
+                            videoList.add(item)
+                        } else {
+                            fileList.add(item)
+                        }
                     }
                 }
             }
@@ -111,14 +123,53 @@ object TelegramRepository {
 
         val inputContent: TdApi.InputMessageContent = when (mediaType) {
             MediaType.PHOTO -> TdApi.InputMessagePhoto().apply {
-                photo = TdApi.InputPhoto().apply { photo = inputFile }
+                val inputPhoto = TdApi.InputPhoto().apply {
+                    photo = inputFile
+                    try {
+                        val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        android.graphics.BitmapFactory.decodeFile(localPath, options)
+                        width = options.outWidth
+                        height = options.outHeight
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Could not decode photo bounds", e)
+                    }
+                }
+                photo = inputPhoto
                 caption = formattedCaption
             }
             MediaType.VIDEO -> TdApi.InputMessageVideo().apply {
-                video = TdApi.InputVideo().apply {
+                val inputVideo = TdApi.InputVideo().apply {
                     video = inputFile
                     supportsStreaming = true
+
+                    // Extract thumbnail and metadata from video
+                    try {
+                        val retriever = android.media.MediaMetadataRetriever()
+                        retriever.setDataSource(localPath)
+                        val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        val widthStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                        val heightStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+
+                        duration = (durationStr?.toLongOrNull() ?: 0L).let { (it / 1000).toInt() }
+                        width = widthStr?.toIntOrNull() ?: 0
+                        height = heightStr?.toIntOrNull() ?: 0
+
+                        val frame = retriever.getFrameAtTime(1000000) ?: retriever.frameAtTime
+                        if (frame != null) {
+                            val localFile = java.io.File(localPath)
+                            val thumbDir = java.io.File(localFile.parentFile ?: java.io.File("/tmp"), "thumbs").apply { if (!exists()) mkdirs() }
+                            val thumbFile = java.io.File(thumbDir, "thumb_${System.currentTimeMillis()}.jpg")
+                            java.io.FileOutputStream(thumbFile).use { out ->
+                                frame.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
+                            }
+                            thumbnail = TdApi.InputThumbnail(TdApi.InputFileLocal(thumbFile.absolutePath), frame.width, frame.height)
+                        }
+                        retriever.release()
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Failed to extract video thumbnail", e)
+                    }
                 }
+                video = inputVideo
                 caption = formattedCaption
             }
             MediaType.DOCUMENT -> TdApi.InputMessageDocument().apply {

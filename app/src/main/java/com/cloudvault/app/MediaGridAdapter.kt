@@ -2,6 +2,7 @@ package com.cloudvault.app
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
@@ -28,7 +29,7 @@ class MediaGridAdapter(
 
     private var items: List<VaultMediaItem> = emptyList()
 
-    // In-memory memory cache for downloaded thumbnails
+    // In-memory LRU cache for downloaded thumbnails & video posters
     companion object {
         private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
         private val cacheSize = maxMemory / 8
@@ -106,7 +107,7 @@ class MediaGridAdapter(
 
             val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
 
-            if (targetFileId > 0 && (item.type == MediaType.PHOTO || item.thumbnailFileId > 0)) {
+            if (targetFileId > 0 && (item.type == MediaType.PHOTO || item.type == MediaType.VIDEO || item.thumbnailFileId > 0)) {
                 // Check memory cache first
                 val cached = bitmapCache.get(targetFileId)
                 if (cached != null) {
@@ -116,7 +117,7 @@ class MediaGridAdapter(
                 } else {
                     pbThumbLoading.visibility = View.VISIBLE
                     loadJob = scope.launch(Dispatchers.IO) {
-                        val bitmap = loadOrDownloadThumbnail(targetFileId)
+                        val bitmap = loadOrDownloadThumbnail(targetFileId, item)
                         withContext(Dispatchers.Main) {
                             pbThumbLoading.visibility = View.GONE
                             if (bitmap != null) {
@@ -135,31 +136,50 @@ class MediaGridAdapter(
             }
         }
 
-        private suspend fun loadOrDownloadThumbnail(fileId: Int): Bitmap? {
+        private suspend fun loadOrDownloadThumbnail(fileId: Int, item: VaultMediaItem): Bitmap? {
             return try {
-                var tdFile = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as TdApi.File
-                if (!tdFile.local.isDownloadingCompleted || tdFile.local.path.isBlank() || !File(tdFile.local.path).exists()) {
-                    TelegramClient.sendRequest(TdApi.DownloadFile(fileId, 32, 0L, 0L, false))
-                    var attempts = 0
-                    while (attempts < 20) {
-                        delay(250)
-                        tdFile = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as TdApi.File
-                        if (tdFile.local.isDownloadingCompleted && File(tdFile.local.path).exists()) {
-                            break
+                // 1. If TDLib thumbnail / photo file ID is available, download and decode it
+                if (item.thumbnailFileId > 0 || item.type == MediaType.PHOTO) {
+                    var tdFile = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as TdApi.File
+                    if (!tdFile.local.isDownloadingCompleted || tdFile.local.path.isBlank() || !File(tdFile.local.path).exists()) {
+                        TelegramClient.sendRequest(TdApi.DownloadFile(fileId, 32, 0L, 0L, false))
+                        var attempts = 0
+                        while (attempts < 25) {
+                            delay(200)
+                            tdFile = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as TdApi.File
+                            if (tdFile.local.isDownloadingCompleted && File(tdFile.local.path).exists()) {
+                                break
+                            }
+                            attempts++
                         }
-                        attempts++
+                    }
+
+                    val path = tdFile.local.path
+                    if (path.isNotBlank() && File(path).exists()) {
+                        val options = BitmapFactory.Options().apply {
+                            inSampleSize = 2
+                        }
+                        val decoded = BitmapFactory.decodeFile(path, options)
+                        if (decoded != null) return decoded
                     }
                 }
 
-                val path = tdFile.local.path
-                if (path.isNotBlank() && File(path).exists()) {
-                    val options = BitmapFactory.Options().apply {
-                        inSampleSize = 2
+                // 2. For video without pre-built thumbnail, extract a frame via the streaming proxy
+                if (item.type == MediaType.VIDEO && item.fileId > 0) {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        val proxyUrl = "http://127.0.0.1:${TelegramStreamingProxy.port}/stream?file_id=${item.fileId}"
+                        retriever.setDataSource(proxyUrl, HashMap())
+                        val frame = retriever.getFrameAtTime(1000000) ?: retriever.frameAtTime
+                        if (frame != null) return frame
+                    } catch (e: Throwable) {
+                        // ignore and return null
+                    } finally {
+                        try { retriever.release() } catch (e: Throwable) {}
                     }
-                    BitmapFactory.decodeFile(path, options)
-                } else {
-                    null
                 }
+
+                null
             } catch (e: Throwable) {
                 null
             }
