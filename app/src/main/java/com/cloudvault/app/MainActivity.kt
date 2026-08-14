@@ -628,6 +628,14 @@ class MainActivity : AppCompatActivity() {
                 updateDisplayedItems()
             }
         }
+        lifecycleScope.launch {
+            TelegramRepository.isLoadingVault.collectLatest { loading ->
+                val hasAnyItems = TelegramRepository.photos.value.isNotEmpty() ||
+                        TelegramRepository.videos.value.isNotEmpty() ||
+                        TelegramRepository.files.value.isNotEmpty()
+                pbLoading.visibility = if (loading && !hasAnyItems) View.VISIBLE else View.GONE
+            }
+        }
     }
 
     private fun showSettingsDialog() {
