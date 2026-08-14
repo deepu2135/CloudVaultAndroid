@@ -50,7 +50,10 @@ object TelegramClient {
     }
 
     fun initialize(context: Context) {
-        if (client != null) return
+        if (client != null) {
+            sendTdlibParameters(context)
+            return
+        }
         _authState.value = TelegramAuthState.Initializing
         if (!loadNativeLibrary()) {
             _authState.value = TelegramAuthState.Error(libraryLoadError ?: "TDLib native library missing")
@@ -97,14 +100,16 @@ object TelegramClient {
         }
     }
 
-    private fun sendTdlibParameters(context: Context) {
+    fun sendTdlibParameters(context: Context) {
         val inputApiId = TdlibManager.getApiId(context)
         val inputApiHash = TdlibManager.getApiHash(context)
 
         if (inputApiId <= 0 || inputApiHash.isBlank()) {
-            _authState.value = TelegramAuthState.Error("API ID & Hash missing. Set them in Settings.")
+            _authState.value = TelegramAuthState.WaitTdlibParameters
             return
         }
+
+        _authState.value = TelegramAuthState.Initializing
 
         val parameters = TdApi.SetTdlibParameters().apply {
             apiId = inputApiId

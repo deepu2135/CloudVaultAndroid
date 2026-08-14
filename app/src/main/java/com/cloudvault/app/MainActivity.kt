@@ -75,10 +75,24 @@ class MainActivity : AppCompatActivity() {
                 when (state) {
                     is TelegramAuthState.Idle -> tvStatus.text = "Status: Idle"
                     is TelegramAuthState.Initializing -> tvStatus.text = "Status: Initializing TDLib..."
-                    is TelegramAuthState.WaitTdlibParameters -> tvStatus.text = "Status: Setup API Credentials in Settings"
-                    is TelegramAuthState.WaitPhoneNumber -> showPhoneInputDialog()
-                    is TelegramAuthState.WaitCode -> showCodeInputDialog()
-                    is TelegramAuthState.WaitPassword -> showPasswordInputDialog()
+                    is TelegramAuthState.WaitTdlibParameters -> {
+                        tvStatus.text = "Status: Tap ⚙️ Settings to enter API ID & Hash"
+                        if (!TdlibManager.isCredentialsConfigured(this@MainActivity)) {
+                            showSettingsDialog()
+                        }
+                    }
+                    is TelegramAuthState.WaitPhoneNumber -> {
+                        tvStatus.text = "Status: Waiting for phone number..."
+                        showPhoneInputDialog()
+                    }
+                    is TelegramAuthState.WaitCode -> {
+                        tvStatus.text = "Status: Waiting for verification code..."
+                        showCodeInputDialog()
+                    }
+                    is TelegramAuthState.WaitPassword -> {
+                        tvStatus.text = "Status: Waiting for 2FA password..."
+                        showPasswordInputDialog()
+                    }
                     is TelegramAuthState.Ready -> {
                         tvStatus.text = "Status: Connected to Telegram Cloud"
                         TelegramRepository.loadVaultItems()
@@ -157,32 +171,34 @@ class MainActivity : AppCompatActivity() {
     private fun showSettingsDialog() {
         if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
-        builder.setTitle("TDLib API Credentials")
+        builder.setTitle("Telegram API Credentials")
+        builder.setMessage("Get your free API ID & API Hash from https://my.telegram.org (API development tools).")
 
         val layout = android.widget.LinearLayout(this)
         layout.orientation = android.widget.LinearLayout.VERTICAL
         layout.setPadding(40, 20, 40, 20)
 
         val etApiId = EditText(this)
-        etApiId.hint = "API ID (e.g., 123456)"
+        etApiId.hint = "API ID (e.g. 12345678)"
+        etApiId.inputType = android.text.InputType.TYPE_CLASS_NUMBER
         etApiId.setText(TdlibManager.getApiId(this).let { if (it > 0) it.toString() else "" })
         layout.addView(etApiId)
 
         val etApiHash = EditText(this)
-        etApiHash.hint = "API Hash (e.g., a1b2c3d4...)"
+        etApiHash.hint = "API Hash (e.g. 0123456789abcdef0123456789abcdef)"
         etApiHash.setText(TdlibManager.getApiHash(this))
         layout.addView(etApiHash)
 
         builder.setView(layout)
-        builder.setPositiveButton("Save Credentials") { _, _ ->
+        builder.setPositiveButton("Save & Connect") { _, _ ->
             val idStr = etApiId.text.toString().trim()
             val hashStr = etApiHash.text.toString().trim()
             val apiId = idStr.toIntOrNull() ?: 0
             if (apiId > 0 && hashStr.isNotBlank()) {
                 TdlibManager.saveApiId(this, apiId)
                 TdlibManager.saveApiHash(this, hashStr)
-                Toast.makeText(this, "Credentials saved! Reloading TDLib...", Toast.LENGTH_SHORT).show()
-                TelegramClient.initialize(applicationContext)
+                Toast.makeText(this, "Credentials saved! Connecting...", Toast.LENGTH_SHORT).show()
+                TelegramClient.sendTdlibParameters(applicationContext)
             } else {
                 Toast.makeText(this, "Please enter valid API ID and API Hash", Toast.LENGTH_SHORT).show()
             }
