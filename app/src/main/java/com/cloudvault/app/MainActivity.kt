@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -161,6 +162,9 @@ class MainActivity : AppCompatActivity() {
 
             // Initialize TDLib
             TelegramClient.initialize(applicationContext)
+
+            // Initialize Auto Backup (Background Worker + Realtime Media Observer)
+            AutoBackupManager.initialize(applicationContext)
         } catch (e: Throwable) {
             android.util.Log.e("MainActivity", "App init exception", e)
             tvStatus.text = "Init Warning: ${e.message}"
@@ -628,41 +632,111 @@ class MainActivity : AppCompatActivity() {
 
     private fun showSettingsDialog() {
         if (isFinishing || isDestroyed) return
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("Telegram API Credentials")
-        builder.setMessage("Get your free API ID & API Hash from https://my.telegram.org (API development tools).")
 
-        val layout = LinearLayout(this)
-        layout.orientation = LinearLayout.VERTICAL
-        layout.setPadding(50, 20, 50, 20)
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_settings, null)
+        val switchAutoBackup: SwitchMaterial = dialogView.findViewById(R.id.switchAutoBackup)
+        val switchWifiOnly: SwitchMaterial = dialogView.findViewById(R.id.switchWifiOnly)
+        val tvBackupStatus: TextView = dialogView.findViewById(R.id.tvBackupStatus)
+        val btnSelectFolders: MaterialButton = dialogView.findViewById(R.id.btnSelectFolders)
+        val btnBackupNow: MaterialButton = dialogView.findViewById(R.id.btnBackupNow)
+        val etSettingsApiId: EditText = dialogView.findViewById(R.id.etSettingsApiId)
+        val etSettingsApiHash: EditText = dialogView.findViewById(R.id.etSettingsApiHash)
+        val btnSaveCredentials: MaterialButton = dialogView.findViewById(R.id.btnSaveCredentials)
 
-        val etApiId = EditText(this)
-        etApiId.hint = "API ID (e.g. 12345678)"
-        etApiId.inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        etApiId.setText(TdlibManager.getApiId(this).let { if (it > 0) it.toString() else "" })
-        layout.addView(etApiId)
+        // Set initial values
+        val isBackupOn = AutoBackupPreferences.isEnabled(this)
+        switchAutoBackup.isChecked = isBackupOn
+        switchWifiOnly.isChecked = AutoBackupPreferences.isWifiOnly(this)
+        tvBackupStatus.text = if (isBackupOn) {
+            "Auto Backup is ON • Real-time observer & background sync active ☁️"
+        } else {
+            "Auto Backup is OFF • Tap to automatically sync photos & videos"
+        }
 
-        val etApiHash = EditText(this)
-        etApiHash.hint = "API Hash (e.g. 0123456789abcdef0123456789abcdef)"
-        etApiHash.setText(TdlibManager.getApiHash(this))
-        layout.addView(etApiHash)
+        switchAutoBackup.setOnCheckedChangeListener { _, isChecked ->
+            AutoBackupManager.enableAutoBackup(this, isChecked)
+            tvBackupStatus.text = if (isChecked) {
+                "Auto Backup is ON • Real-time observer & background sync active ☁️"
+            } else {
+                "Auto Backup is OFF • Tap to automatically sync photos & videos"
+            }
+            Toast.makeText(this, if (isChecked) "Auto Backup enabled!" else "Auto Backup disabled", Toast.LENGTH_SHORT).show()
+        }
 
-        builder.setView(layout)
-        builder.setPositiveButton("Save & Connect") { _, _ ->
-            val idStr = etApiId.text.toString().trim()
-            val hashStr = etApiHash.text.toString().trim()
+        switchWifiOnly.setOnCheckedChangeListener { _, isChecked ->
+            AutoBackupPreferences.setWifiOnly(this, isChecked)
+            Toast.makeText(this, if (isChecked) "Backup set to Wi-Fi only" else "Backup set to Wi-Fi + Mobile Data", Toast.LENGTH_SHORT).show()
+        }
+
+        btnSelectFolders.setOnClickListener {
+            showFolderSelectionDialog()
+        }
+
+        btnBackupNow.setOnClickListener {
+            Toast.makeText(this, "Scanning device for unbacked photos & videos...", Toast.LENGTH_SHORT).show()
+            AutoBackupManager.triggerImmediateSync(this)
+        }
+
+        val currentApiId = TdlibManager.getApiId(this)
+        if (currentApiId > 0) etSettingsApiId.setText(currentApiId.toString())
+        etSettingsApiHash.setText(TdlibManager.getApiHash(this))
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("Close", null)
+            .create()
+
+        btnSaveCredentials.setOnClickListener {
+            val idStr = etSettingsApiId.text.toString().trim()
+            val hashStr = etSettingsApiHash.text.toString().trim()
             val apiId = idStr.toIntOrNull() ?: 0
             if (apiId > 0 && hashStr.isNotBlank()) {
                 TdlibManager.saveApiId(this, apiId)
                 TdlibManager.saveApiHash(this, hashStr)
                 Toast.makeText(this, "Credentials saved! Connecting...", Toast.LENGTH_SHORT).show()
                 TelegramClient.sendTdlibParameters(applicationContext)
+                dialog.dismiss()
             } else {
                 Toast.makeText(this, "Please enter valid API ID and API Hash", Toast.LENGTH_SHORT).show()
             }
         }
-        builder.setNegativeButton("Cancel", null)
-        builder.show()
+
+        dialog.show()
+    }
+
+    private fun showFolderSelectionDialog() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val folders = AutoBackupManager.scanAvailableFolders(this@MainActivity)
+            if (folders.isEmpty()) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "No media folders found on device", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+
+            val items = folders.map { "${it.bucketName} (${it.totalCount} items)" }.toTypedArray()
+            val checkedItems = folders.map { it.isSelected }.toBooleanArray()
+
+            withContext(Dispatchers.Main) {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Select Folders to Back Up")
+                    .setMultiChoiceItems(items, checkedItems) { _, which, isChecked ->
+                        checkedItems[which] = isChecked
+                    }
+                    .setPositiveButton("Save Selection") { _, _ ->
+                        val selectedBucketIds = mutableSetOf<String>()
+                        for (i in folders.indices) {
+                            if (checkedItems[i]) {
+                                selectedBucketIds.add(folders[i].bucketId)
+                            }
+                        }
+                        AutoBackupPreferences.setSelectedBucketIds(this@MainActivity, selectedBucketIds)
+                        Toast.makeText(this@MainActivity, "Backup folders updated (${selectedBucketIds.size} folders)", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
     }
 
     private fun showPhoneInputDialog() {
