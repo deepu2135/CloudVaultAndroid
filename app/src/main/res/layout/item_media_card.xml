@@ -5,10 +5,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="2dp"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="0dp"
     app:cardBackgroundColor="@color/card_bg"
-    app:strokeColor="#2A2A38"
+    app:strokeColor="@color/card_border"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -16,11 +16,11 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Image / Preview Container with Poster Aspect Ratio -->
+        <!-- Image / Preview Container -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="140dp"
-            android:background="#101018">
+            android:layout_height="125dp"
+            android:background="#0C1522">
 
             <ImageView
                 android:id="@+id/ivThumbnail"
@@ -36,16 +36,40 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="📷"
-                android:textSize="32sp" />
+                android:textSize="28sp" />
 
-            <!-- Video Play Badge Overlay -->
+            <!-- Badge inside bottom-left of thumbnail -->
+            <LinearLayout
+                android:id="@+id/badgeTypeOverlay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|start"
+                android:layout_margin="6dp"
+                android:background="#99080E18"
+                android:orientation="horizontal"
+                android:paddingStart="5dp"
+                android:paddingEnd="5dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tvBadgeIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📷"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- Video Play Badge Overlay (center) -->
             <FrameLayout
                 android:id="@+id/badgeVideoOverlay"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_gravity="center"
                 android:visibility="gone"
-                android:background="@drawable/ic_launcher_background">
+                android:background="#80000000">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -53,7 +77,7 @@
                     android:layout_gravity="center"
                     android:text="▶"
                     android:textColor="#FFFFFF"
-                    android:textSize="16sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </FrameLayout>
 
@@ -61,8 +85,8 @@
             <ProgressBar
                 android:id="@+id/pbThumbLoading"
                 style="?android:attr/progressBarStyleSmall"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:layout_gravity="center"
                 android:visibility="gone" />
         </FrameLayout>
@@ -72,18 +96,40 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="8dp">
 
-            <TextView
-                android:id="@+id/tvMediaTitle"
+            <!-- Title Row with 3-dot overflow menu -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:text="Photo.jpg"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tvMediaTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:text="Photo_178488..."
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnItemMenu"
+                    android:layout_width="20dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="⋮"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tvMediaSize"
@@ -91,9 +137,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:maxLines="1"
-                android:text="2.4 MB"
+                android:text="212.8 KB"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
         </LinearLayout>
 
     </LinearLayout>

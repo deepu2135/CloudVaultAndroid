@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_dark">#0B0B0F</color>
-    <color name="card_bg">#16161E</color>
-    <color name="accent_blue">#3B82F6</color>
-    <color name="accent_cyan">#06B6D4</color>
-    <color name="text_primary">#F3F4F6</color>
-    <color name="text_secondary">#9CA3AF</color>
+    <color name="bg_dark">#080E18</color>
+    <color name="card_bg">#121C2B</color>
+    <color name="card_border">#1E2C3F</color>
+    <color name="status_pill_bg">#0A2533</color>
+    <color name="status_pill_border">#00B4D8</color>
+    <color name="accent_cyan">#00B4D8</color>
+    <color name="accent_cyan_bright">#00E5FF</color>
+    <color name="accent_blue">#1976D2</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#8A99AD</color>
+    <color name="tab_inactive">#6C7D93</color>
+    <color name="bottom_nav_bg">#0D1624</color>
 </resources>

@@ -71,10 +71,12 @@ class MediaGridAdapter(
     inner class MediaViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
         private val tvPlaceholderIcon: TextView = itemView.findViewById(R.id.tvPlaceholderIcon)
+        private val tvBadgeIcon: TextView = itemView.findViewById(R.id.tvBadgeIcon)
         private val badgeVideoOverlay: FrameLayout = itemView.findViewById(R.id.badgeVideoOverlay)
         private val pbThumbLoading: ProgressBar = itemView.findViewById(R.id.pbThumbLoading)
         private val tvMediaTitle: TextView = itemView.findViewById(R.id.tvMediaTitle)
         private val tvMediaSize: TextView = itemView.findViewById(R.id.tvMediaSize)
+        private val btnItemMenu: TextView = itemView.findViewById(R.id.btnItemMenu)
 
         private var loadJob: Job? = null
 
@@ -93,16 +95,23 @@ class MediaGridAdapter(
             when (item.type) {
                 MediaType.PHOTO -> {
                     tvPlaceholderIcon.text = "📷"
+                    tvBadgeIcon.text = "📷"
                     badgeVideoOverlay.visibility = View.GONE
                 }
                 MediaType.VIDEO -> {
                     tvPlaceholderIcon.text = "🎬"
+                    tvBadgeIcon.text = "🎬"
                     badgeVideoOverlay.visibility = View.VISIBLE
                 }
                 MediaType.DOCUMENT -> {
                     tvPlaceholderIcon.text = "📄"
+                    tvBadgeIcon.text = "📄"
                     badgeVideoOverlay.visibility = View.GONE
                 }
+            }
+
+            btnItemMenu.setOnClickListener {
+                onItemClick(item)
             }
 
             val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId

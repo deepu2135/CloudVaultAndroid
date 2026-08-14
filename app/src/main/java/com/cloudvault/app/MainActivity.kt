@@ -21,7 +21,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -34,21 +35,43 @@ import java.io.FileOutputStream
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
-    private lateinit var btnUpload: Button
-    private lateinit var btnSettings: Button
-    private lateinit var btnRefresh: Button
-    private lateinit var btnTabPhotos: Button
-    private lateinit var btnTabVideos: Button
-    private lateinit var btnTabFiles: Button
+    private lateinit var cardStatusBanner: MaterialCardView
+    private lateinit var btnTopUpload: MaterialButton
+    private lateinit var btnQuickAdd: MaterialButton
+    private lateinit var btnSettings: MaterialButton
+    private lateinit var fabUpload: MaterialButton
+
+    private lateinit var tabPhotosContainer: LinearLayout
+    private lateinit var tvTabPhotosLabel: TextView
+    private lateinit var tabPhotosIndicator: View
+
+    private lateinit var tabVideosContainer: LinearLayout
+    private lateinit var tvTabVideosLabel: TextView
+    private lateinit var tabVideosIndicator: View
+
+    private lateinit var tabFilesContainer: LinearLayout
+    private lateinit var tvTabFilesLabel: TextView
+    private lateinit var tabFilesIndicator: View
+
+    private lateinit var tvSectionTitle: TextView
+    private lateinit var btnSortFilter: MaterialButton
+    private lateinit var btnGridToggle: TextView
+
     private lateinit var rvMediaGrid: RecyclerView
     private lateinit var layoutEmptyState: LinearLayout
     private lateinit var tvEmptyEmoji: TextView
     private lateinit var tvEmptyTitle: TextView
     private lateinit var tvEmptySubtitle: TextView
-    private lateinit var fabUpload: ExtendedFloatingActionButton
+    private lateinit var pbLoading: ProgressBar
+
+    private lateinit var navVault: LinearLayout
+    private lateinit var navRecent: LinearLayout
+    private lateinit var navStarred: LinearLayout
+    private lateinit var navTrash: LinearLayout
 
     private lateinit var mediaAdapter: MediaGridAdapter
     private var currentCategory: MediaType = MediaType.PHOTO
+    private var isGrid3Col = true
 
     // Activity Result Launchers for picking media
     private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -68,18 +91,39 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         tvStatus = findViewById(R.id.tvStatus)
-        btnUpload = findViewById(R.id.btnUpload)
+        cardStatusBanner = findViewById(R.id.cardStatusBanner)
+        btnTopUpload = findViewById(R.id.btnTopUpload)
+        btnQuickAdd = findViewById(R.id.btnQuickAdd)
         btnSettings = findViewById(R.id.btnSettings)
-        btnRefresh = findViewById(R.id.btnRefresh)
-        btnTabPhotos = findViewById(R.id.btnTabPhotos)
-        btnTabVideos = findViewById(R.id.btnTabVideos)
-        btnTabFiles = findViewById(R.id.btnTabFiles)
+        fabUpload = findViewById(R.id.fabUpload)
+
+        tabPhotosContainer = findViewById(R.id.tabPhotosContainer)
+        tvTabPhotosLabel = findViewById(R.id.tvTabPhotosLabel)
+        tabPhotosIndicator = findViewById(R.id.tabPhotosIndicator)
+
+        tabVideosContainer = findViewById(R.id.tabVideosContainer)
+        tvTabVideosLabel = findViewById(R.id.tvTabVideosLabel)
+        tabVideosIndicator = findViewById(R.id.tabVideosIndicator)
+
+        tabFilesContainer = findViewById(R.id.tabFilesContainer)
+        tvTabFilesLabel = findViewById(R.id.tvTabFilesLabel)
+        tabFilesIndicator = findViewById(R.id.tabFilesIndicator)
+
+        tvSectionTitle = findViewById(R.id.tvSectionTitle)
+        btnSortFilter = findViewById(R.id.btnSortFilter)
+        btnGridToggle = findViewById(R.id.btnGridToggle)
+
         rvMediaGrid = findViewById(R.id.rvMediaGrid)
         layoutEmptyState = findViewById(R.id.layoutEmptyState)
         tvEmptyEmoji = findViewById(R.id.tvEmptyEmoji)
         tvEmptyTitle = findViewById(R.id.tvEmptyTitle)
         tvEmptySubtitle = findViewById(R.id.tvEmptySubtitle)
-        fabUpload = findViewById(R.id.fabUpload)
+        pbLoading = findViewById(R.id.pbLoading)
+
+        navVault = findViewById(R.id.navVault)
+        navRecent = findViewById(R.id.navRecent)
+        navStarred = findViewById(R.id.navStarred)
+        navTrash = findViewById(R.id.navTrash)
 
         setupRecyclerView()
 
@@ -94,24 +138,53 @@ class MainActivity : AppCompatActivity() {
             tvStatus.text = "Init Warning: ${e.message}"
         }
 
-        btnUpload.setOnClickListener { showUploadChoiceDialog() }
+        btnTopUpload.setOnClickListener { showUploadChoiceDialog() }
+        btnQuickAdd.setOnClickListener { showUploadChoiceDialog() }
         fabUpload.setOnClickListener { showUploadChoiceDialog() }
 
         btnSettings.setOnClickListener { showSettingsDialog() }
-        btnRefresh.setOnClickListener {
-            lifecycleScope.launch {
-                TelegramRepository.loadVaultItems()
+        cardStatusBanner.setOnClickListener {
+            if (TelegramClient.authState.value !is TelegramAuthState.Ready) {
+                showSettingsDialog()
+            } else {
+                Toast.makeText(this, "Refreshing Vault...", Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch {
+                    TelegramRepository.loadVaultItems()
+                }
             }
         }
 
-        btnTabPhotos.setOnClickListener { switchCategory(MediaType.PHOTO) }
-        btnTabVideos.setOnClickListener { switchCategory(MediaType.VIDEO) }
-        btnTabFiles.setOnClickListener { switchCategory(MediaType.DOCUMENT) }
+        tabPhotosContainer.setOnClickListener { switchCategory(MediaType.PHOTO) }
+        tabVideosContainer.setOnClickListener { switchCategory(MediaType.VIDEO) }
+        tabFilesContainer.setOnClickListener { switchCategory(MediaType.DOCUMENT) }
+
+        btnGridToggle.setOnClickListener {
+            isGrid3Col = !isGrid3Col
+            val spanCount = if (isGrid3Col) 3 else 2
+            rvMediaGrid.layoutManager = GridLayoutManager(this, spanCount)
+        }
+
+        btnSortFilter.setOnClickListener {
+            Toast.makeText(this, "Sorted by Newest First", Toast.LENGTH_SHORT).show()
+        }
+
+        navVault.setOnClickListener {
+            switchCategory(MediaType.PHOTO)
+        }
+        navRecent.setOnClickListener {
+            Toast.makeText(this, "Recent items", Toast.LENGTH_SHORT).show()
+        }
+        navStarred.setOnClickListener {
+            Toast.makeText(this, "Starred items (Coming soon)", Toast.LENGTH_SHORT).show()
+        }
+        navTrash.setOnClickListener {
+            Toast.makeText(this, "Trash is empty", Toast.LENGTH_SHORT).show()
+        }
 
         observeAuthState()
         observeVaultItems()
 
-        // Set initial category tab
+        // Initial tab
         switchCategory(MediaType.PHOTO)
     }
 
@@ -126,16 +199,30 @@ class MainActivity : AppCompatActivity() {
     private fun switchCategory(category: MediaType) {
         currentCategory = category
 
-        // Update Tab Button Styles
-        val activeBgColor = getColor(R.color.card_bg)
-        btnTabPhotos.setBackgroundColor(if (category == MediaType.PHOTO) activeBgColor else 0)
-        btnTabVideos.setBackgroundColor(if (category == MediaType.VIDEO) activeBgColor else 0)
-        btnTabFiles.setBackgroundColor(if (category == MediaType.DOCUMENT) activeBgColor else 0)
+        val cyanBright = getColor(R.color.accent_cyan_bright)
+        val tabInactive = getColor(R.color.tab_inactive)
+        val cyanColor = getColor(R.color.accent_cyan)
+        val transparent = getColor(android.R.color.transparent)
 
-        // Update Grid Span: 3 for photos, 2 for videos, 1 for files
+        // Reset Tab Styles
+        tvTabPhotosLabel.setTextColor(if (category == MediaType.PHOTO) cyanBright else tabInactive)
+        tabPhotosIndicator.setBackgroundColor(if (category == MediaType.PHOTO) cyanColor else transparent)
+
+        tvTabVideosLabel.setTextColor(if (category == MediaType.VIDEO) cyanBright else tabInactive)
+        tabVideosIndicator.setBackgroundColor(if (category == MediaType.VIDEO) cyanColor else transparent)
+
+        tvTabFilesLabel.setTextColor(if (category == MediaType.DOCUMENT) cyanBright else tabInactive)
+        tabFilesIndicator.setBackgroundColor(if (category == MediaType.DOCUMENT) cyanColor else transparent)
+
+        tvSectionTitle.text = when (category) {
+            MediaType.PHOTO -> "Photos"
+            MediaType.VIDEO -> "Videos"
+            MediaType.DOCUMENT -> "Files & Documents"
+        }
+
         val spanCount = when (category) {
             MediaType.PHOTO -> 3
-            MediaType.VIDEO -> 2
+            MediaType.VIDEO -> 3
             MediaType.DOCUMENT -> 1
         }
         rvMediaGrid.layoutManager = GridLayoutManager(this, spanCount)
@@ -159,7 +246,7 @@ class MainActivity : AppCompatActivity() {
                 MediaType.PHOTO -> {
                     tvEmptyEmoji.text = "📷"
                     tvEmptyTitle.text = "No Photos Found"
-                    tvEmptySubtitle.text = "Photos sent to your Telegram Saved Messages will appear here in a grid."
+                    tvEmptySubtitle.text = "Photos sent to your Telegram Saved Messages will appear here."
                 }
                 MediaType.VIDEO -> {
                     tvEmptyEmoji.text = "🎬"
@@ -181,7 +268,7 @@ class MainActivity : AppCompatActivity() {
     private fun showUploadChoiceDialog() {
         val options = arrayOf("📷 Upload Photo", "🎬 Upload Video", "📄 Upload File / Document")
         AlertDialog.Builder(this)
-            .setTitle("Upload to Telegram Cloud")
+            .setTitle("Upload to Cloud Vault")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> pickPhotoLauncher.launch("image/*")
@@ -348,7 +435,7 @@ class MainActivity : AppCompatActivity() {
                     is TelegramAuthState.Idle -> tvStatus.text = "Status: Idle"
                     is TelegramAuthState.Initializing -> tvStatus.text = "Status: Initializing TDLib..."
                     is TelegramAuthState.WaitTdlibParameters -> {
-                        tvStatus.text = "Status: Tap ⚙️ Settings to enter API ID & Hash"
+                        tvStatus.text = "Status: Tap to enter Telegram API ID & Hash"
                         if (!TdlibManager.isCredentialsConfigured(this@MainActivity)) {
                             showSettingsDialog()
                         }
@@ -366,7 +453,7 @@ class MainActivity : AppCompatActivity() {
                         showPasswordInputDialog()
                     }
                     is TelegramAuthState.Ready -> {
-                        tvStatus.text = "Status: Connected to Telegram Cloud ☁️"
+                        tvStatus.text = "Status: Connected to Telegram Cloud"
                         TelegramRepository.loadVaultItems()
                     }
                     is TelegramAuthState.Error -> {
