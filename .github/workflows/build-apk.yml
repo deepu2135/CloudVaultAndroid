@@ -31,7 +31,8 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug -Pandroid.aapt2FromMavenOverride="" --no-daemon
+        run: ./gradlew :app:assembleDebug --no-daemon
+
 
 
       - name: Upload Debug APK Artifact
