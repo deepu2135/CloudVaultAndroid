@@ -9,8 +9,10 @@ class CloudVaultApp : Application() {
         super.onCreate()
         Log.d("CloudVaultApp", "Application starting...")
 
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             Log.e("CloudVaultApp", "Uncaught exception on thread ${thread.name}", throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
         }
     }
 }
