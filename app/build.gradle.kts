@@ -40,12 +40,6 @@ android {
             jniLibs.srcDirs("src/main/jniLibs")
         }
     }
-
-    packaging {
-        jniLibs {
-            pickFirsts.add("**/libtdjni.so")
-        }
-    }
 }
 
 dependencies {
@@ -64,5 +58,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // TDLib Java bindings
-    implementation("com.github.tdlibx:td:1.8.56")
+    implementation(files("libs/tdlib-java.jar"))
 }
