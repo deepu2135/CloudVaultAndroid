@@ -21,16 +21,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.drinkless.tdlib.TdApi
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MediaGridAdapter(
     private val scope: CoroutineScope,
     private val onItemClick: (VaultMediaItem) -> Unit
-) : RecyclerView.Adapter<MediaGridAdapter.MediaViewHolder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private var items: List<VaultMediaItem> = emptyList()
-
-    // In-memory LRU cache for downloaded thumbnails & video posters
     companion object {
+        const val TYPE_MEDIA = 1
+        const val TYPE_FILE = 2
+
         private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
         private val cacheSize = maxMemory / 8
         val bitmapCache = object : LruCache<Int, Bitmap>(cacheSize) {
@@ -38,7 +41,11 @@ class MediaGridAdapter(
                 return bitmap.byteCount / 1024
             }
         }
+
+        private val dateFormat = SimpleDateFormat("dd MMM yyyy • hh:mm a", Locale.getDefault())
     }
+
+    private var items: List<VaultMediaItem> = emptyList()
 
     fun submitList(newItems: List<VaultMediaItem>) {
         val diffCallback = object : DiffUtil.Callback() {
@@ -56,17 +63,57 @@ class MediaGridAdapter(
         diffResult.dispatchUpdatesTo(this)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MediaViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_media_card, parent, false)
-        return MediaViewHolder(view)
+    override fun getItemViewType(position: Int): Int {
+        return if (items[position].type == MediaType.DOCUMENT) TYPE_FILE else TYPE_MEDIA
     }
 
-    override fun onBindViewHolder(holder: MediaViewHolder, position: Int) {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return if (viewType == TYPE_FILE) {
+            val view = inflater.inflate(R.layout.item_file_card, parent, false)
+            FileViewHolder(view)
+        } else {
+            val view = inflater.inflate(R.layout.item_media_card, parent, false)
+            MediaViewHolder(view)
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val item = items[position]
-        holder.bind(item)
+        if (holder is MediaViewHolder) {
+            holder.bind(item)
+        } else if (holder is FileViewHolder) {
+            holder.bind(item)
+        }
     }
 
     override fun getItemCount() = items.size
+
+    inner class FileViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvFileName: TextView = itemView.findViewById(R.id.tvFileName)
+        private val tvFileBadge: TextView = itemView.findViewById(R.id.tvFileBadge)
+        private val tvFileSize: TextView = itemView.findViewById(R.id.tvFileSize)
+        private val tvFileDate: TextView = itemView.findViewById(R.id.tvFileDate)
+        private val btnFileMenu: TextView = itemView.findViewById(R.id.btnFileMenu)
+
+        fun bind(item: VaultMediaItem) {
+            tvFileName.text = item.title
+            tvFileSize.text = item.formattedSize
+
+            val ext = item.title.substringAfterLast('.', "").uppercase().ifBlank { "FILE" }
+            tvFileBadge.text = ext
+
+            val formattedDate = if (item.dateAdded > 0) {
+                dateFormat.format(Date(item.dateAdded * 1000L))
+            } else {
+                "Recent"
+            }
+            tvFileDate.text = formattedDate
+
+            itemView.setOnClickListener { onItemClick(item) }
+            btnFileMenu.setOnClickListener { onItemClick(item) }
+        }
+    }
 
     inner class MediaViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
@@ -117,7 +164,6 @@ class MediaGridAdapter(
             val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
 
             if (targetFileId > 0 && (item.type == MediaType.PHOTO || item.type == MediaType.VIDEO || item.thumbnailFileId > 0)) {
-                // Check memory cache first
                 val cached = bitmapCache.get(targetFileId)
                 if (cached != null) {
                     ivThumbnail.setImageBitmap(cached)
@@ -147,7 +193,6 @@ class MediaGridAdapter(
 
         private suspend fun loadOrDownloadThumbnail(fileId: Int, item: VaultMediaItem): Bitmap? {
             return try {
-                // 1. If TDLib thumbnail / photo file ID is available, download and decode it
                 if (item.thumbnailFileId > 0 || item.type == MediaType.PHOTO) {
                     var tdFile = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as TdApi.File
                     if (!tdFile.local.isDownloadingCompleted || tdFile.local.path.isBlank() || !File(tdFile.local.path).exists()) {
@@ -173,7 +218,6 @@ class MediaGridAdapter(
                     }
                 }
 
-                // 2. For video without pre-built thumbnail, extract a frame via the streaming proxy
                 if (item.type == MediaType.VIDEO && item.fileId > 0) {
                     val retriever = MediaMetadataRetriever()
                     try {
@@ -182,7 +226,7 @@ class MediaGridAdapter(
                         val frame = retriever.getFrameAtTime(1000000) ?: retriever.frameAtTime
                         if (frame != null) return frame
                     } catch (e: Throwable) {
-                        // ignore and return null
+                        // ignore
                     } finally {
                         try { retriever.release() } catch (e: Throwable) {}
                     }
