@@ -25,12 +25,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+sealed class VaultDisplayItem {
+    data class Header(val dateTitle: String, val dateTimestamp: Long) : VaultDisplayItem()
+    data class Media(val item: VaultMediaItem) : VaultDisplayItem()
+}
+
 class MediaGridAdapter(
     private val scope: CoroutineScope,
     private val onItemClick: (VaultMediaItem) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
+        const val TYPE_HEADER = 0
         const val TYPE_PHOTO = 1
         const val TYPE_VIDEO = 2
         const val TYPE_FILE = 3
@@ -46,14 +52,20 @@ class MediaGridAdapter(
         private val dateFormat = SimpleDateFormat("dd MMM yyyy • hh:mm a", Locale.getDefault())
     }
 
-    private var items: List<VaultMediaItem> = emptyList()
+    private var items: List<VaultDisplayItem> = emptyList()
 
-    fun submitList(newItems: List<VaultMediaItem>) {
+    fun submitList(newItems: List<VaultDisplayItem>) {
         val diffCallback = object : DiffUtil.Callback() {
             override fun getOldListSize() = items.size
             override fun getNewListSize() = newItems.size
             override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                return items[oldItemPosition].id == newItems[newItemPosition].id
+                val old = items[oldItemPosition]
+                val new = newItems[newItemPosition]
+                return when {
+                    old is VaultDisplayItem.Header && new is VaultDisplayItem.Header -> old.dateTitle == new.dateTitle
+                    old is VaultDisplayItem.Media && new is VaultDisplayItem.Media -> old.item.id == new.item.id
+                    else -> false
+                }
             }
             override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
                 return items[oldItemPosition] == newItems[newItemPosition]
@@ -65,16 +77,23 @@ class MediaGridAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
-        return when (items[position].type) {
-            MediaType.PHOTO -> TYPE_PHOTO
-            MediaType.VIDEO -> TYPE_VIDEO
-            MediaType.DOCUMENT -> TYPE_FILE
+        return when (val item = items[position]) {
+            is VaultDisplayItem.Header -> TYPE_HEADER
+            is VaultDisplayItem.Media -> when (item.item.type) {
+                MediaType.PHOTO -> TYPE_PHOTO
+                MediaType.VIDEO -> TYPE_VIDEO
+                MediaType.DOCUMENT -> TYPE_FILE
+            }
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
+            TYPE_HEADER -> {
+                val view = inflater.inflate(R.layout.item_date_header, parent, false)
+                HeaderViewHolder(view)
+            }
             TYPE_PHOTO -> {
                 val view = inflater.inflate(R.layout.item_photo_square, parent, false)
                 PhotoSquareViewHolder(view)
@@ -91,15 +110,27 @@ class MediaGridAdapter(
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        val item = items[position]
-        when (holder) {
-            is PhotoSquareViewHolder -> holder.bind(item)
-            is MediaViewHolder -> holder.bind(item)
-            is FileViewHolder -> holder.bind(item)
+        when (val item = items[position]) {
+            is VaultDisplayItem.Header -> (holder as? HeaderViewHolder)?.bind(item)
+            is VaultDisplayItem.Media -> {
+                when (holder) {
+                    is PhotoSquareViewHolder -> holder.bind(item.item)
+                    is MediaViewHolder -> holder.bind(item.item)
+                    is FileViewHolder -> holder.bind(item.item)
+                }
+            }
         }
     }
 
     override fun getItemCount() = items.size
+
+    inner class HeaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvDateHeader: TextView = itemView.findViewById(R.id.tvDateHeader)
+
+        fun bind(header: VaultDisplayItem.Header) {
+            tvDateHeader.text = header.dateTitle
+        }
+    }
 
     inner class PhotoSquareViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)

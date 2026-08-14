@@ -34,6 +34,10 @@ import kotlinx.coroutines.withContext
 import org.drinkless.tdlib.TdApi
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 enum class VaultSortOrder(val label: String) {
     NEWEST("Newest ⌵"),
@@ -231,8 +235,41 @@ class MainActivity : AppCompatActivity() {
         mediaAdapter = MediaGridAdapter(lifecycleScope) { item ->
             handleMediaItemClick(item)
         }
-        rvMediaGrid.layoutManager = GridLayoutManager(this, 3)
+        val gridLayoutManager = GridLayoutManager(this, 3).apply {
+            spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int {
+                    return when (mediaAdapter.getItemViewType(position)) {
+                        MediaGridAdapter.TYPE_HEADER, MediaGridAdapter.TYPE_FILE -> 3
+                        else -> 1
+                    }
+                }
+            }
+        }
+        rvMediaGrid.layoutManager = gridLayoutManager
         rvMediaGrid.adapter = mediaAdapter
+    }
+
+    private val sectionDateHeaderFormat = SimpleDateFormat("MMM d", Locale.getDefault())
+    private val sectionDateHeaderYearFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+
+    private fun formatDateHeader(timestampSecs: Long): String {
+        if (timestampSecs <= 0L) return "Earlier"
+        val fileCal = Calendar.getInstance().apply { timeInMillis = timestampSecs * 1000L }
+        val nowCal = Calendar.getInstance()
+
+        val isSameYear = fileCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR)
+        val isSameDay = isSameYear && fileCal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
+
+        val yesterdayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+        val isYesterday = yesterdayCal.get(Calendar.YEAR) == fileCal.get(Calendar.YEAR) &&
+                yesterdayCal.get(Calendar.DAY_OF_YEAR) == fileCal.get(Calendar.DAY_OF_YEAR)
+
+        return when {
+            isSameDay -> "Today"
+            isYesterday -> "Yesterday"
+            isSameYear -> sectionDateHeaderFormat.format(Date(timestampSecs * 1000L))
+            else -> sectionDateHeaderYearFormat.format(Date(timestampSecs * 1000L))
+        }
     }
 
     private fun switchCategory(category: MediaType) {
@@ -259,13 +296,6 @@ class MainActivity : AppCompatActivity() {
             MediaType.DOCUMENT -> "Files & Documents"
         }
 
-        val spanCount = when (category) {
-            MediaType.PHOTO -> 3
-            MediaType.VIDEO -> 3
-            MediaType.DOCUMENT -> 1
-        }
-        rvMediaGrid.layoutManager = GridLayoutManager(this, spanCount)
-
         updateDisplayedItems()
     }
 
@@ -285,7 +315,19 @@ class MainActivity : AppCompatActivity() {
             VaultSortOrder.SIZE_ASC -> rawItems.sortedBy { it.sizeBytes }
         }
 
-        mediaAdapter.submitList(items)
+        val displayItems = if (currentCategory == MediaType.PHOTO) {
+            val list = mutableListOf<VaultDisplayItem>()
+            val grouped = items.groupBy { formatDateHeader(it.dateAdded) }
+            for ((dateHeader, mediaList) in grouped) {
+                list.add(VaultDisplayItem.Header(dateHeader, mediaList.firstOrNull()?.dateAdded ?: 0L))
+                mediaList.forEach { list.add(VaultDisplayItem.Media(it)) }
+            }
+            list
+        } else {
+            items.map { VaultDisplayItem.Media(it) }
+        }
+
+        mediaAdapter.submitList(displayItems)
 
         if (items.isEmpty()) {
             layoutEmptyState.visibility = View.VISIBLE
