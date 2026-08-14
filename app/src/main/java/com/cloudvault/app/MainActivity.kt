@@ -41,11 +41,16 @@ class MainActivity : AppCompatActivity() {
         tvContentSummary = findViewById(R.id.tvContentSummary)
         playerView = findViewById(R.id.playerView)
 
-        // Start Local Range Streaming Proxy
-        TelegramStreamingProxy.start()
+        try {
+            // Start Local Range Streaming Proxy on background thread
+            TelegramStreamingProxy.start()
 
-        // Initialize TDLib
-        TelegramClient.initialize(applicationContext)
+            // Initialize TDLib
+            TelegramClient.initialize(applicationContext)
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "App init exception", e)
+            tvStatus.text = "Init Warning: ${e.message}"
+        }
 
         btnSettings.setOnClickListener { showSettingsDialog() }
         btnRefresh.setOnClickListener {

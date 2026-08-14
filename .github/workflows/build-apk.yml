@@ -27,8 +27,8 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
+      - name: Configure AAPT2 for CI
+        run: sed -i '/android.aapt2FromMavenOverride/d' gradle.properties
 
       - name: Build Debug APK
         run: ./gradlew :app:assembleDebug --no-daemon

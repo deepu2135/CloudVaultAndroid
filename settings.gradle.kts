@@ -14,10 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-if (java.io.File("/usr/bin/aapt2").exists()) {
-    System.setProperty("android.aapt2FromMavenOverride", "/usr/bin/aapt2")
-}
-
 rootProject.name = "CloudVault"
 include(":app")
+
 

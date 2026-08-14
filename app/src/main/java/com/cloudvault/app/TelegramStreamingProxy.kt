@@ -25,13 +25,15 @@ object TelegramStreamingProxy {
 
     fun start() {
         if (isRunning) return
-        try {
-            serverSocket = ServerSocket(0)
-            port = serverSocket?.localPort ?: 8080
-            isRunning = true
-            Log.d(TAG, "Local Range Streaming Proxy started on port $port")
+        isRunning = true
 
-            thread(name = "CloudVaultProxyThread") {
+        thread(name = "CloudVaultProxyThread") {
+            try {
+                val socket = ServerSocket(0)
+                serverSocket = socket
+                port = socket.localPort
+                Log.d(TAG, "Local Range Streaming Proxy started on port $port")
+
                 while (isRunning) {
                     try {
                         val clientSocket = serverSocket?.accept() ?: break
@@ -41,9 +43,9 @@ object TelegramStreamingProxy {
                         Log.e(TAG, "Socket accept error", e)
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start streaming proxy socket", e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start streaming proxy", e)
         }
     }
 
