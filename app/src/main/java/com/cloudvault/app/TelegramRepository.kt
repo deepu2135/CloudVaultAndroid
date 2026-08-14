@@ -40,18 +40,20 @@ object TelegramRepository {
             for (msg in history.messages) {
                 when (val content = msg.content) {
                     is TdApi.MessagePhoto -> {
-                        val photo = content.photo.sizes.lastOrNull() ?: continue
+                        val fullPhoto = content.photo.sizes.lastOrNull() ?: continue
+                        val thumbPhoto = content.photo.sizes.firstOrNull()
                         photoList.add(
                             VaultMediaItem(
                                 id = "photo_${msg.id}",
                                 title = "Photo_${msg.date}.jpg",
-                                sizeBytes = photo.photo.size.toLong(),
-                                formattedSize = formatSize(photo.photo.size.toLong()),
+                                sizeBytes = fullPhoto.photo.size.toLong(),
+                                formattedSize = formatSize(fullPhoto.photo.size.toLong()),
                                 mimeType = "image/jpeg",
                                 type = MediaType.PHOTO,
                                 chatId = msg.chatId,
                                 messageId = msg.id,
-                                fileId = photo.photo.id,
+                                fileId = fullPhoto.photo.id,
+                                thumbnailFileId = thumbPhoto?.photo?.id ?: fullPhoto.photo.id,
                                 dateAdded = msg.date.toLong()
                             )
                         )
@@ -68,6 +70,7 @@ object TelegramRepository {
                                 chatId = msg.chatId,
                                 messageId = msg.id,
                                 fileId = content.video.video.id,
+                                thumbnailFileId = content.video.thumbnail?.file?.id ?: 0,
                                 dateAdded = msg.date.toLong()
                             )
                         )
@@ -84,6 +87,7 @@ object TelegramRepository {
                                 chatId = msg.chatId,
                                 messageId = msg.id,
                                 fileId = content.document.document.id,
+                                thumbnailFileId = content.document.thumbnail?.file?.id ?: 0,
                                 dateAdded = msg.date.toLong()
                             )
                         )

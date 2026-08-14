@@ -95,23 +95,66 @@
         android:visibility="gone"
         android:background="#000000" />
 
-    <!-- Content Area -->
-    <ScrollView
+    <!-- Content Area: RecyclerView Grid -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="16dp"
-        android:background="@color/card_bg"
-        android:padding="12dp">
+        android:layout_marginTop="16dp">
 
-        <TextView
-            android:id="@+id/tvContentSummary"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvMediaGrid"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Select a category above to view your CloudVault media."
-            android:textColor="@color/text_secondary"
-            android:textSize="15sp"
-            android:lineSpacingExtra="4dp" />
-    </ScrollView>
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="2dp"
+            android:scrollbars="vertical" />
+
+        <!-- Empty State View -->
+        <LinearLayout
+            android:id="@+id/layoutEmptyState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="24dp">
+
+            <TextView
+                android:id="@+id/tvEmptyEmoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📷"
+                android:textSize="48sp" />
+
+            <TextView
+                android:id="@+id/tvEmptyTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Select a category above"
+                android:textColor="@color/text_primary"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvEmptySubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="Photos, videos, and documents stored in your Telegram Saved Messages will appear here."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Loading Spinner -->
+        <ProgressBar
+            android:id="@+id/pbLoading"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
 </LinearLayout>

@@ -13,6 +13,7 @@ data class VaultMediaItem(
     val chatId: Long,
     val messageId: Long,
     val fileId: Int,
+    val thumbnailFileId: Int = 0,
     val dateAdded: Long
 )
 

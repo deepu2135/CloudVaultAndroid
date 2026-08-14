@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Fullscreen Image -->
+    <ImageView
+        android:id="@+id/ivFullPhoto"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:contentDescription="Full Photo Preview" />
+
+    <!-- Loading Spinner -->
+    <ProgressBar
+        android:id="@+id/pbFullPhotoLoading"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center" />
+
+    <!-- Top Overlay: Title and Close -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#80000000"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvViewerTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Photo.jpg"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tvViewerSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="2.4 MB"
+                android:textColor="#CCCCCC"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDownloadPhoto"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="💾 Save"
+            android:textColor="#FFFFFF"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCloseViewer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✕"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            style="@style/Widget.MaterialComponents.Button.TextButton" />
+    </LinearLayout>
+
+</FrameLayout>
