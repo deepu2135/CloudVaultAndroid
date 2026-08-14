@@ -80,8 +80,8 @@ class MediaGridAdapter(
                 PhotoSquareViewHolder(view)
             }
             TYPE_VIDEO -> {
-                val view = inflater.inflate(R.layout.item_video_square, parent, false)
-                VideoSquareViewHolder(view)
+                val view = inflater.inflate(R.layout.item_media_card, parent, false)
+                MediaViewHolder(view)
             }
             else -> {
                 val view = inflater.inflate(R.layout.item_file_card, parent, false)
@@ -94,7 +94,7 @@ class MediaGridAdapter(
         val item = items[position]
         when (holder) {
             is PhotoSquareViewHolder -> holder.bind(item)
-            is VideoSquareViewHolder -> holder.bind(item)
+            is MediaViewHolder -> holder.bind(item)
             is FileViewHolder -> holder.bind(item)
         }
     }
@@ -143,23 +143,39 @@ class MediaGridAdapter(
         }
     }
 
-    inner class VideoSquareViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    inner class MediaViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
         private val tvPlaceholderIcon: TextView = itemView.findViewById(R.id.tvPlaceholderIcon)
+        private val tvBadgeIcon: TextView = itemView.findViewById(R.id.tvBadgeIcon)
+        private val badgeVideoOverlay: FrameLayout = itemView.findViewById(R.id.badgeVideoOverlay)
         private val pbThumbLoading: ProgressBar = itemView.findViewById(R.id.pbThumbLoading)
+        private val tvMediaTitle: TextView = itemView.findViewById(R.id.tvMediaTitle)
+        private val tvMediaSize: TextView = itemView.findViewById(R.id.tvMediaSize)
+        private val btnItemMenu: TextView = itemView.findViewById(R.id.btnItemMenu)
+
         private var loadJob: Job? = null
 
         fun bind(item: VaultMediaItem) {
             loadJob?.cancel()
 
+            tvMediaTitle.text = item.title
+            tvMediaSize.text = item.formattedSize
+
+            // Reset views
             ivThumbnail.setImageDrawable(null)
             ivThumbnail.visibility = View.GONE
             tvPlaceholderIcon.visibility = View.VISIBLE
             pbThumbLoading.visibility = View.GONE
 
+            tvPlaceholderIcon.text = "🎬"
+            tvBadgeIcon.text = "🎬"
+            badgeVideoOverlay.visibility = View.VISIBLE
+
             itemView.setOnClickListener { onItemClick(item) }
+            btnItemMenu.setOnClickListener { onItemClick(item) }
 
             val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
+
             if (targetFileId > 0) {
                 val cached = bitmapCache.get(targetFileId)
                 if (cached != null) {
