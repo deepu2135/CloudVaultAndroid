@@ -72,6 +72,12 @@ class VlcPlayerActivity : AppCompatActivity() {
 
         val fileId = intent.getIntExtra("FILE_ID", 0)
         val title = intent.getStringExtra("TITLE") ?: "Video"
+        val chatId = intent.getLongExtra("CHAT_ID", 0L)
+        val messageId = intent.getLongExtra("MESSAGE_ID", 0L)
+
+        if (fileId != 0 && chatId != 0L && messageId != 0L) {
+            TelegramStreamingProxy.registerFileMessage(fileId, chatId, messageId)
+        }
 
         vlcRoot = findViewById(R.id.vlcRoot)
         vlcVideoLayout = findViewById(R.id.vlcVideoLayout)

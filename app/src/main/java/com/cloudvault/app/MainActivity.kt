@@ -446,41 +446,20 @@ class MainActivity : AppCompatActivity() {
                 TelegramStreamingProxy.registerFileMessage(item.fileId, item.chatId, item.messageId)
             }
 
-            val isMkv = item.title.endsWith(".mkv", ignoreCase = true) || item.mimeType.contains("matroska", ignoreCase = true)
-            val mimeType = if (isMkv) "video/x-matroska" else "video/*"
             val streamUrl = TelegramStreamingProxy.getUrl(item.fileId, item.title, item.sizeBytes, item.chatId, item.messageId)
 
-            val baseIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(Uri.parse(streamUrl), mimeType)
-                putExtra("title", item.title)
-                putExtra("filename", item.title)
-                putExtra("return_result", true)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            val intent = Intent(this, VlcPlayerActivity::class.java).apply {
+                putExtra("FILE_ID", item.fileId)
+                putExtra("TITLE", item.title)
+                putExtra("STREAM_URL", streamUrl)
+                putExtra("CHAT_ID", item.chatId)
+                putExtra("MESSAGE_ID", item.messageId)
+                putExtra("SIZE_BYTES", item.sizeBytes)
             }
-
-            // Try external VLC (org.videolan.vlc)
-            val vlcIntent = Intent(baseIntent).apply { setPackage("org.videolan.vlc") }
-            try {
-                startActivity(vlcIntent)
-                return
-            } catch (_: Exception) {}
-
-            // Try internal embedded VLC player
-            try {
-                val internalIntent = Intent(this, VlcPlayerActivity::class.java).apply {
-                    putExtra("FILE_ID", item.fileId)
-                    putExtra("TITLE", item.title)
-                }
-                startActivity(internalIntent)
-                return
-            } catch (_: Exception) {}
-
-            // Fallback to system video player chooser
-            val chooser = Intent.createChooser(baseIntent, "Play Video with...")
-            startActivity(chooser)
+            startActivity(intent)
 
         } catch (e: Throwable) {
-            android.util.Log.e("MainActivity", "Failed to launch video player", e)
+            android.util.Log.e("MainActivity", "Failed to launch in-app VLC player", e)
             Toast.makeText(this, "Playback Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
