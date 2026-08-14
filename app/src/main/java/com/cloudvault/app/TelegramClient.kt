@@ -27,6 +27,7 @@ object TelegramClient {
     private var client: Client? = null
     private var isLibraryLoaded = false
     private var libraryLoadError: String? = null
+    @Volatile private var currentTdlibAuthState: TdApi.AuthorizationState? = null
 
     var isAvailable: Boolean = false
         private set
@@ -82,6 +83,7 @@ object TelegramClient {
     private fun handleUpdate(context: Context, update: TdApi.Object) {
         when (update) {
             is TdApi.UpdateAuthorizationState -> {
+                currentTdlibAuthState = update.authorizationState
                 when (update.authorizationState) {
                     is TdApi.AuthorizationStateWaitTdlibParameters -> sendTdlibParameters(context)
                     is TdApi.AuthorizationStateWaitPhoneNumber -> _authState.value = TelegramAuthState.WaitPhoneNumber
@@ -93,6 +95,7 @@ object TelegramClient {
                     }
                     is TdApi.AuthorizationStateClosed -> {
                         client = null
+                        currentTdlibAuthState = null
                         _authState.value = TelegramAuthState.Idle
                     }
                 }
@@ -106,6 +109,18 @@ object TelegramClient {
 
         if (inputApiId <= 0 || inputApiHash.isBlank()) {
             _authState.value = TelegramAuthState.WaitTdlibParameters
+            return
+        }
+
+        val state = currentTdlibAuthState
+        if (state != null && state !is TdApi.AuthorizationStateWaitTdlibParameters) {
+            when (state) {
+                is TdApi.AuthorizationStateWaitPhoneNumber -> _authState.value = TelegramAuthState.WaitPhoneNumber
+                is TdApi.AuthorizationStateWaitCode -> _authState.value = TelegramAuthState.WaitCode
+                is TdApi.AuthorizationStateWaitPassword -> _authState.value = TelegramAuthState.WaitPassword
+                is TdApi.AuthorizationStateReady -> _authState.value = TelegramAuthState.Ready
+                else -> {}
+            }
             return
         }
 
@@ -127,8 +142,12 @@ object TelegramClient {
 
         client?.send(parameters) { result ->
             if (result is TdApi.Error) {
-                Log.e(TAG, "SetTdlibParameters failed: ${result.message}")
-                _authState.value = TelegramAuthState.Error(result.message)
+                if (result.message.contains("Unexpected setTdlibParameters", ignoreCase = true)) {
+                    Log.d(TAG, "TDLib parameters already accepted, ignoring duplicate error")
+                } else {
+                    Log.e(TAG, "SetTdlibParameters failed: ${result.message}")
+                    _authState.value = TelegramAuthState.Error(result.message)
+                }
             }
         }
     }
