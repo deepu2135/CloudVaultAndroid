@@ -101,9 +101,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* result handled */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                requestNotificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         tvStatus = findViewById(R.id.tvStatus)
         cardStatusBanner = findViewById(R.id.cardStatusBanner)
@@ -324,15 +338,25 @@ class MainActivity : AppCompatActivity() {
 
             var successCount = 0
             for ((index, uri) in uris.withIndex()) {
+                val current = index + 1
                 val (tempFile, displayName) = copyUriToTempFile(uri) ?: continue
+
+                UploadNotificationManager.showProgress(applicationContext, current, total, displayName)
+
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Uploading (${index + 1}/$total): $displayName...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Uploading ($current/$total): $displayName...", Toast.LENGTH_SHORT).show()
                 }
 
                 val success = TelegramRepository.uploadFile(tempFile.absolutePath, mediaType, displayName)
                 if (success) {
                     successCount++
                 }
+            }
+
+            if (successCount > 0) {
+                UploadNotificationManager.showComplete(applicationContext, successCount, total)
+            } else {
+                UploadNotificationManager.showError(applicationContext, "Failed to upload selected item(s)")
             }
 
             withContext(Dispatchers.Main) {
