@@ -35,7 +35,7 @@ object DownloadManager {
 
         scope.launch {
             try {
-                TelegramClient.sendRequest(TdApi.DownloadFile(fileId, 32, 0, 0, false))
+                TelegramClient.sendRequest(TdApi.DownloadFile(fileId, 32, 0L, 0L, false))
                 
                 var isDone = false
                 while (!isDone) {

@@ -98,17 +98,17 @@ object TelegramClient {
     }
 
     private fun sendTdlibParameters(context: Context) {
-        val apiId = TdlibManager.getApiId(context)
-        val apiHash = TdlibManager.getApiHash(context)
+        val inputApiId = TdlibManager.getApiId(context)
+        val inputApiHash = TdlibManager.getApiHash(context)
 
-        if (apiId <= 0 || apiHash.isBlank()) {
+        if (inputApiId <= 0 || inputApiHash.isBlank()) {
             _authState.value = TelegramAuthState.Error("API ID & Hash missing. Set them in Settings.")
             return
         }
 
         val parameters = TdApi.SetTdlibParameters().apply {
-            apiId = apiId
-            apiHash = apiHash
+            apiId = inputApiId
+            apiHash = inputApiHash
             systemLanguageCode = "en"
             deviceModel = Build.MODEL
             systemVersion = Build.VERSION.RELEASE
@@ -124,7 +124,7 @@ object TelegramClient {
                 Log.e(TAG, "SetTdlibParameters failed: ${result.message}")
                 _authState.value = TelegramAuthState.Error(result.message)
             } else {
-                client?.send(TdApi.CheckDatabaseEncryptionKey()) {}
+                client?.send(TdApi.SetDatabaseEncryptionKey()) {}
             }
         }
     }

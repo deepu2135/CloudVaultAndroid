@@ -111,7 +111,7 @@ object TelegramStreamingProxy {
 
             // Request TDLib file range download
             TelegramClient.sendRequest(
-                TdApi.DownloadFile(fileId, 32, startByte.toInt(), CHUNK_SIZE, false)
+                TdApi.DownloadFile(fileId, 32, startByte, CHUNK_SIZE.toLong(), false)
             )
 
             // Dynamic stream loop
@@ -139,7 +139,7 @@ object TelegramStreamingProxy {
                     } else {
                         // Request next chunk download
                         TelegramClient.sendRequest(
-                            TdApi.DownloadFile(fileId, 32, currentPos.toInt(), CHUNK_SIZE, false)
+                            TdApi.DownloadFile(fileId, 32, currentPos, CHUNK_SIZE.toLong(), false)
                         )
                         delay(100)
                     }
