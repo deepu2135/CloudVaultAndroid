@@ -48,6 +48,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private lateinit var btnVlcPrev: TextView
     private lateinit var btnVlcNext: TextView
     private lateinit var btnVlcFullscreen: LinearLayout
+    private lateinit var tvFullscreenLabel: TextView
 
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
@@ -105,6 +106,7 @@ class VlcPlayerActivity : AppCompatActivity() {
         btnVlcPrev = findViewById(R.id.btnVlcPrev)
         btnVlcNext = findViewById(R.id.btnVlcNext)
         btnVlcFullscreen = findViewById(R.id.btnVlcFullscreen)
+        tvFullscreenLabel = findViewById(R.id.tvFullscreenLabel)
 
         tvVlcTitle.text = title
 
@@ -361,17 +363,32 @@ class VlcPlayerActivity : AppCompatActivity() {
     }
 
     private var currentAspectIndex = 0
-    private val aspectRatios = arrayOf("FIT", "FILL", "16:9", "4:3", "ORIGINAL")
+    private val aspectModes = arrayOf("Fit Screen", "Fill", "Fit (Original)")
+
     private fun cycleAspectRatio() {
-        currentAspectIndex = (currentAspectIndex + 1) % aspectRatios.size
-        val mode = aspectRatios[currentAspectIndex]
-        mediaPlayer?.aspectRatio = when (mode) {
-            "16:9" -> "16:9"
-            "4:3" -> "4:3"
-            "FILL" -> "1:1"
-            else -> null
+        val player = mediaPlayer ?: return
+        currentAspectIndex = (currentAspectIndex + 1) % aspectModes.size
+        val mode = aspectModes[currentAspectIndex]
+
+        when (currentAspectIndex) {
+            0 -> {
+                // Fit Screen (Scale to fit without cropping)
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
+                player.aspectRatio = null
+            }
+            1 -> {
+                // Fill (Full screen edge-to-edge crop)
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
+                player.aspectRatio = null
+            }
+            2 -> {
+                // Fit (Original) (1:1 Original aspect ratio)
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_ORIGINAL
+                player.aspectRatio = null
+            }
         }
-        Toast.makeText(this, "Aspect Ratio: $mode", Toast.LENGTH_SHORT).show()
+        tvFullscreenLabel.text = mode
+        Toast.makeText(this, "Screen: $mode", Toast.LENGTH_SHORT).show()
     }
 
     private fun scheduleControlsAutoHide() {

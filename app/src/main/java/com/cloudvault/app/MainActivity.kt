@@ -82,17 +82,23 @@ class MainActivity : AppCompatActivity() {
 
     private var currentSortOrder: VaultSortOrder = VaultSortOrder.NEWEST
 
-    // Activity Result Launchers for picking media
-    private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { handleMediaUpload(it, MediaType.PHOTO) }
+    // Activity Result Launchers for picking single or multiple media items
+    private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri>? ->
+        if (!uris.isNullOrEmpty()) {
+            handleBatchMediaUpload(uris, MediaType.PHOTO)
+        }
     }
 
-    private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { handleMediaUpload(it, MediaType.VIDEO) }
+    private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri>? ->
+        if (!uris.isNullOrEmpty()) {
+            handleBatchMediaUpload(uris, MediaType.VIDEO)
+        }
     }
 
-    private val pickFileLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { handleMediaUpload(it, MediaType.DOCUMENT) }
+    private val pickFileLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri>? ->
+        if (!uris.isNullOrEmpty()) {
+            handleBatchMediaUpload(uris, MediaType.DOCUMENT)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -308,30 +314,40 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun handleMediaUpload(uri: Uri, mediaType: MediaType) {
+    private fun handleBatchMediaUpload(uris: List<Uri>, mediaType: MediaType) {
+        if (uris.isEmpty()) return
         lifecycleScope.launch(Dispatchers.IO) {
-            val (tempFile, displayName) = copyUriToTempFile(uri) ?: run {
+            val total = uris.size
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Preparing to upload $total item(s)...", Toast.LENGTH_SHORT).show()
+            }
+
+            var successCount = 0
+            for ((index, uri) in uris.withIndex()) {
+                val (tempFile, displayName) = copyUriToTempFile(uri) ?: continue
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity, "Failed to read selected file", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Uploading (${index + 1}/$total): $displayName...", Toast.LENGTH_SHORT).show()
                 }
-                return@launch
-            }
 
-            withContext(Dispatchers.Main) {
-                Toast.makeText(this@MainActivity, "Uploading $displayName to Telegram...", Toast.LENGTH_SHORT).show()
-            }
-
-            val success = TelegramRepository.uploadFile(tempFile.absolutePath, mediaType, displayName)
-
-            withContext(Dispatchers.Main) {
+                val success = TelegramRepository.uploadFile(tempFile.absolutePath, mediaType, displayName)
                 if (success) {
-                    Toast.makeText(this@MainActivity, "Uploaded $displayName successfully! ☁️", Toast.LENGTH_LONG).show()
+                    successCount++
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                if (successCount > 0) {
+                    Toast.makeText(this@MainActivity, "Uploaded $successCount of $total item(s) to Telegram Cloud! ☁️", Toast.LENGTH_LONG).show()
                     switchCategory(mediaType)
                 } else {
-                    Toast.makeText(this@MainActivity, "Failed to upload $displayName", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, "Failed to upload selected item(s)", Toast.LENGTH_LONG).show()
                 }
             }
         }
+    }
+
+    private fun handleMediaUpload(uri: Uri, mediaType: MediaType) {
+        handleBatchMediaUpload(listOf(uri), mediaType)
     }
 
     private fun copyUriToTempFile(uri: Uri): Pair<File, String>? {

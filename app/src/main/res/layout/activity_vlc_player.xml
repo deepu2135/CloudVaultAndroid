@@ -343,9 +343,10 @@
                         android:textSize="18sp" />
 
                     <TextView
+                        android:id="@+id/tvFullscreenLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Fullscreen"
+                        android:text="Fit Screen"
                         android:textColor="#AAAAAA"
                         android:textSize="9sp" />
                 </LinearLayout>
