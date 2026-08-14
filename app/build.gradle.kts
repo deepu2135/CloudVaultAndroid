@@ -35,11 +35,6 @@ android {
         jvmTarget = "17"
     }
 
-    sourceSets {
-        named("main") {
-            jniLibs.srcDirs("src/main/jniLibs")
-        }
-    }
 }
 
 dependencies {
@@ -57,6 +52,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // TDLib Java bindings
-    implementation(files("libs/tdlib-java.jar"))
+    // TDLib (AAR containing matched TdApi and native libtdjni.so)
+    implementation(files("libs/tdlib.aar"))
 }

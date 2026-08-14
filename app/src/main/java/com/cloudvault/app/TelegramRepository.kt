@@ -107,16 +107,18 @@ object TelegramRepository {
 
         val inputContent: TdApi.InputMessageContent = when (mediaType) {
             MediaType.PHOTO -> TdApi.InputMessagePhoto().apply {
-                photo = inputFile
+                photo = TdApi.InputPhoto().apply { photo = inputFile }
                 caption = formattedCaption
             }
             MediaType.VIDEO -> TdApi.InputMessageVideo().apply {
-                video = inputFile
+                video = TdApi.InputVideo().apply {
+                    video = inputFile
+                    supportsStreaming = true
+                }
                 caption = formattedCaption
-                supportsStreaming = true
             }
             MediaType.DOCUMENT -> TdApi.InputMessageDocument().apply {
-                document = inputFile
+                document = TdApi.InputDocument().apply { document = inputFile }
                 caption = formattedCaption
             }
         }
