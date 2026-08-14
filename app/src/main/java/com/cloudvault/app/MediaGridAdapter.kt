@@ -31,8 +31,9 @@ class MediaGridAdapter(
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
-        const val TYPE_MEDIA = 1
-        const val TYPE_FILE = 2
+        const val TYPE_PHOTO = 1
+        const val TYPE_VIDEO = 2
+        const val TYPE_FILE = 3
 
         private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
         private val cacheSize = maxMemory / 8
@@ -64,30 +65,125 @@ class MediaGridAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
-        return if (items[position].type == MediaType.DOCUMENT) TYPE_FILE else TYPE_MEDIA
+        return when (items[position].type) {
+            MediaType.PHOTO -> TYPE_PHOTO
+            MediaType.VIDEO -> TYPE_VIDEO
+            MediaType.DOCUMENT -> TYPE_FILE
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
-        return if (viewType == TYPE_FILE) {
-            val view = inflater.inflate(R.layout.item_file_card, parent, false)
-            FileViewHolder(view)
-        } else {
-            val view = inflater.inflate(R.layout.item_media_card, parent, false)
-            MediaViewHolder(view)
+        return when (viewType) {
+            TYPE_PHOTO -> {
+                val view = inflater.inflate(R.layout.item_photo_square, parent, false)
+                PhotoSquareViewHolder(view)
+            }
+            TYPE_VIDEO -> {
+                val view = inflater.inflate(R.layout.item_video_square, parent, false)
+                VideoSquareViewHolder(view)
+            }
+            else -> {
+                val view = inflater.inflate(R.layout.item_file_card, parent, false)
+                FileViewHolder(view)
+            }
         }
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val item = items[position]
-        if (holder is MediaViewHolder) {
-            holder.bind(item)
-        } else if (holder is FileViewHolder) {
-            holder.bind(item)
+        when (holder) {
+            is PhotoSquareViewHolder -> holder.bind(item)
+            is VideoSquareViewHolder -> holder.bind(item)
+            is FileViewHolder -> holder.bind(item)
         }
     }
 
     override fun getItemCount() = items.size
+
+    inner class PhotoSquareViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
+        private val tvPlaceholderIcon: TextView = itemView.findViewById(R.id.tvPlaceholderIcon)
+        private val pbThumbLoading: ProgressBar = itemView.findViewById(R.id.pbThumbLoading)
+        private var loadJob: Job? = null
+
+        fun bind(item: VaultMediaItem) {
+            loadJob?.cancel()
+
+            ivThumbnail.setImageDrawable(null)
+            ivThumbnail.visibility = View.GONE
+            tvPlaceholderIcon.visibility = View.VISIBLE
+            pbThumbLoading.visibility = View.GONE
+
+            itemView.setOnClickListener { onItemClick(item) }
+
+            val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
+            if (targetFileId > 0) {
+                val cached = bitmapCache.get(targetFileId)
+                if (cached != null) {
+                    ivThumbnail.setImageBitmap(cached)
+                    ivThumbnail.visibility = View.VISIBLE
+                    tvPlaceholderIcon.visibility = View.GONE
+                } else {
+                    pbThumbLoading.visibility = View.VISIBLE
+                    loadJob = scope.launch(Dispatchers.IO) {
+                        val bitmap = loadOrDownloadThumbnail(targetFileId, item)
+                        withContext(Dispatchers.Main) {
+                            pbThumbLoading.visibility = View.GONE
+                            if (bitmap != null) {
+                                bitmapCache.put(targetFileId, bitmap)
+                                ivThumbnail.setImageBitmap(bitmap)
+                                ivThumbnail.visibility = View.VISIBLE
+                                tvPlaceholderIcon.visibility = View.GONE
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    inner class VideoSquareViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
+        private val tvPlaceholderIcon: TextView = itemView.findViewById(R.id.tvPlaceholderIcon)
+        private val pbThumbLoading: ProgressBar = itemView.findViewById(R.id.pbThumbLoading)
+        private var loadJob: Job? = null
+
+        fun bind(item: VaultMediaItem) {
+            loadJob?.cancel()
+
+            ivThumbnail.setImageDrawable(null)
+            ivThumbnail.visibility = View.GONE
+            tvPlaceholderIcon.visibility = View.VISIBLE
+            pbThumbLoading.visibility = View.GONE
+
+            itemView.setOnClickListener { onItemClick(item) }
+
+            val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
+            if (targetFileId > 0) {
+                val cached = bitmapCache.get(targetFileId)
+                if (cached != null) {
+                    ivThumbnail.setImageBitmap(cached)
+                    ivThumbnail.visibility = View.VISIBLE
+                    tvPlaceholderIcon.visibility = View.GONE
+                } else {
+                    pbThumbLoading.visibility = View.VISIBLE
+                    loadJob = scope.launch(Dispatchers.IO) {
+                        val bitmap = loadOrDownloadThumbnail(targetFileId, item)
+                        withContext(Dispatchers.Main) {
+                            pbThumbLoading.visibility = View.GONE
+                            if (bitmap != null) {
+                                bitmapCache.put(targetFileId, bitmap)
+                                ivThumbnail.setImageBitmap(bitmap)
+                                ivThumbnail.visibility = View.VISIBLE
+                                tvPlaceholderIcon.visibility = View.GONE
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     inner class FileViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvFileName: TextView = itemView.findViewById(R.id.tvFileName)
@@ -115,127 +211,85 @@ class MediaGridAdapter(
         }
     }
 
-    inner class MediaViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
-        private val tvPlaceholderIcon: TextView = itemView.findViewById(R.id.tvPlaceholderIcon)
-        private val tvBadgeIcon: TextView = itemView.findViewById(R.id.tvBadgeIcon)
-        private val badgeVideoOverlay: FrameLayout = itemView.findViewById(R.id.badgeVideoOverlay)
-        private val pbThumbLoading: ProgressBar = itemView.findViewById(R.id.pbThumbLoading)
-        private val tvMediaTitle: TextView = itemView.findViewById(R.id.tvMediaTitle)
-        private val tvMediaSize: TextView = itemView.findViewById(R.id.tvMediaSize)
-        private val btnItemMenu: TextView = itemView.findViewById(R.id.btnItemMenu)
+    private suspend fun loadOrDownloadThumbnail(targetFileId: Int, item: VaultMediaItem): Bitmap? {
+        return withContext(Dispatchers.IO) {
+            try {
+                var tdFile = TelegramClient.sendRequest(TdApi.GetFile(targetFileId)) as TdApi.File
 
-        private var loadJob: Job? = null
-
-        fun bind(item: VaultMediaItem) {
-            loadJob?.cancel()
-
-            tvMediaTitle.text = item.title
-            tvMediaSize.text = item.formattedSize
-
-            // Reset views
-            ivThumbnail.setImageDrawable(null)
-            ivThumbnail.visibility = View.GONE
-            tvPlaceholderIcon.visibility = View.VISIBLE
-            pbThumbLoading.visibility = View.GONE
-
-            when (item.type) {
-                MediaType.PHOTO -> {
-                    tvPlaceholderIcon.text = "📷"
-                    tvBadgeIcon.text = "📷"
-                    badgeVideoOverlay.visibility = View.GONE
+                if (tdFile.local.isDownloadingCompleted && tdFile.local.path.isNotBlank() && File(tdFile.local.path).exists()) {
+                    return@withContext decodeSampledBitmap(tdFile.local.path, 300, 300)
                 }
-                MediaType.VIDEO -> {
-                    tvPlaceholderIcon.text = "🎬"
-                    tvBadgeIcon.text = "🎬"
-                    badgeVideoOverlay.visibility = View.VISIBLE
-                }
-                MediaType.DOCUMENT -> {
-                    tvPlaceholderIcon.text = "📄"
-                    tvBadgeIcon.text = "📄"
-                    badgeVideoOverlay.visibility = View.GONE
-                }
-            }
 
-            btnItemMenu.setOnClickListener {
-                onItemClick(item)
-            }
+                TelegramClient.sendRequest(
+                    TdApi.DownloadFile(
+                        targetFileId,
+                        32,
+                        0L,
+                        0L,
+                        false
+                    )
+                )
 
-            val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
-
-            if (targetFileId > 0 && (item.type == MediaType.PHOTO || item.type == MediaType.VIDEO || item.thumbnailFileId > 0)) {
-                val cached = bitmapCache.get(targetFileId)
-                if (cached != null) {
-                    ivThumbnail.setImageBitmap(cached)
-                    ivThumbnail.visibility = View.VISIBLE
-                    tvPlaceholderIcon.visibility = View.GONE
-                } else {
-                    pbThumbLoading.visibility = View.VISIBLE
-                    loadJob = scope.launch(Dispatchers.IO) {
-                        val bitmap = loadOrDownloadThumbnail(targetFileId, item)
-                        withContext(Dispatchers.Main) {
-                            pbThumbLoading.visibility = View.GONE
-                            if (bitmap != null) {
-                                bitmapCache.put(targetFileId, bitmap)
-                                ivThumbnail.setImageBitmap(bitmap)
-                                ivThumbnail.visibility = View.VISIBLE
-                                tvPlaceholderIcon.visibility = View.GONE
-                            }
-                        }
+                var attempts = 0
+                while (attempts < 25) {
+                    delay(200)
+                    tdFile = TelegramClient.sendRequest(TdApi.GetFile(targetFileId)) as TdApi.File
+                    if (tdFile.local.isDownloadingCompleted && File(tdFile.local.path).exists()) {
+                        return@withContext decodeSampledBitmap(tdFile.local.path, 300, 300)
                     }
-                }
-            }
-
-            itemView.setOnClickListener {
-                onItemClick(item)
-            }
-        }
-
-        private suspend fun loadOrDownloadThumbnail(fileId: Int, item: VaultMediaItem): Bitmap? {
-            return try {
-                if (item.thumbnailFileId > 0 || item.type == MediaType.PHOTO) {
-                    var tdFile = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as TdApi.File
-                    if (!tdFile.local.isDownloadingCompleted || tdFile.local.path.isBlank() || !File(tdFile.local.path).exists()) {
-                        TelegramClient.sendRequest(TdApi.DownloadFile(fileId, 32, 0L, 0L, false))
-                        var attempts = 0
-                        while (attempts < 25) {
-                            delay(200)
-                            tdFile = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as TdApi.File
-                            if (tdFile.local.isDownloadingCompleted && File(tdFile.local.path).exists()) {
-                                break
-                            }
-                            attempts++
-                        }
-                    }
-
-                    val path = tdFile.local.path
-                    if (path.isNotBlank() && File(path).exists()) {
-                        val options = BitmapFactory.Options().apply {
-                            inSampleSize = 2
-                        }
-                        val decoded = BitmapFactory.decodeFile(path, options)
-                        if (decoded != null) return decoded
-                    }
+                    attempts++
                 }
 
-                if (item.type == MediaType.VIDEO && item.fileId > 0) {
-                    val retriever = MediaMetadataRetriever()
-                    try {
-                        val proxyUrl = "http://127.0.0.1:${TelegramStreamingProxy.port}/stream?file_id=${item.fileId}"
-                        retriever.setDataSource(proxyUrl, HashMap())
-                        val frame = retriever.getFrameAtTime(1000000) ?: retriever.frameAtTime
-                        if (frame != null) return frame
-                    } catch (e: Throwable) {
-                        // ignore
-                    } finally {
-                        try { retriever.release() } catch (e: Throwable) {}
-                    }
+                if (item.type == MediaType.VIDEO && TelegramStreamingProxy.port > 0) {
+                    return@withContext extractVideoFrameFromProxy(item.fileId, item.title)
                 }
 
                 null
-            } catch (e: Throwable) {
+            } catch (_: Throwable) {
                 null
             }
         }
+    }
+
+    private fun extractVideoFrameFromProxy(fileId: Int, title: String): Bitmap? {
+        var retriever: MediaMetadataRetriever? = null
+        return try {
+            retriever = MediaMetadataRetriever()
+            val streamUrl = TelegramStreamingProxy.getUrl(fileId, title)
+            retriever.setDataSource(streamUrl, HashMap())
+            retriever.getFrameAtTime(1000000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        } catch (_: Throwable) {
+            null
+        } finally {
+            try {
+                retriever?.release()
+            } catch (_: Throwable) {}
+        }
+    }
+
+    private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeFile(path, options)
+
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+        options.inJustDecodeBounds = false
+        return BitmapFactory.decodeFile(path, options)
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height: Int, width: Int) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 }
