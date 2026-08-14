@@ -115,6 +115,7 @@ object TelegramClient {
             applicationVersion = "1.0.0"
             databaseDirectory = File(context.filesDir, "tdlib_db").absolutePath
             filesDirectory = File(context.cacheDir, "tdlib_files").absolutePath
+            databaseEncryptionKey = ByteArray(0)
             useMessageDatabase = true
             useSecretChats = false
         }
@@ -123,8 +124,6 @@ object TelegramClient {
             if (result is TdApi.Error) {
                 Log.e(TAG, "SetTdlibParameters failed: ${result.message}")
                 _authState.value = TelegramAuthState.Error(result.message)
-            } else {
-                client?.send(TdApi.SetDatabaseEncryptionKey()) {}
             }
         }
     }
