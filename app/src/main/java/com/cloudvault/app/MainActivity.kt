@@ -1,5 +1,6 @@
 package com.cloudvault.app
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -18,9 +19,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
@@ -42,7 +40,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnTabPhotos: Button
     private lateinit var btnTabVideos: Button
     private lateinit var btnTabFiles: Button
-    private lateinit var playerContainer: FrameLayout
     private lateinit var rvMediaGrid: RecyclerView
     private lateinit var layoutEmptyState: LinearLayout
     private lateinit var tvEmptyEmoji: TextView
@@ -50,8 +47,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvEmptySubtitle: TextView
     private lateinit var fabUpload: ExtendedFloatingActionButton
 
-    private var exoPlayer: ExoPlayer? = null
-    private var playerView: PlayerView? = null
     private lateinit var mediaAdapter: MediaGridAdapter
     private var currentCategory: MediaType = MediaType.PHOTO
 
@@ -79,7 +74,6 @@ class MainActivity : AppCompatActivity() {
         btnTabPhotos = findViewById(R.id.btnTabPhotos)
         btnTabVideos = findViewById(R.id.btnTabVideos)
         btnTabFiles = findViewById(R.id.btnTabFiles)
-        playerContainer = findViewById(R.id.playerContainer)
         rvMediaGrid = findViewById(R.id.rvMediaGrid)
         layoutEmptyState = findViewById(R.id.layoutEmptyState)
         tvEmptyEmoji = findViewById(R.id.tvEmptyEmoji)
@@ -336,27 +330,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun playVideoViaProxy(fileId: Int, videoTitle: String) {
         try {
-            if (playerView == null) {
-                val pv = PlayerView(this)
-                playerView = pv
-                playerContainer.addView(pv, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ))
+            val intent = Intent(this, VlcPlayerActivity::class.java).apply {
+                putExtra("FILE_ID", fileId)
+                putExtra("TITLE", videoTitle)
             }
-            if (exoPlayer == null) {
-                exoPlayer = ExoPlayer.Builder(this).build()
-                playerView?.player = exoPlayer
-            }
-            playerContainer.visibility = View.VISIBLE
-            val proxyUrl = "http://127.0.0.1:${TelegramStreamingProxy.port}/stream?file_id=$fileId"
-            val mediaItem = MediaItem.fromUri(proxyUrl)
-            exoPlayer?.setMediaItem(mediaItem)
-            exoPlayer?.prepare()
-            exoPlayer?.play()
-            Toast.makeText(this, "Streaming $videoTitle...", Toast.LENGTH_SHORT).show()
+            startActivity(intent)
         } catch (e: Throwable) {
-            android.util.Log.e("MainActivity", "Failed to play video", e)
+            android.util.Log.e("MainActivity", "Failed to launch VLC Player", e)
             Toast.makeText(this, "Playback Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
@@ -556,8 +536,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        exoPlayer?.release()
-        exoPlayer = null
         TelegramStreamingProxy.stop()
     }
 }
