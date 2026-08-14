@@ -134,25 +134,49 @@ object TelegramClient {
     }
 
     fun setPhoneNumber(phone: String) {
-        client?.send(TdApi.SetAuthenticationPhoneNumber(phone, null)) { result ->
+        var cleanPhone = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").trim()
+        if (!cleanPhone.startsWith("+") && cleanPhone.isNotBlank()) {
+            cleanPhone = "+$cleanPhone"
+        }
+        val settings = TdApi.PhoneNumberAuthenticationSettings().apply {
+            isCurrentPhoneNumber = false
+            allowFlashCall = false
+            allowMissedCall = false
+            allowSmsRetrieverApi = false
+        }
+        client?.send(TdApi.SetAuthenticationPhoneNumber(cleanPhone, settings)) { result ->
             if (result is TdApi.Error) {
-                _authState.value = TelegramAuthState.Error("Phone error: ${result.message}")
+                Log.e(TAG, "SetAuthenticationPhoneNumber failed [${result.code}]: ${result.message}")
+                _authState.value = TelegramAuthState.Error("Phone error [${result.code}]: ${result.message}")
+            }
+        }
+    }
+
+    fun resendCode() {
+        client?.send(TdApi.ResendAuthenticationCode(null)) { result ->
+            if (result is TdApi.Error) {
+                Log.e(TAG, "ResendAuthenticationCode failed [${result.code}]: ${result.message}")
+                _authState.value = TelegramAuthState.Error("Resend code error [${result.code}]: ${result.message}")
             }
         }
     }
 
     fun checkCode(code: String) {
-        client?.send(TdApi.CheckAuthenticationCode(code)) { result ->
+        val cleanCode = code.trim()
+        client?.send(TdApi.CheckAuthenticationCode(cleanCode)) { result ->
             if (result is TdApi.Error) {
-                _authState.value = TelegramAuthState.Error("Invalid code: ${result.message}")
+                Log.e(TAG, "CheckAuthenticationCode failed [${result.code}]: ${result.message}")
+                _authState.value = TelegramAuthState.Error("Code error [${result.code}]: ${result.message}")
             }
         }
     }
 
     fun checkPassword(password: String) {
-        client?.send(TdApi.CheckAuthenticationPassword(password)) { result ->
+        val cleanPassword = password.trim()
+        client?.send(TdApi.CheckAuthenticationPassword(cleanPassword)) { result ->
             if (result is TdApi.Error) {
-                _authState.value = TelegramAuthState.Error("Invalid password: ${result.message}")
+                Log.e(TAG, "CheckAuthenticationPassword failed [${result.code}]: ${result.message}")
+                _authState.value = TelegramAuthState.Error("2FA error [${result.code}]: ${result.message}")
             }
         }
     }

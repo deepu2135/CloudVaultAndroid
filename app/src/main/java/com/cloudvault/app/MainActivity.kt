@@ -99,10 +99,27 @@ class MainActivity : AppCompatActivity() {
                     }
                     is TelegramAuthState.Error -> {
                         tvStatus.text = "Status: Error (${state.message})"
+                        Toast.makeText(this@MainActivity, state.message, Toast.LENGTH_LONG).show()
+                        if (state.message.contains("Phone error", ignoreCase = true) ||
+                            state.message.contains("PHONE_NUMBER", ignoreCase = true) ||
+                            state.message.contains("API_ID", ignoreCase = true)) {
+                            showErrorDialog(state.message)
+                        }
                     }
                 }
             }
         }
+    }
+
+    private fun showErrorDialog(errorMessage: String) {
+        if (isFinishing || isDestroyed) return
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Connection / Auth Notice")
+        builder.setMessage(errorMessage + "\n\nTip: Double-check that your phone number has the country code (e.g. +91..., +1...) and that your API ID and Hash are correct from my.telegram.org.")
+        builder.setPositiveButton("Retry Phone") { _, _ -> showPhoneInputDialog() }
+        builder.setNeutralButton("Edit Settings") { _, _ -> showSettingsDialog() }
+        builder.setNegativeButton("Dismiss", null)
+        builder.show()
     }
 
     private fun observeVaultItems() {
@@ -176,7 +193,7 @@ class MainActivity : AppCompatActivity() {
 
         val layout = android.widget.LinearLayout(this)
         layout.orientation = android.widget.LinearLayout.VERTICAL
-        layout.setPadding(40, 20, 40, 20)
+        layout.setPadding(50, 20, 50, 20)
 
         val etApiId = EditText(this)
         etApiId.hint = "API ID (e.g. 12345678)"
@@ -211,17 +228,26 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Connect Telegram Account")
-        builder.setMessage("Enter your phone number with country code (e.g., +14155552671):")
+        builder.setMessage("Enter your phone number with country code (e.g., +919876543210 or +14155552671):")
 
+        val container = android.widget.FrameLayout(this)
+        container.setPadding(50, 20, 50, 20)
         val input = EditText(this)
-        builder.setView(input)
+        input.hint = "+1234567890"
+        input.inputType = android.text.InputType.TYPE_CLASS_PHONE
+        container.addView(input)
+        builder.setView(container)
 
         builder.setPositiveButton("Send Code") { _, _ ->
             val phone = input.text.toString().trim()
             if (phone.isNotBlank()) {
+                Toast.makeText(this, "Requesting code for $phone...", Toast.LENGTH_SHORT).show()
                 TelegramClient.setPhoneNumber(phone)
+            } else {
+                Toast.makeText(this, "Please enter a valid phone number", Toast.LENGTH_SHORT).show()
             }
         }
+        builder.setNegativeButton("Cancel", null)
         builder.show()
     }
 
@@ -229,16 +255,29 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Telegram Verification Code")
-        builder.setMessage("Enter the code sent to your Telegram app:")
+        builder.setMessage("Enter the login code sent to your active Telegram app (chats list on your phone/desktop):\n\n(Note: Telegram sends the code in-app, not via SMS).")
 
+        val container = android.widget.FrameLayout(this)
+        container.setPadding(50, 20, 50, 20)
         val input = EditText(this)
-        builder.setView(input)
+        input.hint = "12345"
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        container.addView(input)
+        builder.setView(container)
 
-        builder.setPositiveButton("Submit") { _, _ ->
+        builder.setPositiveButton("Submit Code") { _, _ ->
             val code = input.text.toString().trim()
             if (code.isNotBlank()) {
+                Toast.makeText(this, "Verifying code...", Toast.LENGTH_SHORT).show()
                 TelegramClient.checkCode(code)
             }
+        }
+        builder.setNeutralButton("Resend Code") { _, _ ->
+            Toast.makeText(this, "Requesting new code...", Toast.LENGTH_SHORT).show()
+            TelegramClient.resendCode()
+        }
+        builder.setNegativeButton("Change Phone") { _, _ ->
+            showPhoneInputDialog()
         }
         builder.show()
     }
@@ -247,18 +286,24 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Two-Step Verification (2FA)")
-        builder.setMessage("Enter your 2FA password:")
+        builder.setMessage("Your account has 2FA enabled. Enter your Cloud password:")
 
+        val container = android.widget.FrameLayout(this)
+        container.setPadding(50, 20, 50, 20)
         val input = EditText(this)
+        input.hint = "Password"
         input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-        builder.setView(input)
+        container.addView(input)
+        builder.setView(container)
 
-        builder.setPositiveButton("Submit") { _, _ ->
+        builder.setPositiveButton("Submit Password") { _, _ ->
             val pass = input.text.toString().trim()
             if (pass.isNotBlank()) {
+                Toast.makeText(this, "Verifying password...", Toast.LENGTH_SHORT).show()
                 TelegramClient.checkPassword(pass)
             }
         }
+        builder.setNegativeButton("Cancel", null)
         builder.show()
     }
 
