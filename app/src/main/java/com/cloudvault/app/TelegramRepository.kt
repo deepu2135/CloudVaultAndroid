@@ -100,6 +100,31 @@ object TelegramRepository {
         }
     }
 
+    suspend fun uploadFile(localPath: String, mediaType: MediaType, captionText: String = "", targetChatId: Long = 0L): Boolean {
+        val chatId = if (targetChatId != 0L) targetChatId else getSavedMessagesChatId() ?: return false
+        val inputFile = TdApi.InputFileLocal(localPath)
+        val formattedCaption = TdApi.FormattedText(captionText, emptyArray())
+
+        val inputContent: TdApi.InputMessageContent = when (mediaType) {
+            MediaType.PHOTO -> TdApi.InputMessagePhoto(inputFile, null, null, 0, 0, formattedCaption, 0)
+            MediaType.VIDEO -> TdApi.InputMessageVideo(inputFile, null, null, 0, 0, 0, true, formattedCaption, 0)
+            MediaType.DOCUMENT -> TdApi.InputMessageDocument(inputFile, null, false, formattedCaption)
+        }
+
+        return try {
+            val sendMsg = TdApi.SendMessage().apply {
+                this.chatId = chatId
+                this.inputMessageContent = inputContent
+            }
+            TelegramClient.sendRequest(sendMsg)
+            loadVaultItems(chatId)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to upload file to Telegram cloud", e)
+            false
+        }
+    }
+
     private suspend fun getSavedMessagesChatId(): Long? {
         return try {
             val me = TelegramClient.sendRequest(TdApi.GetMe()) as TdApi.User
@@ -111,3 +136,4 @@ object TelegramRepository {
         }
     }
 }
+
