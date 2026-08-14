@@ -11,17 +11,32 @@ android {
         applicationId = "com.cloudvault.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         ndk {
             abiFilters.addAll(setOf("arm64-v8a"))
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("cloudvault.jks")
+            storePassword = "cloudvault"
+            keyAlias = "cloudvault"
+            keyPassword = "cloudvault"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
