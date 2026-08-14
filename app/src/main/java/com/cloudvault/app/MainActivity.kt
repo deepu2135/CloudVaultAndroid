@@ -64,11 +64,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvEmptySubtitle: TextView
     private lateinit var pbLoading: ProgressBar
 
-    private lateinit var navVault: LinearLayout
-    private lateinit var navRecent: LinearLayout
-    private lateinit var navStarred: LinearLayout
-    private lateinit var navTrash: LinearLayout
-
     private lateinit var mediaAdapter: MediaGridAdapter
     private var currentCategory: MediaType = MediaType.PHOTO
     private var isGrid3Col = true
@@ -120,11 +115,6 @@ class MainActivity : AppCompatActivity() {
         tvEmptySubtitle = findViewById(R.id.tvEmptySubtitle)
         pbLoading = findViewById(R.id.pbLoading)
 
-        navVault = findViewById(R.id.navVault)
-        navRecent = findViewById(R.id.navRecent)
-        navStarred = findViewById(R.id.navStarred)
-        navTrash = findViewById(R.id.navTrash)
-
         setupRecyclerView()
 
         try {
@@ -166,19 +156,6 @@ class MainActivity : AppCompatActivity() {
 
         btnSortFilter.setOnClickListener {
             Toast.makeText(this, "Sorted by Newest First", Toast.LENGTH_SHORT).show()
-        }
-
-        navVault.setOnClickListener {
-            switchCategory(MediaType.PHOTO)
-        }
-        navRecent.setOnClickListener {
-            Toast.makeText(this, "Recent items", Toast.LENGTH_SHORT).show()
-        }
-        navStarred.setOnClickListener {
-            Toast.makeText(this, "Starred items (Coming soon)", Toast.LENGTH_SHORT).show()
-        }
-        navTrash.setOnClickListener {
-            Toast.makeText(this, "Trash is empty", Toast.LENGTH_SHORT).show()
         }
 
         observeAuthState()
