@@ -77,20 +77,49 @@ object TelegramRepository {
                     }
                     is TdApi.MessageDocument -> {
                         val doc = content.document
-                        val mime = doc.mimeType.ifBlank { "application/octet-stream" }
-                        val isVideoDoc = mime.startsWith("video/", ignoreCase = true) ||
-                                doc.fileName.endsWith(".mp4", ignoreCase = true) ||
-                                doc.fileName.endsWith(".mkv", ignoreCase = true) ||
-                                doc.fileName.endsWith(".mov", ignoreCase = true) ||
-                                doc.fileName.endsWith(".avi", ignoreCase = true)
+                        val mime = doc.mimeType.ifBlank { "application/octet-stream" }.lowercase()
+                        val name = doc.fileName.lowercase()
+
+                        val isVideo = mime.startsWith("video/") ||
+                                mime.contains("matroska") ||
+                                mime.contains("mp4") ||
+                                mime.contains("webm") ||
+                                name.endsWith(".mkv") ||
+                                name.endsWith(".mp4") ||
+                                name.endsWith(".webm") ||
+                                name.endsWith(".avi") ||
+                                name.endsWith(".mov") ||
+                                name.endsWith(".flv") ||
+                                name.endsWith(".ts") ||
+                                name.endsWith(".m4v") ||
+                                name.endsWith(".wmv") ||
+                                name.endsWith(".3gp") ||
+                                name.endsWith(".m2ts")
+
+                        val isPhoto = !isVideo && (
+                                mime.startsWith("image/") ||
+                                name.endsWith(".jpg") ||
+                                name.endsWith(".jpeg") ||
+                                name.endsWith(".png") ||
+                                name.endsWith(".webp") ||
+                                name.endsWith(".heic") ||
+                                name.endsWith(".bmp") ||
+                                name.endsWith(".gif")
+                        )
+
+                        val itemType = when {
+                            isVideo -> MediaType.VIDEO
+                            isPhoto -> MediaType.PHOTO
+                            else -> MediaType.DOCUMENT
+                        }
 
                         val item = VaultMediaItem(
                             id = "doc_${msg.id}",
                             title = doc.fileName.ifBlank { "File_${msg.date}" },
                             sizeBytes = doc.document.size.toLong(),
                             formattedSize = formatSize(doc.document.size.toLong()),
-                            mimeType = mime,
-                            type = if (isVideoDoc) MediaType.VIDEO else MediaType.DOCUMENT,
+                            mimeType = doc.mimeType.ifBlank { "application/octet-stream" },
+                            type = itemType,
                             chatId = msg.chatId,
                             messageId = msg.id,
                             fileId = doc.document.id,
@@ -98,10 +127,10 @@ object TelegramRepository {
                             dateAdded = msg.date.toLong()
                         )
 
-                        if (isVideoDoc) {
-                            videoList.add(item)
-                        } else {
-                            fileList.add(item)
+                        when (itemType) {
+                            MediaType.VIDEO -> videoList.add(item)
+                            MediaType.PHOTO -> photoList.add(item)
+                            MediaType.DOCUMENT -> fileList.add(item)
                         }
                     }
                 }
