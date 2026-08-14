@@ -22,22 +22,22 @@
             android:textSize="22sp"
             android:textStyle="bold" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRefresh"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="🔄 Sync"
             android:textColor="@color/text_primary"
-            style="?attr/materialButtonOutlinedStyle" />
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="⚙️ Settings"
             android:textColor="@color/text_primary"
-            style="?attr/materialButtonOutlinedStyle" />
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
     </LinearLayout>
 
     <TextView
@@ -56,16 +56,16 @@
         android:layout_marginTop="16dp"
         android:orientation="horizontal">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTabPhotos"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="📷 Photos"
             android:textColor="@color/text_primary"
-            style="?attr/materialButtonOutlinedStyle" />
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTabVideos"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -73,9 +73,9 @@
             android:layout_marginStart="4dp"
             android:text="🎬 Videos"
             android:textColor="@color/text_primary"
-            style="?attr/materialButtonOutlinedStyle" />
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTabFiles"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -83,12 +83,12 @@
             android:layout_marginStart="4dp"
             android:text="📄 Files"
             android:textColor="@color/text_primary"
-            style="?attr/materialButtonOutlinedStyle" />
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
     </LinearLayout>
 
-    <!-- Player View for Video Streaming -->
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
+    <!-- Player Container for Video Streaming -->
+    <FrameLayout
+        android:id="@+id/playerContainer"
         android:layout_width="match_parent"
         android:layout_height="220dp"
         android:layout_marginTop="16dp"

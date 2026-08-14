@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".CloudVaultApp"
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="CloudVault"

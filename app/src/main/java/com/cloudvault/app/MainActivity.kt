@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnTabVideos: Button
     private lateinit var btnTabFiles: Button
     private lateinit var tvContentSummary: TextView
+    private lateinit var playerContainer: FrameLayout
 
     private var exoPlayer: ExoPlayer? = null
     private var playerView: PlayerView? = null
@@ -39,7 +41,7 @@ class MainActivity : AppCompatActivity() {
         btnTabVideos = findViewById(R.id.btnTabVideos)
         btnTabFiles = findViewById(R.id.btnTabFiles)
         tvContentSummary = findViewById(R.id.tvContentSummary)
-        playerView = findViewById(R.id.playerView)
+        playerContainer = findViewById(R.id.playerContainer)
 
         try {
             // Start Local Range Streaming Proxy on background thread
@@ -127,19 +129,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playVideoViaProxy(fileId: Int) {
-        if (exoPlayer == null) {
-            exoPlayer = ExoPlayer.Builder(this).build()
-            playerView?.player = exoPlayer
+        try {
+            if (playerView == null) {
+                val pv = PlayerView(this)
+                playerView = pv
+                playerContainer.addView(pv, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            }
+            if (exoPlayer == null) {
+                exoPlayer = ExoPlayer.Builder(this).build()
+                playerView?.player = exoPlayer
+            }
+            playerContainer.visibility = View.VISIBLE
+            val proxyUrl = "http://127.0.0.1:${TelegramStreamingProxy.port}/stream?file_id=$fileId"
+            val mediaItem = MediaItem.fromUri(proxyUrl)
+            exoPlayer?.setMediaItem(mediaItem)
+            exoPlayer?.prepare()
+            exoPlayer?.play()
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "Failed to play video", e)
+            tvContentSummary.text = "Playback Error: ${e.message}"
         }
-        playerView?.visibility = View.VISIBLE
-        val proxyUrl = "http://127.0.0.1:${TelegramStreamingProxy.port}/stream?file_id=$fileId"
-        val mediaItem = MediaItem.fromUri(proxyUrl)
-        exoPlayer?.setMediaItem(mediaItem)
-        exoPlayer?.prepare()
-        exoPlayer?.play()
     }
 
     private fun showSettingsDialog() {
+        if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
         builder.setTitle("TDLib API Credentials")
 
@@ -176,6 +192,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPhoneInputDialog() {
+        if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Connect Telegram Account")
         builder.setMessage("Enter your phone number with country code (e.g., +14155552671):")
@@ -193,6 +210,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCodeInputDialog() {
+        if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Telegram Verification Code")
         builder.setMessage("Enter the code sent to your Telegram app:")
@@ -210,6 +228,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPasswordInputDialog() {
+        if (isFinishing || isDestroyed) return
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Two-Step Verification (2FA)")
         builder.setMessage("Enter your 2FA password:")
