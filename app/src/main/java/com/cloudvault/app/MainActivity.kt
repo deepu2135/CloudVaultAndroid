@@ -2,11 +2,14 @@ package com.cloudvault.app
 
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.LayoutInflater
 import android.view.View
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -371,12 +374,12 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing || isDestroyed) return
 
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_photo_viewer, null)
-        val ivFullPhoto: ImageView = dialogView.findViewById(R.id.ivFullPhoto)
+        val ivFullPhoto: ZoomableImageView = dialogView.findViewById(R.id.ivFullPhoto)
         val pbFullPhotoLoading: ProgressBar = dialogView.findViewById(R.id.pbFullPhotoLoading)
         val tvViewerTitle: TextView = dialogView.findViewById(R.id.tvViewerTitle)
         val tvViewerSize: TextView = dialogView.findViewById(R.id.tvViewerSize)
-        val btnDownloadPhoto: Button = dialogView.findViewById(R.id.btnDownloadPhoto)
-        val btnCloseViewer: Button = dialogView.findViewById(R.id.btnCloseViewer)
+        val btnDownloadPhoto: FrameLayout = dialogView.findViewById(R.id.btnDownloadPhoto)
+        val btnCloseViewer: FrameLayout = dialogView.findViewById(R.id.btnCloseViewer)
 
         tvViewerTitle.text = item.title
         tvViewerSize.text = item.formattedSize
@@ -384,6 +387,12 @@ class MainActivity : AppCompatActivity() {
         val dialog = AlertDialog.Builder(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
             .setView(dialogView)
             .create()
+
+        dialog.window?.apply {
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            setBackgroundDrawable(ColorDrawable(Color.BLACK))
+            addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+        }
 
         btnCloseViewer.setOnClickListener { dialog.dismiss() }
         btnDownloadPhoto.setOnClickListener {

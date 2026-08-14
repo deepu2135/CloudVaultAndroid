@@ -1,47 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Fullscreen Image -->
-    <ImageView
+    <!-- Interactive Pinch-to-Zoom Image View -->
+    <com.cloudvault.app.ZoomableImageView
         android:id="@+id/ivFullPhoto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitCenter"
+        android:layout_gravity="center"
         android:contentDescription="Full Photo Preview" />
 
     <!-- Loading Spinner -->
     <ProgressBar
         android:id="@+id/pbFullPhotoLoading"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="center" />
+        android:layout_width="54dp"
+        android:layout_height="54dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="@color/accent_cyan" />
 
-    <!-- Top Overlay: Title and Close -->
+    <!-- Top Overlay Header Bar -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="#80000000"
+        android:background="#B3000000"
         android:orientation="horizontal"
-        android:padding="16dp"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="14dp">
 
+        <!-- Back Button -->
+        <FrameLayout
+            android:id="@+id/btnCloseViewer"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/ic_launcher_background"
+            android:backgroundTint="#26FFFFFF">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="←"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <!-- Title & Info -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="12dp"
             android:orientation="vertical">
 
             <TextView
                 android:id="@+id/tvViewerTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Photo.jpg"
+                android:text="Photo_1784485762.jpg"
                 android:textColor="#FFFFFF"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end" />
@@ -50,27 +76,32 @@
                 android:id="@+id/tvViewerSize"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="2.4 MB"
-                android:textColor="#CCCCCC"
+                android:layout_marginTop="2dp"
+                android:text="154.7 KB"
+                android:textColor="#99A1AF"
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
+        <!-- Download Action Button -->
+        <FrameLayout
             android:id="@+id/btnDownloadPhoto"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="💾 Save"
-            android:textColor="#FFFFFF"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
+            android:layout_height="38dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:background="@drawable/ic_launcher_background"
+            android:backgroundTint="@color/accent_cyan">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCloseViewer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="✕"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            style="@style/Widget.MaterialComponents.Button.TextButton" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="⬇ Save"
+                android:textColor="#000000"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
     </LinearLayout>
 
 </FrameLayout>
