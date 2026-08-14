@@ -32,6 +32,15 @@ import org.drinkless.tdlib.TdApi
 import java.io.File
 import java.io.FileOutputStream
 
+enum class VaultSortOrder(val label: String) {
+    NEWEST("Newest ⌵"),
+    OLDEST("Oldest ⌵"),
+    NAME_ASC("Name (A-Z) ⌵"),
+    NAME_DESC("Name (Z-A) ⌵"),
+    SIZE_DESC("Largest ⌵"),
+    SIZE_ASC("Smallest ⌵")
+}
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
@@ -67,6 +76,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mediaAdapter: MediaGridAdapter
     private var currentCategory: MediaType = MediaType.PHOTO
     private var isGrid3Col = true
+
+    private var currentSortOrder: VaultSortOrder = VaultSortOrder.NEWEST
 
     // Activity Result Launchers for picking media
     private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -155,7 +166,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnSortFilter.setOnClickListener {
-            Toast.makeText(this, "Sorted by Newest First", Toast.LENGTH_SHORT).show()
+            showSortDialog()
         }
 
         observeAuthState()
@@ -163,6 +174,34 @@ class MainActivity : AppCompatActivity() {
 
         // Initial tab
         switchCategory(MediaType.PHOTO)
+    }
+
+    private fun showSortDialog() {
+        val options = arrayOf(
+            "🕒 Newest First (Default)",
+            "⏳ Oldest First",
+            "🔤 Name (A to Z)",
+            "🔠 Name (Z to A)",
+            "📊 Size (Largest First)",
+            "📉 Size (Smallest First)"
+        )
+        val sortOrders = arrayOf(
+            VaultSortOrder.NEWEST,
+            VaultSortOrder.OLDEST,
+            VaultSortOrder.NAME_ASC,
+            VaultSortOrder.NAME_DESC,
+            VaultSortOrder.SIZE_DESC,
+            VaultSortOrder.SIZE_ASC
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Sort Items By")
+            .setItems(options) { _, which ->
+                currentSortOrder = sortOrders[which]
+                btnSortFilter.text = currentSortOrder.label
+                updateDisplayedItems()
+            }
+            .show()
     }
 
     private fun setupRecyclerView() {
@@ -208,10 +247,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateDisplayedItems() {
-        val items = when (currentCategory) {
+        val rawItems = when (currentCategory) {
             MediaType.PHOTO -> TelegramRepository.photos.value
             MediaType.VIDEO -> TelegramRepository.videos.value
             MediaType.DOCUMENT -> TelegramRepository.files.value
+        }
+
+        val items = when (currentSortOrder) {
+            VaultSortOrder.NEWEST -> rawItems.sortedByDescending { it.dateAdded }
+            VaultSortOrder.OLDEST -> rawItems.sortedBy { it.dateAdded }
+            VaultSortOrder.NAME_ASC -> rawItems.sortedBy { it.title.lowercase() }
+            VaultSortOrder.NAME_DESC -> rawItems.sortedByDescending { it.title.lowercase() }
+            VaultSortOrder.SIZE_DESC -> rawItems.sortedByDescending { it.sizeBytes }
+            VaultSortOrder.SIZE_ASC -> rawItems.sortedBy { it.sizeBytes }
         }
 
         mediaAdapter.submitList(items)
