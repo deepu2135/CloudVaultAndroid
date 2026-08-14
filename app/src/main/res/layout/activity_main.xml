@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark"
+    android:padding="16dp">
+
+    <!-- Header Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="☁️ CloudVault"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnRefresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔄 Sync"
+            android:textColor="@color/text_primary"
+            style="?attr/materialButtonOutlinedStyle" />
+
+        <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="⚙️ Settings"
+            android:textColor="@color/text_primary"
+            style="?attr/materialButtonOutlinedStyle" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Status: Initializing..."
+        android:textColor="@color/accent_cyan"
+        android:textSize="14sp" />
+
+    <!-- Tab Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnTabPhotos"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📷 Photos"
+            android:textColor="@color/text_primary"
+            style="?attr/materialButtonOutlinedStyle" />
+
+        <Button
+            android:id="@+id/btnTabVideos"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="🎬 Videos"
+            android:textColor="@color/text_primary"
+            style="?attr/materialButtonOutlinedStyle" />
+
+        <Button
+            android:id="@+id/btnTabFiles"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="📄 Files"
+            android:textColor="@color/text_primary"
+            style="?attr/materialButtonOutlinedStyle" />
+    </LinearLayout>
+
+    <!-- Player View for Video Streaming -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        android:background="#000000" />
+
+    <!-- Content Area -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp"
+        android:background="@color/card_bg"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tvContentSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select a category above to view your CloudVault media."
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp"
+            android:lineSpacingExtra="4dp" />
+    </ScrollView>
+
+</LinearLayout>

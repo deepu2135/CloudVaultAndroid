@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">CloudVault</string>
+    <string name="title_photos">Photos</string>
+    <string name="title_videos">Videos</string>
+    <string name="title_files">Files &amp; Documents</string>
+    <string name="title_settings">Settings</string>
+</resources>
