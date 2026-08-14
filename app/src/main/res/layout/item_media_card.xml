@@ -16,10 +16,10 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Image / Preview Container with 1:1 Aspect Ratio -->
+        <!-- Image / Preview Container with Poster Aspect Ratio -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="120dp"
+            android:layout_height="140dp"
             android:background="#101018">
 
             <ImageView

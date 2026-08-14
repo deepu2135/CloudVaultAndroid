@@ -92,12 +92,22 @@ object TelegramClient {
                     is TdApi.AuthorizationStateReady -> {
                         _authState.value = TelegramAuthState.Ready
                         TdlibManager.setSessionActive(context, true)
+                        // Auto-load vault items automatically upon connection
+                        scope.launch {
+                            TelegramRepository.loadVaultItems()
+                        }
                     }
                     is TdApi.AuthorizationStateClosed -> {
                         client = null
                         currentTdlibAuthState = null
                         _authState.value = TelegramAuthState.Idle
                     }
+                }
+            }
+            is TdApi.UpdateNewMessage, is TdApi.UpdateMessageContent, is TdApi.UpdateMessageSendSucceeded -> {
+                // Auto-load when new photos, videos, or files are sent/received
+                scope.launch {
+                    TelegramRepository.loadVaultItems()
                 }
             }
         }

@@ -23,10 +23,20 @@
             android:textStyle="bold" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUpload"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⬆️ Upload"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="@color/accent_cyan"
+            style="@style/Widget.MaterialComponents.Button" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRefresh"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="🔄 Sync"
+            android:layout_marginStart="6dp"
+            android:text="🔄"
             android:textColor="@color/text_primary"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 
@@ -34,8 +44,8 @@
             android:id="@+id/btnSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="⚙️ Settings"
+            android:layout_marginStart="6dp"
+            android:text="⚙️"
             android:textColor="@color/text_primary"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
     </LinearLayout>
@@ -147,13 +157,18 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- Loading Spinner -->
-        <ProgressBar
-            android:id="@+id/pbLoading"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_gravity="center"
-            android:visibility="gone" />
+        <!-- Floating Action Button for Upload -->
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/fabUpload"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:text="Upload"
+            android:textColor="#FFFFFF"
+            app:icon="@android:drawable/ic_input_add"
+            app:iconTint="#FFFFFF"
+            app:backgroundTint="@color/accent_cyan" />
 
     </FrameLayout>
 

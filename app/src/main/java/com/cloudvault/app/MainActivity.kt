@@ -1,7 +1,9 @@
 package com.cloudvault.app
 
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
@@ -12,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -20,6 +23,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -27,10 +31,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.drinkless.tdlib.TdApi
 import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
+    private lateinit var btnUpload: Button
     private lateinit var btnSettings: Button
     private lateinit var btnRefresh: Button
     private lateinit var btnTabPhotos: Button
@@ -42,18 +48,32 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvEmptyEmoji: TextView
     private lateinit var tvEmptyTitle: TextView
     private lateinit var tvEmptySubtitle: TextView
-    private lateinit var pbLoading: ProgressBar
+    private lateinit var fabUpload: ExtendedFloatingActionButton
 
     private var exoPlayer: ExoPlayer? = null
     private var playerView: PlayerView? = null
     private lateinit var mediaAdapter: MediaGridAdapter
     private var currentCategory: MediaType = MediaType.PHOTO
 
+    // Activity Result Launchers for picking media
+    private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { handleMediaUpload(it, MediaType.PHOTO) }
+    }
+
+    private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { handleMediaUpload(it, MediaType.VIDEO) }
+    }
+
+    private val pickFileLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { handleMediaUpload(it, MediaType.DOCUMENT) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         tvStatus = findViewById(R.id.tvStatus)
+        btnUpload = findViewById(R.id.btnUpload)
         btnSettings = findViewById(R.id.btnSettings)
         btnRefresh = findViewById(R.id.btnRefresh)
         btnTabPhotos = findViewById(R.id.btnTabPhotos)
@@ -65,7 +85,7 @@ class MainActivity : AppCompatActivity() {
         tvEmptyEmoji = findViewById(R.id.tvEmptyEmoji)
         tvEmptyTitle = findViewById(R.id.tvEmptyTitle)
         tvEmptySubtitle = findViewById(R.id.tvEmptySubtitle)
-        pbLoading = findViewById(R.id.pbLoading)
+        fabUpload = findViewById(R.id.fabUpload)
 
         setupRecyclerView()
 
@@ -80,12 +100,13 @@ class MainActivity : AppCompatActivity() {
             tvStatus.text = "Init Warning: ${e.message}"
         }
 
+        btnUpload.setOnClickListener { showUploadChoiceDialog() }
+        fabUpload.setOnClickListener { showUploadChoiceDialog() }
+
         btnSettings.setOnClickListener { showSettingsDialog() }
         btnRefresh.setOnClickListener {
-            pbLoading.visibility = View.VISIBLE
             lifecycleScope.launch {
                 TelegramRepository.loadVaultItems()
-                pbLoading.visibility = View.GONE
             }
         }
 
@@ -160,6 +181,75 @@ class MainActivity : AppCompatActivity() {
         } else {
             layoutEmptyState.visibility = View.GONE
             rvMediaGrid.visibility = View.VISIBLE
+        }
+    }
+
+    private fun showUploadChoiceDialog() {
+        val options = arrayOf("📷 Upload Photo", "🎬 Upload Video", "📄 Upload File / Document")
+        AlertDialog.Builder(this)
+            .setTitle("Upload to Telegram Cloud")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> pickPhotoLauncher.launch("image/*")
+                    1 -> pickVideoLauncher.launch("video/*")
+                    2 -> pickFileLauncher.launch("*/*")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun handleMediaUpload(uri: Uri, mediaType: MediaType) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val (tempFile, displayName) = copyUriToTempFile(uri) ?: run {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Failed to read selected file", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Uploading $displayName to Telegram...", Toast.LENGTH_SHORT).show()
+            }
+
+            val success = TelegramRepository.uploadFile(tempFile.absolutePath, mediaType, displayName)
+
+            withContext(Dispatchers.Main) {
+                if (success) {
+                    Toast.makeText(this@MainActivity, "Uploaded $displayName successfully! ☁️", Toast.LENGTH_LONG).show()
+                    switchCategory(mediaType)
+                } else {
+                    Toast.makeText(this@MainActivity, "Failed to upload $displayName", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun copyUriToTempFile(uri: Uri): Pair<File, String>? {
+        return try {
+            var fileName = "upload_${System.currentTimeMillis()}"
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx >= 0) {
+                        val name = cursor.getString(nameIdx)
+                        if (!name.isNullOrBlank()) fileName = name
+                    }
+                }
+            }
+
+            val uploadDir = File(cacheDir, "uploads").apply { if (!exists()) mkdirs() }
+            val tempFile = File(uploadDir, fileName)
+
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            Pair(tempFile, fileName)
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "copyUriToTempFile failed", e)
+            null
         }
     }
 
@@ -297,9 +387,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     is TelegramAuthState.Ready -> {
                         tvStatus.text = "Status: Connected to Telegram Cloud ☁️"
-                        pbLoading.visibility = View.VISIBLE
                         TelegramRepository.loadVaultItems()
-                        pbLoading.visibility = View.GONE
                     }
                     is TelegramAuthState.Error -> {
                         tvStatus.text = "Status: Error (${state.message})"
