@@ -19,6 +19,14 @@ object TelegramRepository {
     private val _files = MutableStateFlow<List<VaultMediaItem>>(emptyList())
     val files: StateFlow<List<VaultMediaItem>> = _files.asStateFlow()
 
+    fun isZipArchiveFilename(name: String): Boolean {
+        return name.endsWith(".zip", ignoreCase = true) ||
+                name.endsWith(".7z", ignoreCase = true) ||
+                name.endsWith(".rar", ignoreCase = true) ||
+                name.endsWith(".tar", ignoreCase = true) ||
+                name.endsWith(".gz", ignoreCase = true)
+    }
+
     private fun formatSize(bytes: Long): String {
         if (bytes < 1024) return "$bytes B"
         val exp = (Math.log(bytes.toDouble()) / Math.log(1024.0)).toInt()

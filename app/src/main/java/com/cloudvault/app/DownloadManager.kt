@@ -29,6 +29,11 @@ object DownloadManager {
     private val _downloadTasks = MutableStateFlow<Map<Int, VaultDownloadTask>>(emptyMap())
     val downloadTasks: StateFlow<Map<Int, VaultDownloadTask>> = _downloadTasks.asStateFlow()
 
+    fun isFileIdActive(fileId: Int): Boolean {
+        val task = _downloadTasks.value[fileId]
+        return task != null && !task.isCompleted
+    }
+
     fun startDownload(context: Context, item: VaultMediaItem) {
         val fileId = item.fileId
         if (fileId == 0) return

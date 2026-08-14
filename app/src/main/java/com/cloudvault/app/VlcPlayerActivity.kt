@@ -5,13 +5,15 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.widget.ImageButton
+import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.button.MaterialButton
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -20,120 +22,189 @@ import java.util.Locale
 
 class VlcPlayerActivity : AppCompatActivity() {
 
+    private lateinit var vlcRoot: FrameLayout
     private lateinit var vlcVideoLayout: VLCVideoLayout
-    private lateinit var layoutControlsOverlay: View
     private lateinit var pbVlcBuffering: ProgressBar
-    private lateinit var btnVlcBack: ImageButton
+    private lateinit var layoutControlsOverlay: FrameLayout
+
+    private lateinit var btnVlcBack: FrameLayout
     private lateinit var tvVlcTitle: TextView
-    private lateinit var btnVlcPlayPause: MaterialButton
-    private lateinit var btnVlcRewind: MaterialButton
-    private lateinit var btnVlcForward: MaterialButton
-    private lateinit var sbVlcProgress: SeekBar
+    private lateinit var btnVlcSubtitles: TextView
+    private lateinit var btnVlcSettings: TextView
+
+    private lateinit var btnVlcRewind: FrameLayout
+    private lateinit var btnVlcPlayPause: FrameLayout
+    private lateinit var tvPlayPauseIcon: TextView
+    private lateinit var btnVlcForward: FrameLayout
+
     private lateinit var tvVlcCurrentTime: TextView
+    private lateinit var sbVlcProgress: SeekBar
     private lateinit var tvVlcTotalDuration: TextView
+
+    private lateinit var btnVlcLock: LinearLayout
+    private lateinit var tvLockIcon: TextView
+    private lateinit var btnVlcSpeed: LinearLayout
+    private lateinit var tvSpeedLabel: TextView
+    private lateinit var btnVlcPrev: TextView
+    private lateinit var btnVlcNext: TextView
+    private lateinit var btnVlcFullscreen: LinearLayout
 
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private var isUserSeeking = false
-    private var controlsVisible = true
 
+    private var isUserTracking = false
+    private var isLocked = false
+    private var currentSpeedIndex = 1
+    private val speedOptions = arrayOf(0.5f, 1.0f, 1.25f, 1.5f, 2.0f)
+    private val speedLabels = arrayOf("0.5x", "1.0x", "1.25x", "1.5x", "2.0x")
+
+    private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControlsRunnable = Runnable {
-        hideControls()
-    }
-
-    private val updateProgressRunnable = object : Runnable {
-        override fun run() {
-            mediaPlayer?.let { player ->
-                if (!isUserSeeking && player.isPlaying) {
-                    val time = player.time
-                    val length = player.length
-                    if (length > 0) {
-                        val progress = ((time.toDouble() / length) * 1000).toInt()
-                        sbVlcProgress.progress = progress
-                        tvVlcCurrentTime.text = formatTime(time)
-                        tvVlcTotalDuration.text = formatTime(length)
-                    }
-                }
-            }
-            handler.postDelayed(this, 500)
+        if (!isLocked) {
+            layoutControlsOverlay.visibility = View.GONE
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_vlc_player)
 
         val fileId = intent.getIntExtra("FILE_ID", 0)
         val title = intent.getStringExtra("TITLE") ?: "Video"
 
+        vlcRoot = findViewById(R.id.vlcRoot)
         vlcVideoLayout = findViewById(R.id.vlcVideoLayout)
-        layoutControlsOverlay = findViewById(R.id.layoutControlsOverlay)
         pbVlcBuffering = findViewById(R.id.pbVlcBuffering)
+        layoutControlsOverlay = findViewById(R.id.layoutControlsOverlay)
+
         btnVlcBack = findViewById(R.id.btnVlcBack)
         tvVlcTitle = findViewById(R.id.tvVlcTitle)
-        btnVlcPlayPause = findViewById(R.id.btnVlcPlayPause)
+        btnVlcSubtitles = findViewById(R.id.btnVlcSubtitles)
+        btnVlcSettings = findViewById(R.id.btnVlcSettings)
+
         btnVlcRewind = findViewById(R.id.btnVlcRewind)
+        btnVlcPlayPause = findViewById(R.id.btnVlcPlayPause)
+        tvPlayPauseIcon = findViewById(R.id.tvPlayPauseIcon)
         btnVlcForward = findViewById(R.id.btnVlcForward)
-        sbVlcProgress = findViewById(R.id.sbVlcProgress)
+
         tvVlcCurrentTime = findViewById(R.id.tvVlcCurrentTime)
+        sbVlcProgress = findViewById(R.id.sbVlcProgress)
         tvVlcTotalDuration = findViewById(R.id.tvVlcTotalDuration)
 
+        btnVlcLock = findViewById(R.id.btnVlcLock)
+        tvLockIcon = findViewById(R.id.tvLockIcon)
+        btnVlcSpeed = findViewById(R.id.btnVlcSpeed)
+        tvSpeedLabel = findViewById(R.id.tvSpeedLabel)
+        btnVlcPrev = findViewById(R.id.btnVlcPrev)
+        btnVlcNext = findViewById(R.id.btnVlcNext)
+        btnVlcFullscreen = findViewById(R.id.btnVlcFullscreen)
+
         tvVlcTitle.text = title
-        sbVlcProgress.max = 1000
 
         btnVlcBack.setOnClickListener { finish() }
 
         btnVlcPlayPause.setOnClickListener {
             togglePlayPause()
-            resetControlsHideTimer()
+            scheduleControlsAutoHide()
         }
 
         btnVlcRewind.setOnClickListener {
-            seekRelative(-10000)
-            resetControlsHideTimer()
+            seekRelative(-10000L)
+            scheduleControlsAutoHide()
         }
 
         btnVlcForward.setOnClickListener {
-            seekRelative(10000)
-            resetControlsHideTimer()
+            seekRelative(10000L)
+            scheduleControlsAutoHide()
         }
 
+        btnVlcSubtitles.setOnClickListener {
+            showTrackSelectionDialog("Subtitles / Audio Tracks")
+            scheduleControlsAutoHide()
+        }
+
+        btnVlcSettings.setOnClickListener {
+            showSpeedDialog()
+            scheduleControlsAutoHide()
+        }
+
+        btnVlcSpeed.setOnClickListener {
+            cycleSpeed()
+            scheduleControlsAutoHide()
+        }
+
+        btnVlcLock.setOnClickListener {
+            toggleLock()
+        }
+
+        btnVlcPrev.setOnClickListener {
+            seekRelative(-30000L)
+            scheduleControlsAutoHide()
+        }
+
+        btnVlcNext.setOnClickListener {
+            seekRelative(30000L)
+            scheduleControlsAutoHide()
+        }
+
+        btnVlcFullscreen.setOnClickListener {
+            cycleAspectRatio()
+            scheduleControlsAutoHide()
+        }
+
+        vlcRoot.setOnClickListener {
+            if (isLocked) {
+                // Show only unlock button briefly
+                layoutControlsOverlay.visibility = View.VISIBLE
+                scheduleControlsAutoHide()
+            } else {
+                if (layoutControlsOverlay.visibility == View.VISIBLE) {
+                    layoutControlsOverlay.visibility = View.GONE
+                } else {
+                    layoutControlsOverlay.visibility = View.VISIBLE
+                    scheduleControlsAutoHide()
+                }
+            }
+        }
+
+        setupSeekBar()
+        initVlcAndPlay(fileId, title)
+        scheduleControlsAutoHide()
+    }
+
+    private fun setupSeekBar() {
+        sbVlcProgress.max = 1000
         sbVlcProgress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val length = mediaPlayer?.length ?: 0L
-                    if (length > 0) {
-                        val targetTime = (length * (progress / 1000.0)).toLong()
-                        tvVlcCurrentTime.text = formatTime(targetTime)
+                    val duration = mediaPlayer?.length ?: 0L
+                    if (duration > 0L) {
+                        val newTime = (progress.toFloat() / 1000f * duration).toLong()
+                        tvVlcCurrentTime.text = formatTime(newTime)
                     }
                 }
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                isUserSeeking = true
-                handler.removeCallbacks(hideControlsRunnable)
+                isUserTracking = true
+                hideHandler.removeCallbacks(hideControlsRunnable)
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                isUserSeeking = false
-                val length = mediaPlayer?.length ?: 0L
-                if (length > 0) {
-                    val targetTime = (length * ((seekBar?.progress ?: 0) / 1000.0)).toLong()
-                    mediaPlayer?.time = targetTime
+                isUserTracking = false
+                val progress = seekBar?.progress ?: 0
+                val duration = mediaPlayer?.length ?: 0L
+                if (duration > 0L) {
+                    val seekTime = (progress.toFloat() / 1000f * duration).toLong()
+                    mediaPlayer?.time = seekTime
                 }
-                resetControlsHideTimer()
+                scheduleControlsAutoHide()
             }
         })
-
-        findViewById<View>(R.id.vlcRoot).setOnClickListener {
-            if (controlsVisible) hideControls() else showControls()
-        }
-
-        initVlcAndPlay(fileId)
     }
 
-    private fun initVlcAndPlay(fileId: Int) {
+    private fun initVlcAndPlay(fileId: Int, videoTitle: String) {
         try {
             val options = ArrayList<String>().apply {
                 add("--no-drop-late-frames")
@@ -149,7 +220,9 @@ class VlcPlayerActivity : AppCompatActivity() {
             mediaPlayer = player
             player.attachViews(vlcVideoLayout, null, false, false)
 
-            val proxyUrl = "http://127.0.0.1:${TelegramStreamingProxy.port}/stream?file_id=$fileId"
+            val rawStreamUrl = intent.getStringExtra("STREAM_URL")
+            val proxyUrl = if (!rawStreamUrl.isNullOrBlank()) rawStreamUrl else TelegramStreamingProxy.getUrl(fileId, videoTitle)
+
             val media = Media(vlc, Uri.parse(proxyUrl)).apply {
                 setHWDecoderEnabled(true, false)
                 addOption(":network-caching=1500")
@@ -166,17 +239,30 @@ class VlcPlayerActivity : AppCompatActivity() {
                     }
                     MediaPlayer.Event.Playing -> {
                         pbVlcBuffering.visibility = View.GONE
-                        btnVlcPlayPause.text = "⏸"
+                        tvPlayPauseIcon.text = "⏸"
                     }
                     MediaPlayer.Event.Paused -> {
-                        btnVlcPlayPause.text = "▶"
+                        tvPlayPauseIcon.text = "▶"
                     }
                     MediaPlayer.Event.EndReached -> {
-                        btnVlcPlayPause.text = "▶"
+                        tvPlayPauseIcon.text = "▶"
+                        pbVlcBuffering.visibility = View.GONE
+                    }
+                    MediaPlayer.Event.TimeChanged -> {
+                        if (!isUserTracking) {
+                            val time = player.time
+                            val length = player.length
+                            if (length > 0L) {
+                                val progress = ((time.toFloat() / length.toFloat()) * 1000).toInt()
+                                sbVlcProgress.progress = progress
+                                tvVlcCurrentTime.text = formatTime(time)
+                                tvVlcTotalDuration.text = formatTime(length)
+                            }
+                        }
                     }
                     MediaPlayer.Event.EncounteredError -> {
                         pbVlcBuffering.visibility = View.GONE
-                        Toast.makeText(this, "VLC Playback Error", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "VLC encountered a playback error", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -185,12 +271,9 @@ class VlcPlayerActivity : AppCompatActivity() {
             media.release()
             player.play()
 
-            handler.post(updateProgressRunnable)
-            resetControlsHideTimer()
-
         } catch (e: Throwable) {
-            android.util.Log.e("VlcPlayerActivity", "Failed to start LibVLC", e)
-            Toast.makeText(this, "VLC Init Error: ${e.message}", Toast.LENGTH_LONG).show()
+            android.util.Log.e("VlcPlayerActivity", "LibVLC init exception", e)
+            Toast.makeText(this, "LibVLC error: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -198,61 +281,119 @@ class VlcPlayerActivity : AppCompatActivity() {
         mediaPlayer?.let { player ->
             if (player.isPlaying) {
                 player.pause()
-                btnVlcPlayPause.text = "▶"
+                tvPlayPauseIcon.text = "▶"
             } else {
                 player.play()
-                btnVlcPlayPause.text = "⏸"
+                tvPlayPauseIcon.text = "⏸"
             }
         }
     }
 
-    private fun seekRelative(offsetMs: Long) {
+    private fun seekRelative(deltaMs: Long) {
         mediaPlayer?.let { player ->
-            val currentTime = player.time
-            val length = player.length
-            val newTime = (currentTime + offsetMs).coerceIn(0L, length)
-            player.time = newTime
+            val curr = player.time
+            val dur = player.length
+            val target = (curr + deltaMs).coerceIn(0L, if (dur > 0L) dur else Long.MAX_VALUE)
+            player.time = target
         }
     }
 
-    private fun showControls() {
-        controlsVisible = true
-        layoutControlsOverlay.visibility = View.VISIBLE
-        resetControlsHideTimer()
+    private fun toggleLock() {
+        isLocked = !isLocked
+        tvLockIcon.text = if (isLocked) "🔓" else "🔒"
+        Toast.makeText(this, if (isLocked) "Screen locked" else "Screen unlocked", Toast.LENGTH_SHORT).show()
+        scheduleControlsAutoHide()
     }
 
-    private fun hideControls() {
-        controlsVisible = false
-        layoutControlsOverlay.visibility = View.GONE
+    private fun cycleSpeed() {
+        currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.size
+        val speed = speedOptions[currentSpeedIndex]
+        mediaPlayer?.rate = speed
+        tvSpeedLabel.text = speedLabels[currentSpeedIndex]
+        Toast.makeText(this, "Speed: ${speedLabels[currentSpeedIndex]}", Toast.LENGTH_SHORT).show()
     }
 
-    private fun resetControlsHideTimer() {
-        handler.removeCallbacks(hideControlsRunnable)
-        handler.postDelayed(hideControlsRunnable, 4000)
+    private fun showSpeedDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Playback Speed")
+            .setItems(speedLabels) { _, which ->
+                currentSpeedIndex = which
+                val speed = speedOptions[which]
+                mediaPlayer?.rate = speed
+                tvSpeedLabel.text = speedLabels[which]
+            }
+            .show()
+    }
+
+    private fun showTrackSelectionDialog(title: String) {
+        val player = mediaPlayer ?: return
+        val audioTracks = player.audioTracks
+        val spuTracks = player.spuTracks
+
+        val items = mutableListOf<String>()
+        val actions = mutableListOf<() -> Unit>()
+
+        audioTracks?.forEach { track ->
+            items.add("🎵 Audio: ${track.name}")
+            actions.add { player.setAudioTrack(track.id) }
+        }
+
+        items.add("🚫 Disable Subtitles")
+        actions.add { player.setSpuTrack(-1) }
+
+        spuTracks?.forEach { track ->
+            items.add("💬 Subtitle: ${track.name}")
+            actions.add { player.setSpuTrack(track.id) }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setItems(items.toTypedArray()) { _, which ->
+                actions.getOrNull(which)?.invoke()
+            }
+            .show()
+    }
+
+    private var currentAspectIndex = 0
+    private val aspectRatios = arrayOf("FIT", "FILL", "16:9", "4:3", "ORIGINAL")
+    private fun cycleAspectRatio() {
+        currentAspectIndex = (currentAspectIndex + 1) % aspectRatios.size
+        val mode = aspectRatios[currentAspectIndex]
+        mediaPlayer?.aspectRatio = when (mode) {
+            "16:9" -> "16:9"
+            "4:3" -> "4:3"
+            "FILL" -> "1:1"
+            else -> null
+        }
+        Toast.makeText(this, "Aspect Ratio: $mode", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun scheduleControlsAutoHide() {
+        hideHandler.removeCallbacks(hideControlsRunnable)
+        hideHandler.postDelayed(hideControlsRunnable, 4000L)
     }
 
     private fun formatTime(millis: Long): String {
-        val totalSeconds = millis / 1000
-        val minutes = totalSeconds / 60
-        val seconds = totalSeconds % 60
-        val hours = minutes / 60
-        return if (hours > 0) {
-            String.format(Locale.US, "%d:%02d:%02d", hours, minutes % 60, seconds)
+        val totalSecs = millis / 1000
+        val hrs = totalSecs / 3600
+        val mins = (totalSecs % 3600) / 60
+        val secs = totalSecs % 60
+        return if (hrs > 0) {
+            String.format(Locale.US, "%d:%02d:%02d", hrs, mins, secs)
         } else {
-            String.format(Locale.US, "%02d:%02d", minutes, seconds)
+            String.format(Locale.US, "%02d:%02d", mins, secs)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        mediaPlayer?.pause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
-        mediaPlayer?.let { player ->
-            player.stop()
-            player.detachViews()
-            player.release()
-        }
+        hideHandler.removeCallbacksAndMessages(null)
+        mediaPlayer?.release()
         libVLC?.release()
-        mediaPlayer = null
-        libVLC = null
     }
 }

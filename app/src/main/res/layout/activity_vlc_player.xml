@@ -16,62 +16,112 @@
     <!-- Buffering Spinner -->
     <ProgressBar
         android:id="@+id/pbVlcBuffering"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
         android:layout_gravity="center"
-        android:indeterminateTint="@color/accent_cyan" />
+        android:indeterminateTint="#FF7700" />
 
     <!-- Overlay Controller Container -->
     <FrameLayout
         android:id="@+id/layoutControlsOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#40000000">
+        android:background="#50000000">
 
-        <!-- Top Bar: Back button and Title -->
+        <!-- Top Bar: Back, Title, CC, Settings, VLC Indicator -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="top"
-            android:background="#90000000"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="12dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="12dp">
 
-            <ImageButton
+            <!-- Rounded Back Button -->
+            <FrameLayout
                 android:id="@+id/btnVlcBack"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_revert"
-                app:tint="#FFFFFF"
-                android:contentDescription="Back" />
+                android:background="@drawable/ic_launcher_background"
+                android:backgroundTint="#26FFFFFF">
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="←"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <!-- Video Title -->
             <TextView
                 android:id="@+id/tvVlcTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
-                android:text="Video Player"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="12dp"
+                android:text="Video_1782206965.mp4"
                 android:textColor="#FFFFFF"
-                android:textSize="16sp"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
-            <!-- VLC Badge -->
+            <!-- Subtitle CC Button -->
             <TextView
+                android:id="@+id/btnVlcSubtitles"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🟠 VLC"
-                android:textColor="#FF9800"
-                android:textSize="12sp"
+                android:layout_marginEnd="16dp"
+                android:text="[CC]"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
                 android:textStyle="bold"
-                android:padding="4dp" />
+                android:padding="6dp" />
+
+            <!-- Settings Button -->
+            <TextView
+                android:id="@+id/btnVlcSettings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:text="⚙️"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:padding="6dp" />
+
+            <!-- VLC Badge -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🟠"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="VLC"
+                    android:textColor="#FF8800"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
         </LinearLayout>
 
-        <!-- Center Controls: Rewind, Play/Pause, Forward -->
+        <!-- Center Controls: Rewind 10s, Orange Play/Pause, Forward 10s -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -79,79 +129,229 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <com.google.android.material.button.MaterialButton
+            <!-- Rewind 10s -->
+            <FrameLayout
                 android:id="@+id/btnVlcRewind"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:text="⏪"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                style="@style/Widget.MaterialComponents.Button.TextButton" />
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/ic_launcher_background"
+                android:backgroundTint="#33FFFFFF">
 
-            <com.google.android.material.button.MaterialButton
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="↶ 10"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <!-- Play/Pause Orange Circle -->
+            <FrameLayout
                 android:id="@+id/btnVlcPlayPause"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:text="⏸"
-                android:textColor="#FFFFFF"
-                android:textSize="28sp"
-                style="@style/Widget.MaterialComponents.Button.TextButton" />
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:layout_marginStart="28dp"
+                android:layout_marginEnd="28dp"
+                android:background="@drawable/ic_launcher_background"
+                android:backgroundTint="#FF7700">
 
-            <com.google.android.material.button.MaterialButton
+                <TextView
+                    android:id="@+id/tvPlayPauseIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="⏸"
+                    android:textColor="#FFFFFF"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <!-- Forward 10s -->
+            <FrameLayout
                 android:id="@+id/btnVlcForward"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:text="⏩"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                style="@style/Widget.MaterialComponents.Button.TextButton" />
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/ic_launcher_background"
+                android:backgroundTint="#33FFFFFF">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="↷ 10"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
         </LinearLayout>
 
-        <!-- Bottom Bar: SeekBar and Timers -->
+        <!-- Bottom Controller Bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:background="#90000000"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp">
 
-            <SeekBar
-                android:id="@+id/sbVlcProgress"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:progressTint="@color/accent_cyan"
-                android:thumbTint="@color/accent_cyan" />
-
+            <!-- Time Row with Orange Seekbar -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="4dp">
+                android:gravity="center_vertical">
 
+                <!-- Current Time -->
                 <TextView
                     android:id="@+id/tvVlcCurrentTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="00:00"
+                    android:text="00:07"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <!-- Progress Seekbar -->
+                <SeekBar
+                    android:id="@+id/sbVlcProgress"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:progressTint="#FF7700"
+                    android:thumbTint="#FF7700" />
+
+                <!-- Total Duration -->
+                <TextView
+                    android:id="@+id/tvVlcTotalDuration"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="3:00:55"
+                    android:textColor="#BBBBBB"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- Bottom Actions Row: Lock, Speed, Previous, Next, Fullscreen -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Lock Button -->
+                <LinearLayout
+                    android:id="@+id/btnVlcLock"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="6dp">
+
+                    <TextView
+                        android:id="@+id/tvLockIcon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔒"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Lock"
+                        android:textColor="#AAAAAA"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
+                <!-- Speed Selector -->
+                <LinearLayout
+                    android:id="@+id/btnVlcSpeed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="6dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⏱️"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/tvSpeedLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="1.0x"
+                        android:textColor="#AAAAAA"
+                        android:textSize="9sp" />
+                </LinearLayout>
 
                 <View
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:layout_weight="1" />
 
+                <!-- Prev Button -->
                 <TextView
-                    android:id="@+id/tvVlcTotalDuration"
+                    android:id="@+id/btnVlcPrev"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="00:00"
-                    android:textColor="#CCCCCC"
-                    android:textSize="12sp" />
+                    android:text="⏮"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp"
+                    android:padding="8dp" />
+
+                <!-- Next Button -->
+                <TextView
+                    android:id="@+id/btnVlcNext"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:text="⏭"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp"
+                    android:padding="8dp" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <!-- Fullscreen Toggle -->
+                <LinearLayout
+                    android:id="@+id/btnVlcFullscreen"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="6dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⛶"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Fullscreen"
+                        android:textColor="#AAAAAA"
+                        android:textSize="9sp" />
+                </LinearLayout>
+
             </LinearLayout>
+
         </LinearLayout>
 
     </FrameLayout>
