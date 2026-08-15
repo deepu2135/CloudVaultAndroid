@@ -164,7 +164,8 @@ object TelegramRepository {
                         messageId = msg.id,
                         fileId = content.video.video.id,
                         thumbnailFileId = content.video.thumbnail?.file?.id ?: 0,
-                        dateAdded = msg.date.toLong()
+                        dateAdded = msg.date.toLong(),
+                        durationSeconds = content.video.duration
                     )
                 )
             }

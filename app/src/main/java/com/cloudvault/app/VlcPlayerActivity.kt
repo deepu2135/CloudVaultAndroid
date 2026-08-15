@@ -56,6 +56,7 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
+    private var explicitDurationMs: Long = 0L
 
     private var isUserTracking = false
     private var isLocked = false
@@ -92,6 +93,8 @@ class VlcPlayerActivity : AppCompatActivity() {
         val title = intent.getStringExtra("TITLE") ?: "Video"
         val chatId = intent.getLongExtra("CHAT_ID", 0L)
         val messageId = intent.getLongExtra("MESSAGE_ID", 0L)
+        val durSec = intent.getIntExtra("DURATION_SECONDS", 0)
+        explicitDurationMs = if (durSec > 0) durSec * 1000L else intent.getLongExtra("DURATION_MS", 0L)
 
         if (fileId != 0 && chatId != 0L && messageId != 0L) {
             TelegramStreamingProxy.registerFileMessage(fileId, chatId, messageId)
@@ -115,6 +118,10 @@ class VlcPlayerActivity : AppCompatActivity() {
         tvVlcCurrentTime = findViewById(R.id.tvVlcCurrentTime)
         sbVlcProgress = findViewById(R.id.sbVlcProgress)
         tvVlcTotalDuration = findViewById(R.id.tvVlcTotalDuration)
+
+        if (explicitDurationMs > 0L) {
+            tvVlcTotalDuration.text = formatTime(explicitDurationMs)
+        }
 
         btnVlcLock = findViewById(R.id.btnVlcLock)
         tvLockIcon = findViewById(R.id.tvLockIcon)
@@ -198,12 +205,26 @@ class VlcPlayerActivity : AppCompatActivity() {
         scheduleControlsAutoHide()
     }
 
+    private fun getEffectiveDuration(): Long {
+        val vlcLength = mediaPlayer?.length ?: 0L
+        if (explicitDurationMs > 0L) {
+            // When streaming over local HTTP, VLC's demuxer can sometimes estimate an inaccurate length
+            // (e.g. 3 hours = 10,855,000ms for a 1-minute video due to container timescale quirk).
+            // If VLC reports 0, or VLC reports a length > 2.5x or < 0.3x the verified video duration,
+            // prioritize explicitDurationMs.
+            if (vlcLength <= 0L || vlcLength > explicitDurationMs * 2.5 || vlcLength < explicitDurationMs * 0.3) {
+                return explicitDurationMs
+            }
+        }
+        return if (vlcLength > 0L) vlcLength else explicitDurationMs
+    }
+
     private fun setupSeekBar() {
         sbVlcProgress.max = 1000
         sbVlcProgress.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val duration = mediaPlayer?.length ?: 0L
+                    val duration = getEffectiveDuration()
                     if (duration > 0L) {
                         val newTime = (progress.toFloat() / 1000f * duration).toLong()
                         tvVlcCurrentTime.text = formatTime(newTime)
@@ -219,7 +240,7 @@ class VlcPlayerActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
                 isUserTracking = false
                 val progress = seekBar?.progress ?: 0
-                val duration = mediaPlayer?.length ?: 0L
+                val duration = getEffectiveDuration()
                 if (duration > 0L) {
                     val seekTime = (progress.toFloat() / 1000f * duration).toLong()
                     mediaPlayer?.time = seekTime
@@ -296,12 +317,15 @@ class VlcPlayerActivity : AppCompatActivity() {
                         MediaPlayer.Event.TimeChanged -> {
                             if (!isUserTracking) {
                                 val time = player.time
-                                val length = player.length
+                                val length = getEffectiveDuration()
                                 if (length > 0L) {
-                                    val progress = ((time.toFloat() / length.toFloat()) * 1000).toInt()
+                                    val clampedTime = time.coerceIn(0L, length)
+                                    val progress = ((clampedTime.toFloat() / length.toFloat()) * 1000).toInt().coerceIn(0, 1000)
                                     sbVlcProgress.progress = progress
-                                    tvVlcCurrentTime.text = formatTime(time)
+                                    tvVlcCurrentTime.text = formatTime(clampedTime)
                                     tvVlcTotalDuration.text = formatTime(length)
+                                } else if (time > 0L) {
+                                    tvVlcCurrentTime.text = formatTime(time)
                                 }
                             }
                         }
@@ -340,7 +364,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private fun seekRelative(deltaMs: Long) {
         mediaPlayer?.let { player ->
             val curr = player.time
-            val dur = player.length
+            val dur = getEffectiveDuration()
             val target = (curr + deltaMs).coerceIn(0L, if (dur > 0L) dur else Long.MAX_VALUE)
             player.time = target
         }

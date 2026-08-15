@@ -928,6 +928,7 @@ class MainActivity : AppCompatActivity() {
                 putExtra("CHAT_ID", item.chatId)
                 putExtra("MESSAGE_ID", item.messageId)
                 putExtra("SIZE_BYTES", item.sizeBytes)
+                putExtra("DURATION_SECONDS", item.durationSeconds)
             }
             startActivity(intent)
 

@@ -14,7 +14,8 @@ data class VaultMediaItem(
     val messageId: Long,
     val fileId: Int,
     val thumbnailFileId: Int = 0,
-    val dateAdded: Long
+    val dateAdded: Long,
+    val durationSeconds: Int = 0
 )
 
 enum class MediaType {
