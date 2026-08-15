@@ -6,8 +6,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -17,6 +15,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -71,15 +72,21 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.attributes.layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        }
-        hideSystemUI()
-
         setContentView(R.layout.activity_vlc_player)
+
+        try {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                window.attributes = window.attributes.apply {
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+        } catch (e: Throwable) {
+            android.util.Log.e("VlcPlayer", "Window cutout setup error", e)
+        }
+
+        window.decorView.post { hideSystemUI() }
 
         val fileId = intent.getIntExtra("FILE_ID", 0)
         val title = intent.getStringExtra("TITLE") ?: "Video"
@@ -236,7 +243,17 @@ class VlcPlayerActivity : AppCompatActivity() {
 
             val player = MediaPlayer(vlc)
             mediaPlayer = player
-            player.attachViews(vlcVideoLayout, null, true, true)
+
+            try {
+                player.attachViews(vlcVideoLayout, null, true, true)
+            } catch (e: Throwable) {
+                android.util.Log.w("VlcPlayer", "TextureView attach failed, fallback to SurfaceView", e)
+                try {
+                    player.attachViews(vlcVideoLayout, null, true, false)
+                } catch (e2: Throwable) {
+                    android.util.Log.e("VlcPlayer", "attachViews fallback failed", e2)
+                }
+            }
 
             val rawStreamUrl = intent.getStringExtra("STREAM_URL")
             val proxyUrl = if (!rawStreamUrl.isNullOrBlank()) rawStreamUrl else TelegramStreamingProxy.getUrl(fileId, videoTitle)
@@ -247,40 +264,43 @@ class VlcPlayerActivity : AppCompatActivity() {
             }
 
             player.setEventListener { event ->
-                when (event.type) {
-                    MediaPlayer.Event.Buffering -> {
-                        if (event.buffering < 100f) {
-                            pbVlcBuffering.visibility = View.VISIBLE
-                        } else {
-                            pbVlcBuffering.visibility = View.GONE
-                        }
-                    }
-                    MediaPlayer.Event.Playing -> {
-                        pbVlcBuffering.visibility = View.GONE
-                        tvPlayPauseIcon.text = "⏸"
-                    }
-                    MediaPlayer.Event.Paused -> {
-                        tvPlayPauseIcon.text = "▶"
-                    }
-                    MediaPlayer.Event.EndReached -> {
-                        tvPlayPauseIcon.text = "▶"
-                        pbVlcBuffering.visibility = View.GONE
-                    }
-                    MediaPlayer.Event.TimeChanged -> {
-                        if (!isUserTracking) {
-                            val time = player.time
-                            val length = player.length
-                            if (length > 0L) {
-                                val progress = ((time.toFloat() / length.toFloat()) * 1000).toInt()
-                                sbVlcProgress.progress = progress
-                                tvVlcCurrentTime.text = formatTime(time)
-                                tvVlcTotalDuration.text = formatTime(length)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    when (event.type) {
+                        MediaPlayer.Event.Buffering -> {
+                            if (event.buffering < 100f) {
+                                pbVlcBuffering.visibility = View.VISIBLE
+                            } else {
+                                pbVlcBuffering.visibility = View.GONE
                             }
                         }
-                    }
-                    MediaPlayer.Event.EncounteredError -> {
-                        pbVlcBuffering.visibility = View.GONE
-                        Toast.makeText(this, "VLC encountered a playback error", Toast.LENGTH_SHORT).show()
+                        MediaPlayer.Event.Playing -> {
+                            pbVlcBuffering.visibility = View.GONE
+                            tvPlayPauseIcon.text = "⏸"
+                        }
+                        MediaPlayer.Event.Paused -> {
+                            tvPlayPauseIcon.text = "▶"
+                        }
+                        MediaPlayer.Event.EndReached -> {
+                            tvPlayPauseIcon.text = "▶"
+                            pbVlcBuffering.visibility = View.GONE
+                        }
+                        MediaPlayer.Event.TimeChanged -> {
+                            if (!isUserTracking) {
+                                val time = player.time
+                                val length = player.length
+                                if (length > 0L) {
+                                    val progress = ((time.toFloat() / length.toFloat()) * 1000).toInt()
+                                    sbVlcProgress.progress = progress
+                                    tvVlcCurrentTime.text = formatTime(time)
+                                    tvVlcTotalDuration.text = formatTime(length)
+                                }
+                            }
+                        }
+                        MediaPlayer.Event.EncounteredError -> {
+                            pbVlcBuffering.visibility = View.GONE
+                            Toast.makeText(this@VlcPlayerActivity, "VLC encountered a playback error", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
@@ -426,23 +446,24 @@ class VlcPlayerActivity : AppCompatActivity() {
     }
 
     private fun hideSystemUI() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let { controller ->
-                controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior =
-                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_FULLSCREEN
-            )
+        try {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        } catch (e: Throwable) {
+            try {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN
+                )
+            } catch (_: Throwable) {}
         }
     }
 
@@ -455,13 +476,34 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        mediaPlayer?.pause()
+        try {
+            mediaPlayer?.pause()
+        } catch (_: Throwable) {}
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try {
+            mediaPlayer?.pause()
+        } catch (_: Throwable) {}
     }
 
     override fun onDestroy() {
         super.onDestroy()
         hideHandler.removeCallbacksAndMessages(null)
-        mediaPlayer?.release()
-        libVLC?.release()
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.detachViews()
+            mediaPlayer?.release()
+        } catch (e: Throwable) {
+            android.util.Log.e("VlcPlayerActivity", "Error releasing MediaPlayer", e)
+        }
+        try {
+            libVLC?.release()
+        } catch (e: Throwable) {
+            android.util.Log.e("VlcPlayerActivity", "Error releasing LibVLC", e)
+        }
+        mediaPlayer = null
+        libVLC = null
     }
 }
