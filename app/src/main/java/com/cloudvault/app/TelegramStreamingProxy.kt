@@ -153,11 +153,6 @@ object TelegramStreamingProxy {
 
         withContext(NonCancellable) {
             try {
-                // Cancel stuck TDLib download task on major offset jumps
-                if (isOffsetJump && !DownloadManager.isFileIdActive(fileId)) {
-                    runCatching { TelegramClient.sendRequest(TdApi.CancelDownloadFile(fileId, false)) }
-                }
-
                 val res = TelegramClient.sendRequest(TdApi.DownloadFile().also { req ->
                     req.fileId = fileId
                     req.priority = DOWNLOAD_PRIORITY
@@ -464,20 +459,23 @@ object TelegramStreamingProxy {
         try {
             lastStreamedFileId = fileId
 
-            // Ensure TDLib message/file reference is pre-warmed if message mapping exists
+            // Pre-warm TDLib message reference in the background without blocking the HTTP response
             val targetFileId = resolveFileId(fileId)
             if (fileToMessageMap.containsKey(targetFileId) || fileToMessageMap.containsKey(fileId)) {
-                refreshFileId(targetFileId)
+                scope.launch { runCatching { refreshFileId(targetFileId) } }
             }
 
-            // Get file info
-            val fileInfo = getFileInfo(fileId)
-            val exactSize = fileInfo?.second?.takeIf { it > 0 } ?: urlSize.takeIf { it > 0 }
-            val totalSize = exactSize ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
-            val localPath = fileInfo?.first
+            // Get file total size instantly from URL parameter if available, else query TDLib
+            val totalSize: Long = if (urlSize > 0L) {
+                urlSize
+            } else {
+                val fileInfo = getFileInfo(fileId)
+                fileInfo?.second?.takeIf { it > 0 } ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
+            }
 
             if (totalSize <= 0L) {
                 output.write("HTTP/1.1 404 Not Found\r\n\r\n".toByteArray())
+                output.flush()
                 return
             }
 
@@ -521,8 +519,7 @@ object TelegramStreamingProxy {
 
             val length = end - start + 1
 
-            val ext = fileName?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.isNotBlank() }
-                ?: localPath?.substringAfterLast('.', "")?.lowercase() ?: ""
+            val ext = fileName?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.isNotBlank() } ?: "mp4"
                 
             val mimeType = getMimeType(ext)
 
