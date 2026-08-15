@@ -363,7 +363,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     }
 
     private var currentAspectIndex = 0
-    private val aspectModes = arrayOf("Fit Screen", "Fill", "Fit (Original)")
+    private val aspectModes = arrayOf("Best Fit", "Zoom to Fill", "Stretch (Full)")
 
     private fun cycleAspectRatio() {
         val player = mediaPlayer ?: return
@@ -375,22 +375,22 @@ class VlcPlayerActivity : AppCompatActivity() {
 
         when (currentAspectIndex) {
             0 -> {
-                // 1. Fit Screen (Entire video visible, original aspect ratio with letterboxing)
+                // 1. Best Fit (Entire video visible, original aspect ratio with letterboxing)
                 player.aspectRatio = null
                 player.scale = 0f
                 player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
             }
             1 -> {
-                // 2. Fill (Full screen edge-to-edge fill)
+                // 2. Zoom to Fill (Crops top/bottom or sides without distortion to remove black bars)
+                player.aspectRatio = null
+                player.scale = 0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_FIT_SCREEN
+            }
+            2 -> {
+                // 3. Stretch (Full screen edge-to-edge stretch)
                 player.scale = 0f
                 player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
                 player.aspectRatio = "$rootW:$rootH"
-            }
-            2 -> {
-                // 3. Fit (Original) (1:1 Original source resolution)
-                player.aspectRatio = null
-                player.scale = 1.0f
-                player.videoScale = MediaPlayer.ScaleType.SURFACE_ORIGINAL
             }
         }
         vlcVideoLayout.requestLayout()
