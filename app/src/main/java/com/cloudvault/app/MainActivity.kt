@@ -12,6 +12,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -662,6 +663,9 @@ class MainActivity : AppCompatActivity() {
         val btnSettingsLogout: MaterialButton = dialogView.findViewById(R.id.btnSettingsLogout)
         val btnCloseSettings: TextView = dialogView.findViewById(R.id.btnCloseSettings)
 
+        val cardOptionCacheManager: MaterialCardView = dialogView.findViewById(R.id.cardOptionCacheManager)
+        val tvSettingsCacheSizeBadge: TextView = dialogView.findViewById(R.id.tvSettingsCacheSizeBadge)
+
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .create()
@@ -679,11 +683,26 @@ class MainActivity : AppCompatActivity() {
                 "Disabled • Tap to configure"
             }
         }
+
+        fun updateCacheSummary() {
+            lifecycleScope.launch {
+                val stats = CacheManager.calculateCacheStats(this@MainActivity)
+                tvSettingsCacheSizeBadge.text = CacheManager.formatBytes(stats.totalBytes)
+            }
+        }
+
         updateBackupSummary()
+        updateCacheSummary()
 
         cardOptionAutoBackup.setOnClickListener {
             showAutoBackupSettingsDialog {
                 updateBackupSummary()
+            }
+        }
+
+        cardOptionCacheManager.setOnClickListener {
+            showCacheManagerDialog {
+                updateCacheSummary()
             }
         }
 
@@ -728,6 +747,183 @@ class MainActivity : AppCompatActivity() {
 
         btnCloseSettings.setOnClickListener {
             dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    private fun showCacheManagerDialog(onDismissCallback: (() -> Unit)? = null) {
+        if (isFinishing || isDestroyed) return
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_cache_manager, null)
+        val btnCacheBack: TextView = dialogView.findViewById(R.id.btnCacheBack)
+        val btnCacheClose: TextView = dialogView.findViewById(R.id.btnCacheClose)
+        val donutStorageChart: StorageDonutChartView = dialogView.findViewById(R.id.donutStorageChart)
+        val tvDeviceStoragePercent: TextView = dialogView.findViewById(R.id.tvDeviceStoragePercent)
+        val pbCacheLoading: ProgressBar = dialogView.findViewById(R.id.pbCacheLoading)
+
+        val rowCacheVideos: LinearLayout = dialogView.findViewById(R.id.rowCacheVideos)
+        val cbVideos: CheckBox = dialogView.findViewById(R.id.cbVideos)
+        val tvVideosPercent: TextView = dialogView.findViewById(R.id.tvVideosPercent)
+        val tvVideosSize: TextView = dialogView.findViewById(R.id.tvVideosSize)
+
+        val rowCacheDocs: LinearLayout = dialogView.findViewById(R.id.rowCacheDocs)
+        val cbDocs: CheckBox = dialogView.findViewById(R.id.cbDocs)
+        val tvDocsPercent: TextView = dialogView.findViewById(R.id.tvDocsPercent)
+        val tvDocsSize: TextView = dialogView.findViewById(R.id.tvDocsSize)
+
+        val rowCachePhotos: LinearLayout = dialogView.findViewById(R.id.rowCachePhotos)
+        val cbPhotos: CheckBox = dialogView.findViewById(R.id.cbPhotos)
+        val tvPhotosPercent: TextView = dialogView.findViewById(R.id.tvPhotosPercent)
+        val tvPhotosSize: TextView = dialogView.findViewById(R.id.tvPhotosSize)
+
+        val rowCacheOther: LinearLayout = dialogView.findViewById(R.id.rowCacheOther)
+        val cbOther: CheckBox = dialogView.findViewById(R.id.cbOther)
+        val tvOtherPercent: TextView = dialogView.findViewById(R.id.tvOtherPercent)
+        val tvOtherSize: TextView = dialogView.findViewById(R.id.tvOtherSize)
+
+        val btnClearSelectedCache: MaterialButton = dialogView.findViewById(R.id.btnClearSelectedCache)
+
+        val rowKeepMedia: LinearLayout = dialogView.findViewById(R.id.rowKeepMedia)
+        val tvKeepMediaValue: TextView = dialogView.findViewById(R.id.tvKeepMediaValue)
+        val rowMaxCacheSize: LinearLayout = dialogView.findViewById(R.id.rowMaxCacheSize)
+        val tvMaxCacheValue: TextView = dialogView.findViewById(R.id.tvMaxCacheValue)
+
+        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.setContentView(dialogView)
+        dialog.window?.apply {
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            setBackgroundDrawable(ColorDrawable(Color.parseColor("#0A0F1D")))
+        }
+
+        btnCacheBack.setOnClickListener { dialog.dismiss() }
+        btnCacheClose.setOnClickListener { dialog.dismiss() }
+        dialog.setOnDismissListener { onDismissCallback?.invoke() }
+
+        fun updateRetentionLabels() {
+            val keepDays = CacheManager.getKeepMediaDays(this)
+            tvKeepMediaValue.text = when (keepDays) {
+                3 -> "3 Days"
+                7 -> "1 Week"
+                30 -> "1 Month"
+                else -> "Forever"
+            }
+
+            val maxMb = CacheManager.getMaxCacheSizeMb(this)
+            tvMaxCacheValue.text = when (maxMb) {
+                500L -> "500 MB"
+                2048L -> "2 GB"
+                5120L -> "5 GB"
+                else -> "No Limit"
+            }
+        }
+        updateRetentionLabels()
+
+        rowKeepMedia.setOnClickListener {
+            val options = arrayOf("3 Days", "1 Week", "1 Month", "Forever (Default)")
+            val daysValues = arrayOf(3, 7, 30, -1)
+            AlertDialog.Builder(this)
+                .setTitle("Keep Media")
+                .setItems(options) { _, which ->
+                    CacheManager.setKeepMediaDays(this, daysValues[which])
+                    updateRetentionLabels()
+                }
+                .show()
+        }
+
+        rowMaxCacheSize.setOnClickListener {
+            val options = arrayOf("500 MB", "2 GB", "5 GB", "No Limit (Default)")
+            val mbValues = arrayOf(500L, 2048L, 5120L, 0L)
+            AlertDialog.Builder(this)
+                .setTitle("Maximum Cache Size")
+                .setItems(options) { _, which ->
+                    CacheManager.setMaxCacheSizeMb(this, mbValues[which])
+                    updateRetentionLabels()
+                }
+                .show()
+        }
+
+        fun renderStats(stats: CacheManager.CacheStats) {
+            val total = stats.totalBytes
+
+            fun calcPercent(size: Long): String {
+                if (total <= 0L || size <= 0L) return "<1%"
+                val pct = ((size.toDouble() / total.toDouble()) * 100).toInt()
+                return if (pct < 1) "<1%" else "$pct%"
+            }
+
+            tvVideosSize.text = CacheManager.formatBytes(stats.videoBytes)
+            tvVideosPercent.text = calcPercent(stats.videoBytes)
+
+            tvDocsSize.text = CacheManager.formatBytes(stats.documentBytes)
+            tvDocsPercent.text = calcPercent(stats.documentBytes)
+
+            tvPhotosSize.text = CacheManager.formatBytes(stats.photoBytes)
+            tvPhotosPercent.text = calcPercent(stats.photoBytes)
+
+            tvOtherSize.text = CacheManager.formatBytes(stats.otherBytes)
+            tvOtherPercent.text = calcPercent(stats.otherBytes)
+
+            tvDeviceStoragePercent.text = "CloudVault uses ${stats.deviceUsagePercent}% of your device storage."
+
+            fun updateChartAndButton() {
+                var selectedBytes = 0L
+                if (cbVideos.isChecked) selectedBytes += stats.videoBytes
+                if (cbDocs.isChecked) selectedBytes += stats.documentBytes
+                if (cbPhotos.isChecked) selectedBytes += stats.photoBytes
+                if (cbOther.isChecked) selectedBytes += stats.otherBytes
+
+                val segments = listOf(
+                    StorageDonutChartView.Segment("videos", stats.videoBytes, Color.parseColor("#3B82F6"), cbVideos.isChecked),
+                    StorageDonutChartView.Segment("docs", stats.documentBytes, Color.parseColor("#10B981"), cbDocs.isChecked),
+                    StorageDonutChartView.Segment("photos", stats.photoBytes, Color.parseColor("#F59E0B"), cbPhotos.isChecked),
+                    StorageDonutChartView.Segment("other", stats.otherBytes, Color.parseColor("#EAB308"), cbOther.isChecked)
+                )
+
+                donutStorageChart.setData(segments, CacheManager.formatBytes(selectedBytes))
+                btnClearSelectedCache.text = "Clear Cache ${CacheManager.formatBytes(selectedBytes)}"
+                btnClearSelectedCache.isEnabled = selectedBytes > 0L
+                btnClearSelectedCache.alpha = if (selectedBytes > 0L) 1.0f else 0.5f
+            }
+
+            cbVideos.setOnCheckedChangeListener { _, _ -> updateChartAndButton() }
+            cbDocs.setOnCheckedChangeListener { _, _ -> updateChartAndButton() }
+            cbPhotos.setOnCheckedChangeListener { _, _ -> updateChartAndButton() }
+            cbOther.setOnCheckedChangeListener { _, _ -> updateChartAndButton() }
+
+            rowCacheVideos.setOnClickListener { cbVideos.toggle() }
+            rowCacheDocs.setOnClickListener { cbDocs.toggle() }
+            rowCachePhotos.setOnClickListener { cbPhotos.toggle() }
+            rowCacheOther.setOnClickListener { cbOther.toggle() }
+
+            updateChartAndButton()
+        }
+
+        fun loadCacheData() {
+            pbCacheLoading.visibility = View.VISIBLE
+            lifecycleScope.launch {
+                val stats = CacheManager.calculateCacheStats(this@MainActivity)
+                pbCacheLoading.visibility = View.GONE
+                renderStats(stats)
+            }
+        }
+        loadCacheData()
+
+        btnClearSelectedCache.setOnClickListener {
+            pbCacheLoading.visibility = View.VISIBLE
+            btnClearSelectedCache.isEnabled = false
+            lifecycleScope.launch {
+                val updated = CacheManager.clearSelectedCache(
+                    this@MainActivity,
+                    cbVideos.isChecked,
+                    cbDocs.isChecked,
+                    cbPhotos.isChecked,
+                    cbOther.isChecked
+                )
+                pbCacheLoading.visibility = View.GONE
+                renderStats(updated)
+                Toast.makeText(this@MainActivity, "Cache cleared successfully! 🧹", Toast.LENGTH_SHORT).show()
+            }
         }
 
         dialog.show()
