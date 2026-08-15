@@ -22,7 +22,7 @@ object TelegramStreamingProxy {
     private const val TAG = "TelegramProxy"
     private const val CHUNK_SIZE = 512 * 1024         // 512 KB per socket chunk for maximum throughput & fast demuxing
     var prefetchSizeMb = 32L                             // Prefetch window sent to TDLib (dynamically configured)
-    private const val DOWNLOAD_TIMEOUT_MS = 30_000L
+    private const val DOWNLOAD_TIMEOUT_MS = 60_000L
     private const val DOWNLOAD_PRIORITY = 32              // max TDLib priority
     private const val POLL_INTERVAL_MS = 100L
 
@@ -458,6 +458,9 @@ object TelegramStreamingProxy {
 
         try {
             lastStreamedFileId = fileId
+            lastDownloadRequestOffset.remove(fileId)
+            lastDownloadRequestTime.remove(fileId)
+            activeDownloadWindows.remove(fileId)
 
             // Pre-warm TDLib message reference in the background without blocking the HTTP response
             val targetFileId = resolveFileId(fileId)
@@ -553,7 +556,9 @@ object TelegramStreamingProxy {
             while (offset <= end && running) {
                 val chunkSize = minOf(CHUNK_SIZE.toLong(), end - offset + 1).toInt()
                 val alignedOffset = offset - (offset % (1024 * 1024))
-                val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, prefetchSizeMb, chunkSize)
+                // Fast-start: request 4MB prefetch for initial chunks for instant playback, then 32MB continuous buffer
+                val currentPrefetch = if (m.chunksOk < 2) minOf(4L, prefetchSizeMb) else prefetchSizeMb
+                val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, currentPrefetch, chunkSize)
 
                 if (activeDownloadEnd < 0L || offset >= activeDownloadEnd - maxOf(CHUNK_SIZE.toLong(), safeLimit / 4)) {
                     val isFirstTrigger = activeDownloadEnd < 0L
@@ -1424,7 +1429,7 @@ object TelegramStreamingProxy {
     ): ByteArray? {
         var activeFileId = resolveFileId(fileId)
         val chunkStartMs = System.currentTimeMillis()
-        val timeoutMs = if (metrics?.requestType == "seek_probe") 10_000L else DOWNLOAD_TIMEOUT_MS
+        val timeoutMs = if (metrics?.requestType == "seek_probe") 20_000L else DOWNLOAD_TIMEOUT_MS
         var isFileNotFound = false
         val dataBytes = withTimeoutOrNull(timeoutMs) {
             var attempts = 0
@@ -1537,16 +1542,10 @@ object TelegramStreamingProxy {
                     // A real stall is when ReadFilePart gets no data for >5 seconds (attempts >= 100 with 50ms polling = ~5s)
                     val isStalled = attempts >= 100 && attempts % 100 == 0
                     if (isStalled) {
-                        TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Resetting TDLib stream & refreshing message location...")
+                        TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Refreshing message location and elevating TDLib priority...")
                         val refreshed = refreshFileId(activeFileId, force = true)
                         if (refreshed != null && refreshed != 0) {
                             activeFileId = refreshed
-                        }
-                        if (!DownloadManager.isFileIdActive(activeFileId)) {
-                            runCatching { TelegramClient.sendRequest(TdApi.CancelDownloadFile(activeFileId, false)) }
-                            if (activeFileId != fileId) {
-                                runCatching { TelegramClient.sendRequest(TdApi.CancelDownloadFile(fileId, false)) }
-                            }
                         }
                         lastDownloadRequestOffset.remove(activeFileId)
                         lastDownloadRequestTime.remove(activeFileId)
