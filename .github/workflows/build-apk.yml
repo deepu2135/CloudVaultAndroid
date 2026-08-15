@@ -35,17 +35,17 @@ jobs:
 
 
 
-      - name: Upload Debug APK Artifact
+      - name: Upload Debug APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: CloudVault-Debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: CloudVault-Debug-APKs
+          path: app/build/outputs/apk/debug/*.apk
 
       - name: Get Short SHA
         id: slug
         run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release with APK
+      - name: Create GitHub Release with APKs
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
         uses: softprops/action-gh-release@v2
         with:
@@ -56,14 +56,25 @@ jobs:
 
             **Commit:** `${{ steps.slug.outputs.sha }}`
 
+            ### 📦 Download & Install
+            Choose the APK matching your device CPU architecture for the smallest file size and fastest download:
+            - **`app-arm64-v8a-debug.apk`** (Recommended): Modern 64-bit Android smartphones & tablets (~75% smaller).
+            - **`app-armeabi-v7a-debug.apk`**: Older 32-bit Android phones.
+            - **`app-x86_64-debug.apk`**: 64-bit Android emulators & Chromebooks.
+            - **`app-x86-debug.apk`**: 32-bit Android emulators.
+            - **`app-universal-debug.apk`**: All-in-one APK containing all CPU architectures.
+
             ### Features Included
             - **TDLib Integration**: Native MTProto client engine supporting photos, videos, and documents.
             - **On-Demand Range Proxy**: HTTP socket proxy for instant byte-range streaming without full download.
-            - **ExoPlayer Integration**: Direct streaming video playback.
+            - **LibVLC Player**: Native hardware-accelerated video streaming with custom controls.
             - **Cloud Gallery**: Tabbed interface for Photos, Videos, and Files.
-
-            ### Download & Install
-            Download `app-debug.apk` below and install it directly on your Android device.
-          files: app/build/outputs/apk/debug/app-debug.apk
+            - **Auto Backup**: Google Photos style background media backup.
+          files: |
+            app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+            app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+            app/build/outputs/apk/debug/app-x86_64-debug.apk
+            app/build/outputs/apk/debug/app-x86-debug.apk
+            app/build/outputs/apk/debug/app-universal-debug.apk
           draft: false
           prerelease: false
