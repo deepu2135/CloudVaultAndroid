@@ -16,7 +16,7 @@ class ZoomableImageView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : AppCompatImageView(context, attrs, defStyleAttr) {
 
-    private val matrix = Matrix()
+    private val mMatrix = Matrix()
     private var mode = NONE
 
     private val last = PointF()
@@ -28,6 +28,7 @@ class ZoomableImageView @JvmOverloads constructor(
     private var viewWidth = 0
     private var viewHeight = 0
     private var saveScale = 1f
+    private var baseScale = 1f
     private var origWidth = 0f
     private var origHeight = 0f
 
@@ -66,12 +67,13 @@ class ZoomableImageView @JvmOverloads constructor(
                 scaleFactor = minScale / prevScale
             }
 
-            val focusX = if (origWidth * saveScale <= viewWidth) viewWidth / 2f else detector.focusX
-            val focusY = if (origHeight * saveScale <= viewHeight) viewHeight / 2f else detector.focusY
+            val totalScale = baseScale * saveScale
+            val focusX = if (origWidth * totalScale <= viewWidth) viewWidth / 2f else detector.focusX
+            val focusY = if (origHeight * totalScale <= viewHeight) viewHeight / 2f else detector.focusY
 
-            matrix.postScale(scaleFactor, scaleFactor, focusX, focusY)
+            mMatrix.postScale(scaleFactor, scaleFactor, focusX, focusY)
             fixTrans()
-            imageMatrix = matrix
+            imageMatrix = mMatrix
             invalidate()
             return true
         }
@@ -85,9 +87,9 @@ class ZoomableImageView @JvmOverloads constructor(
                 val targetScale = 2.5f
                 val factor = targetScale / saveScale
                 saveScale = targetScale
-                matrix.postScale(factor, factor, e.x, e.y)
+                mMatrix.postScale(factor, factor, e.x, e.y)
                 fixTrans()
-                imageMatrix = matrix
+                imageMatrix = mMatrix
                 invalidate()
             }
             return true
@@ -100,28 +102,29 @@ class ZoomableImageView @JvmOverloads constructor(
     }
 
     private fun fixTrans() {
-        matrix.getValues(m)
+        mMatrix.getValues(m)
         val transX = m[Matrix.MTRANS_X]
         val transY = m[Matrix.MTRANS_Y]
 
-        val contentW = origWidth * saveScale
-        val contentH = origHeight * saveScale
+        val totalScale = baseScale * saveScale
+        val contentW = origWidth * totalScale
+        val contentH = origHeight * totalScale
 
         val fixX = getFixTranslation(transX, viewWidth.toFloat(), contentW)
         val fixY = getFixTranslation(transY, viewHeight.toFloat(), contentH)
 
         if (fixX != 0f || fixY != 0f) {
-            matrix.postTranslate(fixX, fixY)
+            mMatrix.postTranslate(fixX, fixY)
         }
     }
 
     private fun getFixTranslation(trans: Float, viewSize: Float, contentSize: Float): Float {
         if (contentSize <= viewSize) {
-            // When content is smaller or equal to screen, keep it perfectly centered!
+            // Keep centered in view
             val targetCenter = (viewSize - contentSize) / 2f
             return targetCenter - trans
         }
-        // When content is larger than screen (zoomed in), clamp to edges
+        // Clamped inside bounds
         val minTrans = viewSize - contentSize
         val maxTrans = 0f
 
@@ -132,7 +135,7 @@ class ZoomableImageView @JvmOverloads constructor(
         }
     }
 
-    private fun fitToScreen() {
+    fun fitToScreen() {
         val d = drawable ?: return
         val bmW = d.intrinsicWidth
         val bmH = d.intrinsicHeight
@@ -142,7 +145,8 @@ class ZoomableImageView @JvmOverloads constructor(
         val scaleY = viewHeight.toFloat() / bmH.toFloat()
         val scale = scaleX.coerceAtMost(scaleY)
 
-        matrix.setScale(scale, scale)
+        mMatrix.reset()
+        mMatrix.setScale(scale, scale)
 
         val displayedW = scale * bmW.toFloat()
         val displayedH = scale * bmH.toFloat()
@@ -150,19 +154,20 @@ class ZoomableImageView @JvmOverloads constructor(
         val redundantX = (viewWidth.toFloat() - displayedW) / 2f
         val redundantY = (viewHeight.toFloat() - displayedH) / 2f
 
-        matrix.postTranslate(redundantX, redundantY)
+        mMatrix.postTranslate(redundantX, redundantY)
 
-        origWidth = displayedW
-        origHeight = displayedH
+        origWidth = bmW.toFloat()
+        origHeight = bmH.toFloat()
+        baseScale = scale
         saveScale = 1f
 
-        imageMatrix = matrix
+        imageMatrix = mMatrix
         invalidate()
     }
 
     override fun setImageDrawable(drawable: Drawable?) {
         super.setImageDrawable(drawable)
-        fitToScreen()
+        post { fitToScreen() }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -189,16 +194,17 @@ class ZoomableImageView @JvmOverloads constructor(
                     val deltaX = curr.x - last.x
                     val deltaY = curr.y - last.y
 
-                    val contentW = origWidth * saveScale
-                    val contentH = origHeight * saveScale
+                    val totalScale = baseScale * saveScale
+                    val contentW = origWidth * totalScale
+                    val contentH = origHeight * totalScale
 
                     val dragX = if (contentW <= viewWidth) 0f else deltaX
                     val dragY = if (contentH <= viewHeight) 0f else deltaY
 
-                    matrix.postTranslate(dragX, dragY)
+                    mMatrix.postTranslate(dragX, dragY)
                     fixTrans()
                     last.set(curr.x, curr.y)
-                    imageMatrix = matrix
+                    imageMatrix = mMatrix
                     invalidate()
                 }
             }

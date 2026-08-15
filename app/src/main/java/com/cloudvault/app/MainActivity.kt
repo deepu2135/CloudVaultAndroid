@@ -478,6 +478,10 @@ class MainActivity : AppCompatActivity() {
             setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
             setBackgroundDrawable(ColorDrawable(Color.BLACK))
             addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                attributes.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
 
         btnCloseViewer.setOnClickListener { dialog.dismiss() }
@@ -488,7 +492,7 @@ class MainActivity : AppCompatActivity() {
 
         dialog.show()
 
-        // Load full resolution photo in background
+        // Load full resolution photo in background with EXIF orientation correction
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 var tdFile = TelegramClient.sendRequest(TdApi.GetFile(item.fileId)) as TdApi.File
@@ -507,10 +511,12 @@ class MainActivity : AppCompatActivity() {
 
                 val path = tdFile.local.path
                 if (path.isNotBlank() && File(path).exists()) {
-                    val bitmap = BitmapFactory.decodeFile(path)
+                    val bitmap = ImageUtils.decodeOrientedBitmap(path)
                     withContext(Dispatchers.Main) {
                         pbFullPhotoLoading.visibility = View.GONE
-                        ivFullPhoto.setImageBitmap(bitmap)
+                        if (bitmap != null) {
+                            ivFullPhoto.setImageBitmap(bitmap)
+                        }
                     }
                 }
             } catch (e: Throwable) {
