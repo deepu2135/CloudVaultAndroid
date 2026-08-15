@@ -1,12 +1,16 @@
 package com.cloudvault.app
 
 import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.widget.ScrollView
 import android.provider.OpenableColumns
 import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
@@ -648,14 +652,39 @@ class MainActivity : AppCompatActivity() {
                 val current = index + 1
                 val (tempFile, displayName) = copyUriToTempFile(uri) ?: continue
 
-                UploadNotificationManager.showProgress(applicationContext, current, total, displayName)
+                UploadNotificationManager.showProgress(applicationContext, current, total, displayName, percent = 0)
 
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Uploading ($current/$total): $displayName...", Toast.LENGTH_SHORT).show()
                 }
 
+                var lastProgressUpdate = 0L
                 try {
-                    val success = TelegramRepository.uploadFile(tempFile.absolutePath, mediaType, displayName)
+                    val success = TelegramRepository.uploadFile(
+                        localPath = tempFile.absolutePath,
+                        mediaType = mediaType,
+                        captionText = displayName,
+                        onProgress = { uploaded, totalBytes ->
+                            val now = System.currentTimeMillis()
+                            if (now - lastProgressUpdate > 500L || uploaded == totalBytes) {
+                                lastProgressUpdate = now
+                                val pct = if (totalBytes > 0) ((uploaded * 100) / totalBytes).toInt().coerceIn(0, 100) else 0
+                                val progressText = if (totalBytes > 0) {
+                                    "${CacheManager.formatBytes(uploaded)} of ${CacheManager.formatBytes(totalBytes)} ($pct%)"
+                                } else {
+                                    "${CacheManager.formatBytes(uploaded)} uploaded"
+                                }
+                                UploadNotificationManager.showProgress(
+                                    applicationContext,
+                                    current,
+                                    total,
+                                    displayName,
+                                    percent = pct,
+                                    statusText = progressText
+                                )
+                            }
+                        }
+                    )
                     if (success) {
                         successCount++
                     }
@@ -1006,6 +1035,9 @@ class MainActivity : AppCompatActivity() {
         val cardOptionCacheManager: MaterialCardView = dialogView.findViewById(R.id.cardOptionCacheManager)
         val tvSettingsCacheSizeBadge: TextView = dialogView.findViewById(R.id.tvSettingsCacheSizeBadge)
 
+        val cardOptionAppLogs: MaterialCardView? = dialogView.findViewById(R.id.cardOptionAppLogs)
+        val tvSettingsLogsCountBadge: TextView? = dialogView.findViewById(R.id.tvSettingsLogsCountBadge)
+
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .create()
@@ -1031,8 +1063,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        fun updateLogsSummary() {
+            val count = TeleflixLogger.getLogCount()
+            tvSettingsLogsCountBadge?.text = "$count LOGS"
+        }
+
         updateBackupSummary()
         updateCacheSummary()
+        updateLogsSummary()
 
         cardOptionAutoBackup.setOnClickListener {
             showAutoBackupSettingsDialog {
@@ -1044,6 +1082,10 @@ class MainActivity : AppCompatActivity() {
             showCacheManagerDialog {
                 updateCacheSummary()
             }
+        }
+
+        cardOptionAppLogs?.setOnClickListener {
+            showAppLogsDialog()
         }
 
         // Toggle collapsible API settings
@@ -1088,6 +1130,108 @@ class MainActivity : AppCompatActivity() {
         btnCloseSettings.setOnClickListener {
             dialog.dismiss()
         }
+
+        dialog.show()
+    }
+
+    private fun showAppLogsDialog() {
+        if (isFinishing || isDestroyed) return
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_logs, null)
+        val tvLogsContent: TextView = dialogView.findViewById(R.id.tvLogsContent)
+        val tvLogsCount: TextView = dialogView.findViewById(R.id.tvLogsCount)
+        val tvEmptyLogs: TextView = dialogView.findViewById(R.id.tvEmptyLogs)
+        val etLogSearch: EditText = dialogView.findViewById(R.id.etLogSearch)
+        val btnClearFilter: TextView = dialogView.findViewById(R.id.btnClearFilter)
+        val btnCopyLogs: MaterialButton = dialogView.findViewById(R.id.btnCopyLogs)
+        val btnRefreshLogs: MaterialButton = dialogView.findViewById(R.id.btnRefreshLogs)
+        val btnClearLogs: MaterialButton = dialogView.findViewById(R.id.btnClearLogs)
+        val btnDismissLogs: MaterialButton = dialogView.findViewById(R.id.btnDismissLogs)
+        val btnCloseLogs: TextView = dialogView.findViewById(R.id.btnCloseLogs)
+        val scrollLogs: ScrollView = dialogView.findViewById(R.id.scrollLogs)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        fun refreshLogDisplay() {
+            val query = etLogSearch.text.toString().trim()
+            val logs = if (query.isNotBlank()) {
+                TeleflixLogger.getFilteredLogs(query)
+            } else {
+                TeleflixLogger.getFormattedLogs()
+            }
+
+            val totalCount = TeleflixLogger.getLogCount()
+            tvLogsCount.text = if (query.isNotBlank()) {
+                "Filtering by \"$query\" • Total: $totalCount"
+            } else {
+                "$totalCount log entries recorded"
+            }
+
+            if (logs.isBlank() || logs == "--- No Diagnostic Logs Recorded Yet ---") {
+                tvLogsContent.text = ""
+                tvEmptyLogs.visibility = View.VISIBLE
+            } else {
+                tvEmptyLogs.visibility = View.GONE
+                tvLogsContent.text = logs
+            }
+
+            scrollLogs.post {
+                scrollLogs.fullScroll(View.FOCUS_DOWN)
+            }
+        }
+
+        refreshLogDisplay()
+
+        etLogSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                btnClearFilter.visibility = if (!s.isNullOrBlank()) View.VISIBLE else View.GONE
+                refreshLogDisplay()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
+        btnClearFilter.setOnClickListener {
+            etLogSearch.setText("")
+        }
+
+        btnCopyLogs.setOnClickListener {
+            val query = etLogSearch.text.toString().trim()
+            val logsToCopy = if (query.isNotBlank()) {
+                TeleflixLogger.getFilteredLogs(query)
+            } else {
+                TeleflixLogger.getFormattedLogs()
+            }
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clip = ClipData.newPlainText("CloudVault Diagnostic Logs", logsToCopy)
+            clipboard?.setPrimaryClip(clip)
+            Toast.makeText(this, "Logs copied to clipboard 📋", Toast.LENGTH_SHORT).show()
+        }
+
+        btnRefreshLogs.setOnClickListener {
+            refreshLogDisplay()
+            Toast.makeText(this, "Logs refreshed 🔄", Toast.LENGTH_SHORT).show()
+        }
+
+        btnClearLogs.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Clear App Logs?")
+                .setMessage("Are you sure you want to clear all diagnostic logs?")
+                .setPositiveButton("Clear") { _, _ ->
+                    TeleflixLogger.clearLogs()
+                    refreshLogDisplay()
+                    Toast.makeText(this, "Logs cleared 🗑️", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        btnDismissLogs.setOnClickListener { dialog.dismiss() }
+        btnCloseLogs.setOnClickListener { dialog.dismiss() }
 
         dialog.show()
     }

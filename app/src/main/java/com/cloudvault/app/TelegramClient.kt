@@ -38,6 +38,12 @@ object TelegramClient {
     )
     val fileUpdates: SharedFlow<TdApi.File> = _fileUpdates.asSharedFlow()
 
+    private val _messageUpdates = MutableSharedFlow<TdApi.Object>(
+        extraBufferCapacity = 128,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val messageUpdates: SharedFlow<TdApi.Object> = _messageUpdates.asSharedFlow()
+
     private var client: Client? = null
     private var isLibraryLoaded = false
     private var libraryLoadError: String? = null
@@ -121,7 +127,17 @@ object TelegramClient {
             is TdApi.UpdateFile -> {
                 _fileUpdates.tryEmit(update.file)
             }
-            is TdApi.UpdateNewMessage, is TdApi.UpdateMessageContent, is TdApi.UpdateMessageSendSucceeded -> {
+            is TdApi.UpdateMessageSendSucceeded -> {
+                _messageUpdates.tryEmit(update)
+                scope.launch {
+                    TelegramRepository.loadVaultItems()
+                }
+            }
+            is TdApi.UpdateMessageSendFailed -> {
+                _messageUpdates.tryEmit(update)
+            }
+            is TdApi.UpdateNewMessage, is TdApi.UpdateMessageContent -> {
+                _messageUpdates.tryEmit(update)
                 // Auto-load when new photos, videos, or files are sent/received
                 scope.launch {
                     TelegramRepository.loadVaultItems()
@@ -262,6 +278,14 @@ object TelegramClient {
 
                 if (file != null && file.local.isDownloadingCompleted && file.local.path.isNotBlank() && File(file.local.path).exists()) {
                     return@withContext file
+                }
+
+                // If TDLib cached that the file was completed or local path exists, but it was deleted on disk (e.g. by user),
+                // tell TDLib to clear its local cache entry so it can download cleanly from Telegram Cloud!
+                if (file != null && (file.local.isDownloadingCompleted || file.local.path.isNotBlank()) && (file.local.path.isBlank() || !File(file.local.path).exists())) {
+                    try {
+                        sendRequest(TdApi.DeleteFile(fileId))
+                    } catch (_: Throwable) {}
                 }
 
                 // 2. Request download

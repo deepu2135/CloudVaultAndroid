@@ -57,6 +57,9 @@ object DownloadManager {
 
             var file = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as? TdApi.File
             if (file == null || !file.local.isDownloadingCompleted || file.local.path.isBlank() || !File(file.local.path).exists()) {
+                if (file != null && (file.local.isDownloadingCompleted || file.local.path.isNotBlank()) && (file.local.path.isBlank() || !File(file.local.path).exists())) {
+                    runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(fileId)) }
+                }
                 TelegramClient.sendRequest(TdApi.DownloadFile(fileId, 32, 0L, 0L, false))
 
                 var isDone = false

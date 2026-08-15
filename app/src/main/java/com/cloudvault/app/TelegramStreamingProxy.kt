@@ -1408,6 +1408,8 @@ object TelegramStreamingProxy {
                 if (diskFile.exists() && diskFile.length() in 1..(5 * 1024 * 1024L)) {
                     downloadedFile = diskFile
                     break
+                } else if (!diskFile.exists() && attempts == 0) {
+                    runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(fileId)) }
                 }
             }
             delay(50L)
@@ -1535,10 +1537,22 @@ object TelegramStreamingProxy {
                 }
 
                 if (file?.local?.isDownloadingCompleted == true) {
-                    val finalData = try {
-                        TelegramClient.sendRequest(TdApi.ReadFilePart(activeFileId, offset, limit.toLong())) as? TdApi.Data
-                    } catch (e: Exception) { null }
-                    return@withTimeoutOrNull finalData?.data
+                    val localFileExists = !file.local.path.isNullOrBlank() && java.io.File(file.local.path).exists()
+                    if (localFileExists) {
+                        val finalData = try {
+                            TelegramClient.sendRequest(TdApi.ReadFilePart(activeFileId, offset, limit.toLong())) as? TdApi.Data
+                        } catch (e: Exception) { null }
+                        if (finalData?.data != null && finalData.data.isNotEmpty()) {
+                            return@withTimeoutOrNull finalData.data
+                        }
+                    } else {
+                        // The local file on device storage was deleted (e.g. by user to free local space).
+                        // Tell TDLib to reset its local cache record so it can stream the file chunks from Telegram Cloud!
+                        if (attempts == 0) {
+                            TeleflixLogger.log(TAG, "Local file for fileId=$activeFileId missing from disk, resetting local state via DeleteFile to stream from Telegram Cloud")
+                            runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(activeFileId)) }
+                        }
+                    }
                 }
 
                 // Check if download is active

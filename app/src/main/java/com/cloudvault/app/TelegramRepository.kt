@@ -2,9 +2,17 @@ package com.cloudvault.app
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.TdApi
 import java.io.File
 import java.io.FileOutputStream
@@ -104,6 +112,9 @@ object TelegramRepository {
         videoList: MutableList<VaultMediaItem>,
         fileList: MutableList<VaultMediaItem>
     ) {
+        if (msg.sendingState is TdApi.MessageSendingStateFailed) {
+            return
+        }
         when (val content = msg.content) {
             is TdApi.MessagePhoto -> {
                 val sizes = content.photo.sizes
@@ -218,8 +229,21 @@ object TelegramRepository {
         }
     }
 
-    suspend fun uploadFile(localPath: String, mediaType: MediaType, captionText: String = "", targetChatId: Long = 0L): Boolean {
-        val chatId = if (targetChatId != 0L) targetChatId else getSavedMessagesChatId() ?: return false
+    suspend fun uploadFile(
+        localPath: String,
+        mediaType: MediaType,
+        captionText: String = "",
+        targetChatId: Long = 0L,
+        onProgress: ((uploadedBytes: Long, totalBytes: Long) -> Unit)? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        val targetFile = File(localPath)
+        if (!targetFile.exists() || targetFile.length() <= 0L) {
+            Log.e(TAG, "uploadFile failed: file does not exist or is empty at $localPath")
+            return@withContext false
+        }
+        val totalFileSize = targetFile.length()
+
+        val chatId = if (targetChatId != 0L) targetChatId else getSavedMessagesChatId() ?: return@withContext false
         val inputFile = TdApi.InputFileLocal(localPath)
         val formattedCaption = TdApi.FormattedText(captionText, emptyArray())
 
@@ -258,8 +282,7 @@ object TelegramRepository {
 
                         val frame = retriever.getFrameAtTime(1000000) ?: retriever.frameAtTime
                         if (frame != null) {
-                            val localFile = File(localPath)
-                            val thumbDir = File(localFile.parentFile ?: File("/tmp"), "thumbs").apply { if (!exists()) mkdirs() }
+                            val thumbDir = File(targetFile.parentFile ?: File(localPath).parentFile, "thumbs").apply { if (!exists()) mkdirs() }
                             val thumbFile = File(thumbDir, "thumb_${System.currentTimeMillis()}.jpg")
                             FileOutputStream(thumbFile).use { out ->
                                 frame.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
@@ -280,14 +303,126 @@ object TelegramRepository {
             }
         }
 
-        return try {
+        try {
             val sendMsg = TdApi.SendMessage().apply {
                 this.chatId = chatId
                 this.inputMessageContent = inputContent
             }
-            TelegramClient.sendRequest(sendMsg)
-            loadVaultItems(chatId)
-            true
+            val sentMsg = TelegramClient.sendRequest(sendMsg) as? TdApi.Message
+                ?: throw IllegalStateException("SendMessage returned null")
+
+            val tempMsgId = sentMsg.id
+            Log.d(TAG, "uploadFile dispatched SendMessage tempMsgId=$tempMsgId, waiting for TDLib upload...")
+
+            if (sentMsg.sendingState == null) {
+                // Immediate success (e.g. instantly cached)
+                onProgress?.invoke(totalFileSize, totalFileSize)
+                loadVaultItems(chatId)
+                return@withContext true
+            }
+
+            if (sentMsg.sendingState is TdApi.MessageSendingStateFailed) {
+                Log.e(TAG, "uploadFile: message failed immediately")
+                return@withContext false
+            }
+
+            val uploadingFileId: Int = when (val c = sentMsg.content) {
+                is TdApi.MessagePhoto -> c.photo.sizes.maxByOrNull { it.photo.size }?.photo?.id
+                    ?: (c.photo.sizes.lastOrNull()?.photo?.id ?: 0)
+                is TdApi.MessageVideo -> c.video.video.id
+                is TdApi.MessageDocument -> c.document.document.id
+                else -> 0
+            }
+
+            val timeoutMs = ((totalFileSize / 25_000L) * 1000L).coerceIn(180_000L, 3_600_000L)
+            val uploadSuccess = withTimeoutOrNull(timeoutMs) {
+                var isDone = false
+                var isError = false
+
+                val fileCollector = launch {
+                    TelegramClient.fileUpdates.collect { file ->
+                        if (file.id == uploadingFileId) {
+                            val uploaded = file.remote.uploadedSize
+                            val total = if (file.size > 0) file.size else (if (file.expectedSize > 0) file.expectedSize else totalFileSize)
+                            onProgress?.invoke(uploaded, total)
+                            if (file.remote.isUploadingCompleted) {
+                                isDone = true
+                            }
+                        }
+                    }
+                }
+
+                val msgCollector = launch {
+                    TelegramClient.messageUpdates.collect { update ->
+                        when (update) {
+                            is TdApi.UpdateMessageSendSucceeded -> {
+                                if (update.oldMessageId == tempMsgId || update.message.id == tempMsgId) {
+                                    Log.d(TAG, "uploadFile: received UpdateMessageSendSucceeded for tempMsgId=$tempMsgId")
+                                    isDone = true
+                                }
+                            }
+                            is TdApi.UpdateMessageSendFailed -> {
+                                if (update.oldMessageId == tempMsgId || update.message.id == tempMsgId) {
+                                    val errCode = update.error?.code ?: 0
+                                    val errMsg = update.error?.message ?: "unknown"
+                                    Log.e(TAG, "uploadFile: received UpdateMessageSendFailed [$errCode]: $errMsg")
+                                    isError = true
+                                }
+                            }
+                        }
+                    }
+                }
+
+                try {
+                    while (isActive && !isDone && !isError) {
+                        delay(1000L)
+
+                        // Fallback polling check
+                        try {
+                            if (uploadingFileId > 0) {
+                                val checkFile = TelegramClient.sendRequest(TdApi.GetFile(uploadingFileId)) as? TdApi.File
+                                if (checkFile != null) {
+                                    val uploaded = checkFile.remote.uploadedSize
+                                    val total = if (checkFile.size > 0) checkFile.size else (if (checkFile.expectedSize > 0) checkFile.expectedSize else totalFileSize)
+                                    onProgress?.invoke(uploaded, total)
+                                    if (checkFile.remote.isUploadingCompleted) {
+                                        isDone = true
+                                        break
+                                    }
+                                }
+                            }
+
+                            val checkMsg = TelegramClient.sendRequest(TdApi.GetMessage(chatId, tempMsgId)) as? TdApi.Message
+                            if (checkMsg != null) {
+                                if (checkMsg.sendingState == null) {
+                                    isDone = true
+                                    break
+                                } else if (checkMsg.sendingState is TdApi.MessageSendingStateFailed) {
+                                    isError = true
+                                    break
+                                }
+                            }
+                        } catch (_: Throwable) {
+                            // If tempMsgId is no longer found, it might have been replaced with server id
+                        }
+                    }
+                } finally {
+                    fileCollector.cancel()
+                    msgCollector.cancel()
+                }
+
+                isDone && !isError
+            } ?: false
+
+            if (uploadSuccess) {
+                onProgress?.invoke(totalFileSize, totalFileSize)
+                loadVaultItems(chatId)
+                Log.d(TAG, "uploadFile completed successfully to Telegram Cloud! tempMsgId=$tempMsgId")
+                true
+            } else {
+                Log.e(TAG, "uploadFile failed or timed out for $localPath")
+                false
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to upload file to Telegram cloud", e)
             false

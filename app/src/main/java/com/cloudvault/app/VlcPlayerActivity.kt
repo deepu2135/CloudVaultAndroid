@@ -258,6 +258,8 @@ class VlcPlayerActivity : AppCompatActivity() {
             val rawStreamUrl = intent.getStringExtra("STREAM_URL")
             val proxyUrl = if (!rawStreamUrl.isNullOrBlank()) rawStreamUrl else TelegramStreamingProxy.getUrl(fileId, videoTitle)
 
+            TeleflixLogger.log("VlcPlayer", "Initializing VLC playback for '$videoTitle' (fileId=$fileId) url=$proxyUrl")
+
             val media = Media(vlc, Uri.parse(proxyUrl)).apply {
                 setHWDecoderEnabled(true, false)
                 addOption(":network-caching=1500")
@@ -270,6 +272,9 @@ class VlcPlayerActivity : AppCompatActivity() {
                         MediaPlayer.Event.Buffering -> {
                             if (event.buffering < 100f) {
                                 pbVlcBuffering.visibility = View.VISIBLE
+                                if (event.buffering.toInt() % 25 == 0) {
+                                    TeleflixLogger.log("VlcPlayer", "Buffering video stream: ${event.buffering.toInt()}%")
+                                }
                             } else {
                                 pbVlcBuffering.visibility = View.GONE
                             }
@@ -277,13 +282,16 @@ class VlcPlayerActivity : AppCompatActivity() {
                         MediaPlayer.Event.Playing -> {
                             pbVlcBuffering.visibility = View.GONE
                             tvPlayPauseIcon.text = "⏸"
+                            TeleflixLogger.log("VlcPlayer", "Playback state: PLAYING")
                         }
                         MediaPlayer.Event.Paused -> {
                             tvPlayPauseIcon.text = "▶"
+                            TeleflixLogger.log("VlcPlayer", "Playback state: PAUSED")
                         }
                         MediaPlayer.Event.EndReached -> {
                             tvPlayPauseIcon.text = "▶"
                             pbVlcBuffering.visibility = View.GONE
+                            TeleflixLogger.log("VlcPlayer", "Playback state: END REACHED")
                         }
                         MediaPlayer.Event.TimeChanged -> {
                             if (!isUserTracking) {
@@ -299,6 +307,7 @@ class VlcPlayerActivity : AppCompatActivity() {
                         }
                         MediaPlayer.Event.EncounteredError -> {
                             pbVlcBuffering.visibility = View.GONE
+                            TeleflixLogger.log("VlcPlayer", "Playback error encountered in VLC engine", isError = true)
                             Toast.makeText(this@VlcPlayerActivity, "VLC encountered a playback error", Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -310,6 +319,7 @@ class VlcPlayerActivity : AppCompatActivity() {
             player.play()
 
         } catch (e: Throwable) {
+            TeleflixLogger.log("VlcPlayer", "LibVLC init exception: ${e.message}", isError = true)
             android.util.Log.e("VlcPlayerActivity", "LibVLC init exception", e)
             Toast.makeText(this, "LibVLC error: ${e.message}", Toast.LENGTH_LONG).show()
         }

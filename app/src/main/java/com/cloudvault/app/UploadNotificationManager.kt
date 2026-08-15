@@ -27,18 +27,37 @@ object UploadNotificationManager {
         }
     }
 
-    fun showProgress(context: Context, current: Int, total: Int, fileName: String) {
+    fun showProgress(
+        context: Context,
+        current: Int,
+        total: Int,
+        fileName: String,
+        percent: Int = -1,
+        statusText: String? = null
+    ) {
         ensureChannel(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
+        val title = if (total > 1) "Uploading to Cloud ($current/$total)" else "Uploading to Telegram Cloud"
+        val content = when {
+            !statusText.isNullOrBlank() -> "$fileName • $statusText"
+            percent in 0..100 -> "$fileName • $percent%"
+            else -> if (total > 1) "($current/$total) $fileName" else fileName
+        }
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
-            .setContentTitle("Uploading to Telegram Cloud")
-            .setContentText("($current/$total) $fileName")
-            .setProgress(total, current, false)
+            .setContentTitle(title)
+            .setContentText(content)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+
+        if (percent in 0..100) {
+            builder.setProgress(100, percent, false)
+        } else {
+            builder.setProgress(total, current, false)
+        }
 
         manager.notify(NOTIFICATION_ID, builder.build())
     }

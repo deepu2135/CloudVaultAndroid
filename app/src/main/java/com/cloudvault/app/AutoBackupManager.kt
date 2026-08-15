@@ -168,8 +168,34 @@ object AutoBackupManager {
                 }
 
                 if (uploadPath != null) {
+                    var lastProgressUpdate = 0L
                     try {
-                        val success = TelegramRepository.uploadFile(uploadPath, file.mediaType, file.displayName)
+                        val success = TelegramRepository.uploadFile(
+                            localPath = uploadPath,
+                            mediaType = file.mediaType,
+                            captionText = file.displayName,
+                            onProgress = { uploaded, totalBytes ->
+                                val now = System.currentTimeMillis()
+                                if (now - lastProgressUpdate > 500L || uploaded == totalBytes) {
+                                    lastProgressUpdate = now
+                                    val pct = if (totalBytes > 0) ((uploaded * 100) / totalBytes).toInt().coerceIn(0, 100) else 0
+                                    val progressText = if (totalBytes > 0) {
+                                        "${CacheManager.formatBytes(uploaded)} of ${CacheManager.formatBytes(totalBytes)} ($pct%)"
+                                    } else {
+                                        "${CacheManager.formatBytes(uploaded)} uploaded"
+                                    }
+                                    _backupStatus.value = "Backing up ($current/$total): ${file.displayName} ($pct%)"
+                                    UploadNotificationManager.showProgress(
+                                        context,
+                                        current,
+                                        total,
+                                        "Auto Backup: ${file.displayName}",
+                                        percent = pct,
+                                        statusText = progressText
+                                    )
+                                }
+                            }
+                        )
                         if (success) {
                             AutoBackupPreferences.markSignatureBackedUp(context, file.signature)
                             successCount++

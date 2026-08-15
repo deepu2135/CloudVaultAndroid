@@ -29,12 +29,28 @@ object TeleflixLogger {
         }
     }
 
+    fun getLogList(): List<String> {
+        return logQueue.toList()
+    }
+
+    fun getLogCount(): Int = logQueue.size
+
     fun getFormattedLogs(): String {
         val list = logQueue.toList()
         if (list.isEmpty()) {
             return "--- No Diagnostic Logs Recorded Yet ---"
         }
         return list.joinToString("\n")
+    }
+
+    fun getFilteredLogs(query: String): String {
+        if (query.isBlank()) return getFormattedLogs()
+        val lower = query.lowercase()
+        val filtered = logQueue.filter { it.lowercase().contains(lower) }
+        if (filtered.isEmpty()) {
+            return "--- No Logs Matching \"$query\" ---"
+        }
+        return filtered.joinToString("\n")
     }
 
     fun copyLogsToClipboard(context: Context): Boolean {
