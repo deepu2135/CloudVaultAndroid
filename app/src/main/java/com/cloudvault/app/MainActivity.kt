@@ -648,23 +648,107 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing || isDestroyed) return
 
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_settings, null)
+        val cardOptionAutoBackup: MaterialCardView = dialogView.findViewById(R.id.cardOptionAutoBackup)
+        val tvSettingsAutoBackupSummary: TextView = dialogView.findViewById(R.id.tvSettingsAutoBackupSummary)
+        val tvSettingsAutoBackupBadge: TextView = dialogView.findViewById(R.id.tvSettingsAutoBackupBadge)
+        val layoutToggleApiSettings: LinearLayout = dialogView.findViewById(R.id.layoutToggleApiSettings)
+        val layoutApiFields: LinearLayout = dialogView.findViewById(R.id.layoutApiFields)
+        val tvApiExpandIcon: TextView = dialogView.findViewById(R.id.tvApiExpandIcon)
+        val etSettingsApiId: EditText = dialogView.findViewById(R.id.etSettingsApiId)
+        val etSettingsApiHash: EditText = dialogView.findViewById(R.id.etSettingsApiHash)
+        val btnSaveCredentials: MaterialButton = dialogView.findViewById(R.id.btnSaveCredentials)
+        val btnSettingsLogout: MaterialButton = dialogView.findViewById(R.id.btnSettingsLogout)
+        val btnCloseSettings: TextView = dialogView.findViewById(R.id.btnCloseSettings)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        fun updateBackupSummary() {
+            val isBackupOn = AutoBackupPreferences.isEnabled(this)
+            tvSettingsAutoBackupBadge.text = if (isBackupOn) "ON" else "OFF"
+            tvSettingsAutoBackupBadge.setTextColor(if (isBackupOn) Color.parseColor("#00E5FF") else Color.parseColor("#94A3B8"))
+            val selectedCount = AutoBackupPreferences.getSelectedBucketIds(this)?.size
+            tvSettingsAutoBackupSummary.text = if (isBackupOn) {
+                if (selectedCount != null) "$selectedCount folder(s) syncing ☁️" else "All device media syncing ☁️"
+            } else {
+                "Disabled • Tap to configure"
+            }
+        }
+        updateBackupSummary()
+
+        cardOptionAutoBackup.setOnClickListener {
+            showAutoBackupSettingsDialog {
+                updateBackupSummary()
+            }
+        }
+
+        // Toggle collapsible API settings
+        var isApiExpanded = false
+        layoutToggleApiSettings.setOnClickListener {
+            isApiExpanded = !isApiExpanded
+            layoutApiFields.visibility = if (isApiExpanded) View.VISIBLE else View.GONE
+            tvApiExpandIcon.text = if (isApiExpanded) "▲" else "▼"
+        }
+
+        val currentApiId = TdlibManager.getApiId(this)
+        if (currentApiId > 0) etSettingsApiId.setText(currentApiId.toString())
+        etSettingsApiHash.setText(TdlibManager.getApiHash(this))
+
+        btnSaveCredentials.setOnClickListener {
+            val idStr = etSettingsApiId.text.toString().trim()
+            val hashStr = etSettingsApiHash.text.toString().trim()
+            val apiId = idStr.toIntOrNull() ?: 0
+            if (apiId > 0 && hashStr.isNotBlank()) {
+                TdlibManager.saveApiId(this, apiId)
+                TdlibManager.saveApiHash(this, hashStr)
+                Toast.makeText(this, "Credentials saved! Connecting...", Toast.LENGTH_SHORT).show()
+                TelegramClient.sendTdlibParameters(applicationContext)
+                dialog.dismiss()
+            } else {
+                Toast.makeText(this, "Please enter valid API ID and API Hash", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnSettingsLogout.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Log Out")
+                .setMessage("Are you sure you want to log out of CloudVault?")
+                .setPositiveButton("Log Out") { _, _ ->
+                    TelegramClient.logOut()
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        btnCloseSettings.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    private fun showAutoBackupSettingsDialog(onDismissCallback: (() -> Unit)? = null) {
+        if (isFinishing || isDestroyed) return
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_autobackup_settings, null)
         val switchAutoBackup: SwitchMaterial = dialogView.findViewById(R.id.switchAutoBackup)
         val switchWifiOnly: SwitchMaterial = dialogView.findViewById(R.id.switchWifiOnly)
         val tvBackupStatus: TextView = dialogView.findViewById(R.id.tvBackupStatus)
         val btnSelectFolders: MaterialButton = dialogView.findViewById(R.id.btnSelectFolders)
         val btnBackupNow: MaterialButton = dialogView.findViewById(R.id.btnBackupNow)
-        val etSettingsApiId: EditText = dialogView.findViewById(R.id.etSettingsApiId)
-        val etSettingsApiHash: EditText = dialogView.findViewById(R.id.etSettingsApiHash)
-        val btnSaveCredentials: MaterialButton = dialogView.findViewById(R.id.btnSaveCredentials)
+        val btnBackFromAutoBackup: TextView = dialogView.findViewById(R.id.btnBackFromAutoBackup)
 
-        // Set initial values
         val isBackupOn = AutoBackupPreferences.isEnabled(this)
         switchAutoBackup.isChecked = isBackupOn
         switchWifiOnly.isChecked = AutoBackupPreferences.isWifiOnly(this)
         tvBackupStatus.text = if (isBackupOn) {
             "Auto Backup is ON • Real-time observer & background sync active ☁️"
         } else {
-            "Auto Backup is OFF • Tap to automatically sync photos & videos"
+            "Auto Backup is OFF • Tap switch to automatically sync photos & videos"
         }
 
         switchAutoBackup.setOnCheckedChangeListener { _, isChecked ->
@@ -672,7 +756,7 @@ class MainActivity : AppCompatActivity() {
             tvBackupStatus.text = if (isChecked) {
                 "Auto Backup is ON • Real-time observer & background sync active ☁️"
             } else {
-                "Auto Backup is OFF • Tap to automatically sync photos & videos"
+                "Auto Backup is OFF • Tap switch to automatically sync photos & videos"
             }
             Toast.makeText(this, if (isChecked) "Auto Backup enabled!" else "Auto Backup disabled", Toast.LENGTH_SHORT).show()
         }
@@ -691,28 +775,17 @@ class MainActivity : AppCompatActivity() {
             AutoBackupManager.triggerImmediateSync(this)
         }
 
-        val currentApiId = TdlibManager.getApiId(this)
-        if (currentApiId > 0) etSettingsApiId.setText(currentApiId.toString())
-        etSettingsApiHash.setText(TdlibManager.getApiHash(this))
-
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
-            .setPositiveButton("Close", null)
             .create()
 
-        btnSaveCredentials.setOnClickListener {
-            val idStr = etSettingsApiId.text.toString().trim()
-            val hashStr = etSettingsApiHash.text.toString().trim()
-            val apiId = idStr.toIntOrNull() ?: 0
-            if (apiId > 0 && hashStr.isNotBlank()) {
-                TdlibManager.saveApiId(this, apiId)
-                TdlibManager.saveApiHash(this, hashStr)
-                Toast.makeText(this, "Credentials saved! Connecting...", Toast.LENGTH_SHORT).show()
-                TelegramClient.sendTdlibParameters(applicationContext)
-                dialog.dismiss()
-            } else {
-                Toast.makeText(this, "Please enter valid API ID and API Hash", Toast.LENGTH_SHORT).show()
-            }
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog.setOnDismissListener {
+            onDismissCallback?.invoke()
+        }
+
+        btnBackFromAutoBackup.setOnClickListener {
+            dialog.dismiss()
         }
 
         dialog.show()

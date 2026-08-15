@@ -11,191 +11,258 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Title -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="CloudVault Settings"
-            android:textColor="#FFFFFF"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <!-- Auto Backup Card -->
-        <com.google.android.material.card.MaterialCardView
+        <!-- Header -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardCornerRadius="12dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Settings"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnCloseSettings"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:text="✕"
+                android:textColor="#94A3B8"
+                android:textSize="18sp"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+        </LinearLayout>
+
+        <!-- Option: Auto Backup Row -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardOptionAutoBackup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            app:cardCornerRadius="14dp"
             app:cardElevation="0dp"
             app:cardBackgroundColor="#0F172A"
             app:strokeColor="#1E293B"
-            app:strokeWidth="1dp">
+            app:strokeWidth="1dp"
+            android:clickable="true"
+            android:focusable="true">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="📸 Auto Backup (Google Photos Style)"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchAutoBackup"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:useMaterialThemeColors="true" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/tvBackupStatus"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Automatically sync new photos and videos to Telegram Cloud"
-                    android:textColor="#94A3B8"
-                    android:textSize="12sp" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="12dp"
-                    android:layout_marginBottom="12dp"
-                    android:background="#1E293B" />
-
-                <!-- Wi-Fi Only Switch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="📶 Back Up on Wi-Fi Only"
-                        android:textColor="#E2E8F0"
-                        android:textSize="14sp" />
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchWifiOnly"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        app:useMaterialThemeColors="true" />
-                </LinearLayout>
-
-                <!-- Folder Selection Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSelectFolders"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="📁 Select Device Folders to Back Up"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#1E293B"
-                    app:cornerRadius="8dp" />
-
-                <!-- Trigger Sync Now -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnBackupNow"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="🔄 Back Up Now"
-                    android:textColor="#000000"
-                    app:backgroundTint="@color/accent_cyan"
-                    app:cornerRadius="8dp" />
-
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- API Credentials Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
                 android:padding="16dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🔑 Telegram API Credentials"
-                    android:textColor="#FFFFFF"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
+                    android:text="📸"
+                    android:textSize="22sp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="14dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Auto Backup &amp; Sync"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvSettingsAutoBackupSummary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Back up device photos &amp; videos"
+                        android:textColor="#94A3B8"
+                        android:textSize="12sp" />
+                </LinearLayout>
 
                 <TextView
-                    android:layout_width="match_parent"
+                    android:id="@+id/tvSettingsAutoBackupBadge"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="From my.telegram.org (API development tools)"
-                    android:textColor="#94A3B8"
-                    android:textSize="12sp" />
+                    android:text="ON"
+                    android:textColor="@color/accent_cyan"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="3dp"
+                    android:background="#16263D" />
 
-                <EditText
-                    android:id="@+id/etSettingsApiId"
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="#1E293B"
-                    android:hint="API ID (e.g. 12345678)"
-                    android:inputType="number"
-                    android:padding="12dp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#64748B"
-                    android:textSize="14sp" />
-
-                <EditText
-                    android:id="@+id/etSettingsApiHash"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="#1E293B"
-                    android:hint="API Hash (e.g. 0123456789abcdef...)"
-                    android:inputType="text"
-                    android:padding="12dp"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#64748B"
-                    android:textSize="14sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSaveCredentials"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="Save API Credentials"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#334155"
-                    app:cornerRadius="8dp" />
-
+                    android:layout_marginStart="8dp"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="22sp" />
             </LinearLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
-    </LinearLayout>
+        <!-- Option: API Credentials (Collapsed by default) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#0F172A"
+            app:strokeColor="#1E293B"
+            app:strokeWidth="1dp">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Collapsible Header -->
+                <LinearLayout
+                    android:id="@+id/layoutToggleApiSettings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="16dp"
+                    android:background="?attr/selectableItemBackground">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔑"
+                        android:textSize="20sp" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="14dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="API Configuration"
+                            android:textColor="#FFFFFF"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Custom Telegram API credentials (Advanced)"
+                            android:textColor="#94A3B8"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvApiExpandIcon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="▼"
+                        android:textColor="#64748B"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Hidden Collapsible Fields -->
+                <LinearLayout
+                    android:id="@+id/layoutApiFields"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="16dp"
+                    android:visibility="gone">
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="#1E293B" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="API ID"
+                        android:textColor="#94A3B8"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etSettingsApiId"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:background="#1E293B"
+                        android:hint="••••••••"
+                        android:inputType="numberPassword"
+                        android:padding="10dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#64748B"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="API Hash"
+                        android:textColor="#94A3B8"
+                        android:textSize="12sp" />
+
+                    <EditText
+                        android:id="@+id/etSettingsApiHash"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:background="#1E293B"
+                        android:hint="••••••••••••••••••••••••••••••••"
+                        android:inputType="textPassword"
+                        android:padding="10dp"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#64748B"
+                        android:textSize="13sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSaveCredentials"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Save API Credentials"
+                        android:textColor="#FFFFFF"
+                        app:backgroundTint="#334155"
+                        app:cornerRadius="8dp" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Log Out Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSettingsLogout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Log Out of CloudVault"
+            android:textColor="#EF4444"
+            app:backgroundTint="#1A0F1D"
+            app:strokeColor="#7F1D1D"
+            app:strokeWidth="1dp"
+            app:cornerRadius="10dp" />
+
+    </LinearLayout>
 </ScrollView>

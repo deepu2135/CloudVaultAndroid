@@ -210,6 +210,14 @@ object TelegramClient {
         }
     }
 
+    fun logOut() {
+        client?.send(TdApi.LogOut()) { result ->
+            if (result is TdApi.Ok) {
+                Log.d(TAG, "Logged out successfully")
+            }
+        }
+    }
+
     suspend fun <T : TdApi.Object> sendRequest(query: TdApi.Function<T>): T {
         val activeClient = client ?: throw IllegalStateException("TDLib client not initialized")
         return suspendCancellableCoroutine { continuation ->
