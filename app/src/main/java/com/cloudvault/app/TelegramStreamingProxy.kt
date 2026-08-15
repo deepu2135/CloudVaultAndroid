@@ -95,7 +95,9 @@ object TelegramStreamingProxy {
                 freshId
             } else target
         } catch (e: Exception) {
-            TeleflixLogger.log(TAG, "Failed refreshFileId for fileId $fileId (chatId=$chatId, msgId=$messageId): ${e.message}")
+            if (e !is kotlinx.coroutines.CancellationException) {
+                TeleflixLogger.log(TAG, "Failed refreshFileId for fileId $fileId (chatId=$chatId, msgId=$messageId): ${e.message}")
+            }
             null
         }
     }
@@ -1429,7 +1431,7 @@ object TelegramStreamingProxy {
     ): ByteArray? {
         var activeFileId = resolveFileId(fileId)
         val chunkStartMs = System.currentTimeMillis()
-        val timeoutMs = if (metrics?.requestType == "seek_probe") 20_000L else DOWNLOAD_TIMEOUT_MS
+        val timeoutMs = DOWNLOAD_TIMEOUT_MS
         var isFileNotFound = false
         val dataBytes = withTimeoutOrNull(timeoutMs) {
             var attempts = 0
