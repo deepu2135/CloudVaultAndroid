@@ -226,7 +226,7 @@ class VlcPlayerActivity : AppCompatActivity() {
 
             val player = MediaPlayer(vlc)
             mediaPlayer = player
-            player.attachViews(vlcVideoLayout, null, false, false)
+            player.attachViews(vlcVideoLayout, null, true, true)
 
             val rawStreamUrl = intent.getStringExtra("STREAM_URL")
             val proxyUrl = if (!rawStreamUrl.isNullOrBlank()) rawStreamUrl else TelegramStreamingProxy.getUrl(fileId, videoTitle)
@@ -370,23 +370,30 @@ class VlcPlayerActivity : AppCompatActivity() {
         currentAspectIndex = (currentAspectIndex + 1) % aspectModes.size
         val mode = aspectModes[currentAspectIndex]
 
+        val rootW = if (vlcRoot.width > 0) vlcRoot.width else resources.displayMetrics.widthPixels
+        val rootH = if (vlcRoot.height > 0) vlcRoot.height else resources.displayMetrics.heightPixels
+
         when (currentAspectIndex) {
             0 -> {
-                // Fit Screen (Scale to fit without cropping)
-                player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
+                // 1. Fit Screen (Entire video visible, original aspect ratio with letterboxing)
                 player.aspectRatio = null
+                player.scale = 0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
             }
             1 -> {
-                // Fill (Full screen edge-to-edge crop)
+                // 2. Fill (Full screen edge-to-edge fill)
+                player.scale = 0f
                 player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
-                player.aspectRatio = null
+                player.aspectRatio = "$rootW:$rootH"
             }
             2 -> {
-                // Fit (Original) (1:1 Original aspect ratio)
-                player.videoScale = MediaPlayer.ScaleType.SURFACE_ORIGINAL
+                // 3. Fit (Original) (1:1 Original source resolution)
                 player.aspectRatio = null
+                player.scale = 1.0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_ORIGINAL
             }
         }
+        vlcVideoLayout.requestLayout()
         tvFullscreenLabel.text = mode
         Toast.makeText(this, "Screen: $mode", Toast.LENGTH_SHORT).show()
     }
