@@ -242,6 +242,14 @@ object AutoBackupManager {
         val selectedBucketIds = AutoBackupPreferences.getSelectedBucketIds(context)
         val unbackedList = mutableListOf<LocalMediaFile>()
 
+        // Get cloud vault items to prevent duplicate uploads if already in Telegram
+        val cloudVaultSizes = mutableSetOf<Long>()
+        val cloudVaultNames = mutableSetOf<String>()
+        (TelegramRepository.photos.value + TelegramRepository.videos.value + TelegramRepository.files.value).forEach { item ->
+            if (item.sizeBytes > 0) cloudVaultSizes.add(item.sizeBytes)
+            if (item.title.isNotBlank()) cloudVaultNames.add(item.title.lowercase())
+        }
+
         fun queryMedia(uri: Uri, isVideo: Boolean) {
             val projection = arrayOf(
                 MediaStore.MediaColumns._ID,
@@ -258,7 +266,7 @@ object AutoBackupManager {
                 projection,
                 null,
                 null,
-                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
+                "${MediaStore.MediaColumns.DATE_MODIFIED} ASC"
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
                 val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
@@ -296,9 +304,18 @@ object AutoBackupManager {
                         bucketName = bucketName
                     )
 
-                    if (!AutoBackupPreferences.hasSignature(context, localFile.signature)) {
-                        unbackedList.add(localFile)
+                    // 1. Check local backup signature
+                    if (AutoBackupPreferences.hasSignature(context, localFile.signature)) {
+                        continue
                     }
+
+                    // 2. Check if already uploaded to Telegram Cloud (matching size and name)
+                    if (cloudVaultSizes.contains(localFile.sizeBytes) && cloudVaultNames.contains(localFile.displayName.lowercase())) {
+                        AutoBackupPreferences.markSignatureBackedUp(context, localFile.signature)
+                        continue
+                    }
+
+                    unbackedList.add(localFile)
                 }
             }
         }
@@ -310,7 +327,8 @@ object AutoBackupManager {
             Log.e(TAG, "scanUnbackedMedia query error", e)
         }
 
-        return unbackedList
+        // Ensure strictly sorted oldest first
+        return unbackedList.sortedBy { it.dateModified }
     }
 
     private fun copyUriToCache(context: Context, uri: Uri, fileName: String): File? {
