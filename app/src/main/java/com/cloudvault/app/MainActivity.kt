@@ -1,5 +1,6 @@
 package com.cloudvault.app
 
+import android.app.Dialog
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -470,9 +471,8 @@ class MainActivity : AppCompatActivity() {
         tvViewerTitle.text = item.title
         tvViewerSize.text = item.formattedSize
 
-        val dialog = AlertDialog.Builder(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-            .setView(dialogView)
-            .create()
+        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.setContentView(dialogView)
 
         dialog.window?.apply {
             setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
@@ -491,6 +491,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+        dialog.window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
 
         // Load full resolution photo in background with EXIF orientation correction
         lifecycleScope.launch(Dispatchers.IO) {
@@ -516,6 +517,7 @@ class MainActivity : AppCompatActivity() {
                         pbFullPhotoLoading.visibility = View.GONE
                         if (bitmap != null) {
                             ivFullPhoto.setImageBitmap(bitmap)
+                            ivFullPhoto.post { ivFullPhoto.fitToScreen() }
                         }
                     }
                 }
