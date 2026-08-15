@@ -580,31 +580,10 @@ class MediaGridAdapter(
                     }
                 }
 
-                // 3. For video, try proxy video frame extraction if available
-                if (item.type == MediaType.VIDEO && TelegramStreamingProxy.port > 0) {
-                    return@withContext extractVideoFrameFromProxy(item.fileId, item.title)
-                }
-
                 null
             } catch (_: Throwable) {
                 null
             }
-        }
-    }
-
-    private fun extractVideoFrameFromProxy(fileId: Int, title: String): Bitmap? {
-        var retriever: MediaMetadataRetriever? = null
-        return try {
-            retriever = MediaMetadataRetriever()
-            val streamUrl = TelegramStreamingProxy.getUrl(fileId, title)
-            retriever.setDataSource(streamUrl, HashMap())
-            retriever.getFrameAtTime(1000000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-        } catch (_: Throwable) {
-            null
-        } finally {
-            try {
-                retriever?.release()
-            } catch (_: Throwable) {}
         }
     }
 

@@ -204,7 +204,6 @@ object TelegramStreamingProxy {
         running = false
         activeFileJobs.values.forEach { runCatching { it.cancel() } }
         activeFileJobs.clear()
-        lastStreamedFileId?.let { scope.launch { deleteFile(it) } }
         lastStreamedFileId = null
         try {
             serverSocket?.close()
@@ -463,19 +462,6 @@ object TelegramStreamingProxy {
         val currentJob = kotlin.coroutines.coroutineContext[Job]
 
         try {
-            val prev = lastStreamedFileId
-            if (prev != null && prev != fileId) {
-                TeleflixLogger.log(TAG, "New file requested ($fileId), cancelling active jobs for old file ($prev)")
-                activeFileJobs.remove("file_$prev")?.cancel()
-                if (!DownloadManager.isFileIdActive(prev)) {
-                    runCatching {
-                        TelegramClient.sendRequest(TdApi.CancelDownloadFile(prev, false))
-                    }
-                    if (!isCacheEnabled() && (activeStreamRequests[prev]?.isEmpty() != false)) {
-                        scope.launch { deleteFile(prev) }
-                    }
-                }
-            }
             lastStreamedFileId = fileId
 
             // Ensure TDLib message/file reference is pre-warmed if message mapping exists
@@ -518,17 +504,10 @@ object TelegramStreamingProxy {
             metrics = m
             activeStreamRequests.getOrPut(fileId) { java.util.concurrent.ConcurrentHashMap.newKeySet<String>() }.add(m.reqId)
 
-            if (m.requestType != "seek_probe") {
-                latestActiveStreamReqId[fileId] = m.reqId
-                val jobKey = "file_$fileId"
-                currentJobRegisteredKey = jobKey
-                if (currentJob != null) {
-                    val oldJob = activeFileJobs.put(jobKey, currentJob)
-                    if (oldJob != null && oldJob != currentJob && oldJob.isActive) {
-                        TeleflixLogger.log(TAG, "Cancelling previous stream job for fileId=$fileId due to new request $jobKey")
-                        oldJob.cancel()
-                    }
-                }
+            val jobKey = "file_${fileId}_${m.reqId}"
+            currentJobRegisteredKey = jobKey
+            if (currentJob != null) {
+                activeFileJobs[jobKey] = currentJob
             }
             m.logStart()
 
@@ -1447,14 +1426,6 @@ object TelegramStreamingProxy {
         metrics: StreamMetrics? = null
     ): ByteArray? {
         var activeFileId = resolveFileId(fileId)
-        if (metrics != null && metrics.requestType != "seek_probe") {
-            val latestReqId = latestActiveStreamReqId[activeFileId]
-            if (latestReqId != null && latestReqId != metrics.reqId) {
-                TeleflixLogger.log(TAG, "downloadChunk: reqId=${metrics.reqId} for fileId=$activeFileId superseded by $latestReqId")
-                metrics.exitReason = "superseded"
-                return null
-            }
-        }
         val chunkStartMs = System.currentTimeMillis()
         val timeoutMs = if (metrics?.requestType == "seek_probe") 10_000L else DOWNLOAD_TIMEOUT_MS
         var isFileNotFound = false
@@ -1463,14 +1434,6 @@ object TelegramStreamingProxy {
             var consecutiveGetFileErrors = 0
             while (attempts < 2000 && running) {
                 activeFileId = resolveFileId(activeFileId)
-                if (metrics != null && metrics.requestType != "seek_probe") {
-                    val latestReqId = latestActiveStreamReqId[activeFileId]
-                    if (latestReqId != null && latestReqId != metrics.reqId) {
-                        TeleflixLogger.log(TAG, "downloadChunk loop: reqId=${metrics.reqId} for fileId=$activeFileId superseded by $latestReqId")
-                        metrics.exitReason = "superseded"
-                        return@withTimeoutOrNull null
-                    }
-                }
                 val readRes = try {
                     val lockStart = System.currentTimeMillis()
                     getFileMutex(activeFileId).withLock {

@@ -1137,103 +1137,109 @@ class MainActivity : AppCompatActivity() {
     private fun showAppLogsDialog() {
         if (isFinishing || isDestroyed) return
 
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_logs, null)
-        val tvLogsContent: TextView = dialogView.findViewById(R.id.tvLogsContent)
-        val tvLogsCount: TextView = dialogView.findViewById(R.id.tvLogsCount)
-        val tvEmptyLogs: TextView = dialogView.findViewById(R.id.tvEmptyLogs)
-        val etLogSearch: EditText = dialogView.findViewById(R.id.etLogSearch)
-        val btnClearFilter: TextView = dialogView.findViewById(R.id.btnClearFilter)
-        val btnCopyLogs: MaterialButton = dialogView.findViewById(R.id.btnCopyLogs)
-        val btnRefreshLogs: MaterialButton = dialogView.findViewById(R.id.btnRefreshLogs)
-        val btnClearLogs: MaterialButton = dialogView.findViewById(R.id.btnClearLogs)
-        val btnDismissLogs: MaterialButton = dialogView.findViewById(R.id.btnDismissLogs)
-        val btnCloseLogs: TextView = dialogView.findViewById(R.id.btnCloseLogs)
-        val scrollLogs: ScrollView = dialogView.findViewById(R.id.scrollLogs)
+        try {
+            val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_logs, null)
+            val btnLogsBack: TextView = dialogView.findViewById(R.id.btnLogsBack)
+            val btnLogsClose: TextView = dialogView.findViewById(R.id.btnLogsClose)
+            val tvLogsContent: TextView = dialogView.findViewById(R.id.tvLogsContent)
+            val tvLogsCount: TextView = dialogView.findViewById(R.id.tvLogsCount)
+            val tvEmptyLogs: TextView = dialogView.findViewById(R.id.tvEmptyLogs)
+            val etLogSearch: EditText = dialogView.findViewById(R.id.etLogSearch)
+            val btnClearFilter: TextView = dialogView.findViewById(R.id.btnClearFilter)
+            val btnCopyLogs: MaterialButton = dialogView.findViewById(R.id.btnCopyLogs)
+            val btnRefreshLogs: MaterialButton = dialogView.findViewById(R.id.btnRefreshLogs)
+            val btnClearLogs: MaterialButton = dialogView.findViewById(R.id.btnClearLogs)
+            val scrollLogs: ScrollView = dialogView.findViewById(R.id.scrollLogs)
 
-        val dialog = AlertDialog.Builder(this)
-            .setView(dialogView)
-            .create()
-
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        fun refreshLogDisplay() {
-            val query = etLogSearch.text.toString().trim()
-            val logs = if (query.isNotBlank()) {
-                TeleflixLogger.getFilteredLogs(query)
-            } else {
-                TeleflixLogger.getFormattedLogs()
+            val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+            dialog.setContentView(dialogView)
+            dialog.window?.apply {
+                setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+                setBackgroundDrawable(ColorDrawable(Color.parseColor("#0A0F1D")))
             }
 
-            val totalCount = TeleflixLogger.getLogCount()
-            tvLogsCount.text = if (query.isNotBlank()) {
-                "Filtering by \"$query\" • Total: $totalCount"
-            } else {
-                "$totalCount log entries recorded"
-            }
-
-            if (logs.isBlank() || logs == "--- No Diagnostic Logs Recorded Yet ---") {
-                tvLogsContent.text = ""
-                tvEmptyLogs.visibility = View.VISIBLE
-            } else {
-                tvEmptyLogs.visibility = View.GONE
-                tvLogsContent.text = logs
-            }
-
-            scrollLogs.post {
-                scrollLogs.fullScroll(View.FOCUS_DOWN)
-            }
-        }
-
-        refreshLogDisplay()
-
-        etLogSearch.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                btnClearFilter.visibility = if (!s.isNullOrBlank()) View.VISIBLE else View.GONE
-                refreshLogDisplay()
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
-
-        btnClearFilter.setOnClickListener {
-            etLogSearch.setText("")
-        }
-
-        btnCopyLogs.setOnClickListener {
-            val query = etLogSearch.text.toString().trim()
-            val logsToCopy = if (query.isNotBlank()) {
-                TeleflixLogger.getFilteredLogs(query)
-            } else {
-                TeleflixLogger.getFormattedLogs()
-            }
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            val clip = ClipData.newPlainText("CloudVault Diagnostic Logs", logsToCopy)
-            clipboard?.setPrimaryClip(clip)
-            Toast.makeText(this, "Logs copied to clipboard 📋", Toast.LENGTH_SHORT).show()
-        }
-
-        btnRefreshLogs.setOnClickListener {
-            refreshLogDisplay()
-            Toast.makeText(this, "Logs refreshed 🔄", Toast.LENGTH_SHORT).show()
-        }
-
-        btnClearLogs.setOnClickListener {
-            AlertDialog.Builder(this)
-                .setTitle("Clear App Logs?")
-                .setMessage("Are you sure you want to clear all diagnostic logs?")
-                .setPositiveButton("Clear") { _, _ ->
-                    TeleflixLogger.clearLogs()
-                    refreshLogDisplay()
-                    Toast.makeText(this, "Logs cleared 🗑️", Toast.LENGTH_SHORT).show()
+            fun refreshLogDisplay() {
+                val query = etLogSearch.text?.toString()?.trim() ?: ""
+                val logs = if (query.isNotBlank()) {
+                    TeleflixLogger.getFilteredLogs(query)
+                } else {
+                    TeleflixLogger.getFormattedLogs()
                 }
-                .setNegativeButton("Cancel", null)
-                .show()
+
+                val totalCount = TeleflixLogger.getLogCount()
+                tvLogsCount.text = if (query.isNotBlank()) {
+                    "Filtering by \"$query\" • Total: $totalCount"
+                } else {
+                    "$totalCount log entries recorded"
+                }
+
+                if (logs.isBlank() || logs == "--- No Diagnostic Logs Recorded Yet ---") {
+                    tvLogsContent.text = ""
+                    tvEmptyLogs.visibility = View.VISIBLE
+                } else {
+                    tvEmptyLogs.visibility = View.GONE
+                    tvLogsContent.text = logs
+                }
+
+                scrollLogs.post {
+                    scrollLogs.fullScroll(View.FOCUS_DOWN)
+                }
+            }
+
+            refreshLogDisplay()
+
+            etLogSearch.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    btnClearFilter.visibility = if (!s.isNullOrBlank()) View.VISIBLE else View.GONE
+                    refreshLogDisplay()
+                }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+
+            btnClearFilter.setOnClickListener {
+                etLogSearch.setText("")
+            }
+
+            btnCopyLogs.setOnClickListener {
+                val query = etLogSearch.text?.toString()?.trim() ?: ""
+                val logsToCopy = if (query.isNotBlank()) {
+                    TeleflixLogger.getFilteredLogs(query)
+                } else {
+                    TeleflixLogger.getFormattedLogs()
+                }
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                val clip = ClipData.newPlainText("CloudVault Diagnostic Logs", logsToCopy)
+                clipboard?.setPrimaryClip(clip)
+                Toast.makeText(this, "Logs copied to clipboard 📋", Toast.LENGTH_SHORT).show()
+            }
+
+            btnRefreshLogs.setOnClickListener {
+                refreshLogDisplay()
+                Toast.makeText(this, "Logs refreshed 🔄", Toast.LENGTH_SHORT).show()
+            }
+
+            btnClearLogs.setOnClickListener {
+                AlertDialog.Builder(this)
+                    .setTitle("Clear App Logs?")
+                    .setMessage("Are you sure you want to clear all diagnostic logs?")
+                    .setPositiveButton("Clear") { _, _ ->
+                        TeleflixLogger.clearLogs()
+                        refreshLogDisplay()
+                        Toast.makeText(this, "Logs cleared 🗑️", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+
+            btnLogsBack.setOnClickListener { dialog.dismiss() }
+            btnLogsClose.setOnClickListener { dialog.dismiss() }
+
+            dialog.show()
+        } catch (e: Throwable) {
+            android.util.Log.e("MainActivity", "Failed to show logs dialog", e)
+            Toast.makeText(this, "Error opening logs: ${e.message}", Toast.LENGTH_SHORT).show()
         }
-
-        btnDismissLogs.setOnClickListener { dialog.dismiss() }
-        btnCloseLogs.setOnClickListener { dialog.dismiss() }
-
-        dialog.show()
     }
 
     private fun showCacheManagerDialog(onDismissCallback: (() -> Unit)? = null) {
