@@ -38,11 +38,23 @@ object DownloadManager {
         return task != null && !task.isCompleted
     }
 
-    suspend fun downloadItem(context: Context, item: VaultMediaItem): File? = withContext(Dispatchers.IO) {
+    suspend fun downloadItem(context: Context, item: VaultMediaItem, showNotification: Boolean = true): File? = withContext(Dispatchers.IO) {
         val fileId = item.fileId
         if (fileId == 0) return@withContext null
+        val appContext = context.applicationContext
 
         try {
+            if (showNotification) {
+                DownloadNotificationManager.showDownloadProgress(
+                    appContext,
+                    fileId,
+                    "Downloading ${item.title}",
+                    0,
+                    100,
+                    "Starting download..."
+                )
+            }
+
             var file = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as? TdApi.File
             if (file == null || !file.local.isDownloadingCompleted || file.local.path.isBlank() || !File(file.local.path).exists()) {
                 TelegramClient.sendRequest(TdApi.DownloadFile(fileId, 32, 0L, 0L, false))
@@ -50,11 +62,11 @@ object DownloadManager {
                 var isDone = false
                 var attempts = 0
                 while (!isDone && attempts < 1200) {
-                    delay(400)
+                    delay(350)
                     file = TelegramClient.sendRequest(TdApi.GetFile(fileId)) as? TdApi.File ?: break
                     val downloaded = file.local.downloadedSize.toLong()
                     val total = if (file.expectedSize > 0) file.expectedSize.toLong() else file.size.toLong()
-                    val percent = if (total > 0) ((downloaded * 100) / total).toInt() else 0
+                    val percent = if (total > 0) ((downloaded * 100) / total).toInt().coerceIn(0, 100) else 0
 
                     isDone = file.local.isDownloadingCompleted
 
@@ -70,6 +82,23 @@ object DownloadManager {
                     val updated = _downloadTasks.value.toMutableMap()
                     updated[fileId] = task
                     _downloadTasks.value = updated
+
+                    if (showNotification) {
+                        val progressText = if (total > 0) {
+                            "${CacheManager.formatBytes(downloaded)} of ${CacheManager.formatBytes(total)} ($percent%)"
+                        } else {
+                            "${CacheManager.formatBytes(downloaded)} downloaded"
+                        }
+                        DownloadNotificationManager.showDownloadProgress(
+                            appContext,
+                            fileId,
+                            "Downloading ${item.title}",
+                            percent,
+                            100,
+                            progressText
+                        )
+                    }
+
                     attempts++
                 }
             }
@@ -93,17 +122,45 @@ object DownloadManager {
 
                 // Scan with MediaScannerConnection so it appears in device Gallery and Downloads
                 MediaScannerConnection.scanFile(
-                    context.applicationContext,
+                    appContext,
                     arrayOf(targetFile.absolutePath),
                     if (item.mimeType.isNotBlank()) arrayOf(item.mimeType) else null,
                     null
                 )
 
+                if (showNotification) {
+                    DownloadNotificationManager.showDownloadComplete(
+                        appContext,
+                        fileId,
+                        "Download Complete 📁",
+                        "Saved ${item.title} to Downloads/CloudVault",
+                        targetFile,
+                        item.mimeType
+                    )
+                }
+
                 Log.d(TAG, "Saved downloaded file to ${targetFile.absolutePath}")
                 return@withContext targetFile
+            } else {
+                if (showNotification) {
+                    DownloadNotificationManager.showDownloadError(
+                        appContext,
+                        fileId,
+                        "Download Failed",
+                        "Could not download ${item.title}"
+                    )
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Download failed for ${item.title}", e)
+            if (showNotification) {
+                DownloadNotificationManager.showDownloadError(
+                    appContext,
+                    fileId,
+                    "Download Error",
+                    e.message ?: "Failed downloading ${item.title}"
+                )
+            }
         }
         null
     }
@@ -111,7 +168,7 @@ object DownloadManager {
     fun startDownload(context: Context, item: VaultMediaItem) {
         val appContext = context.applicationContext
         scope.launch {
-            downloadItem(appContext, item)
+            downloadItem(appContext, item, showNotification = true)
         }
     }
 
@@ -127,11 +184,34 @@ object DownloadManager {
             var successCount = 0
             for ((index, item) in items.withIndex()) {
                 val current = index + 1
+                DownloadNotificationManager.showDownloadProgress(
+                    appContext,
+                    DownloadNotificationManager.DEFAULT_NOTIFICATION_ID,
+                    "Downloading from CloudVault ⬇️",
+                    current,
+                    total,
+                    "($current/$total) ${item.title}"
+                )
                 onProgress?.invoke(current, total, item.title)
-                val dest = downloadItem(appContext, item)
+                val dest = downloadItem(appContext, item, showNotification = false)
                 if (dest != null && dest.exists()) {
                     successCount++
                 }
+            }
+            if (successCount > 0) {
+                DownloadNotificationManager.showDownloadComplete(
+                    appContext,
+                    DownloadNotificationManager.DEFAULT_NOTIFICATION_ID,
+                    "Batch Download Complete 📁",
+                    "Saved $successCount of $total item(s) to Downloads/CloudVault"
+                )
+            } else {
+                DownloadNotificationManager.showDownloadError(
+                    appContext,
+                    DownloadNotificationManager.DEFAULT_NOTIFICATION_ID,
+                    "Download Failed",
+                    "Could not download items"
+                )
             }
             onComplete?.invoke(successCount, total)
         }

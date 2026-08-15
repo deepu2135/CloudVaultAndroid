@@ -175,13 +175,7 @@ class MainActivity : AppCompatActivity() {
             DownloadManager.startBatchDownload(
                 this,
                 selected,
-                onProgress = { current, total, currentName ->
-                    UploadNotificationManager.showProgress(applicationContext, current, total, "Downloading: $currentName")
-                },
                 onComplete = { successCount, total ->
-                    if (successCount > 0) {
-                        UploadNotificationManager.showComplete(applicationContext, successCount, total)
-                    }
                     lifecycleScope.launch(Dispatchers.Main) {
                         Toast.makeText(
                             this@MainActivity,
