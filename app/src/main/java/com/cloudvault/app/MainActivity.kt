@@ -527,9 +527,13 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Uploading ($current/$total): $displayName...", Toast.LENGTH_SHORT).show()
                 }
 
-                val success = TelegramRepository.uploadFile(tempFile.absolutePath, mediaType, displayName)
-                if (success) {
-                    successCount++
+                try {
+                    val success = TelegramRepository.uploadFile(tempFile.absolutePath, mediaType, displayName)
+                    if (success) {
+                        successCount++
+                    }
+                } finally {
+                    runCatching { tempFile.delete() }
                 }
             }
 

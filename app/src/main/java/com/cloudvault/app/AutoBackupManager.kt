@@ -168,10 +168,16 @@ object AutoBackupManager {
                 }
 
                 if (uploadPath != null) {
-                    val success = TelegramRepository.uploadFile(uploadPath, file.mediaType, file.displayName)
-                    if (success) {
-                        AutoBackupPreferences.markSignatureBackedUp(context, file.signature)
-                        successCount++
+                    try {
+                        val success = TelegramRepository.uploadFile(uploadPath, file.mediaType, file.displayName)
+                        if (success) {
+                            AutoBackupPreferences.markSignatureBackedUp(context, file.signature)
+                            successCount++
+                        }
+                    } finally {
+                        if (uploadPath.contains("autobackup_temp")) {
+                            runCatching { File(uploadPath).delete() }
+                        }
                     }
                 }
             }

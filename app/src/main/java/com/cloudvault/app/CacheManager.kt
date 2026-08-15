@@ -110,6 +110,23 @@ object CacheManager {
             }
         }
 
+        fun purgeStaleTempUploads(dir: File?) {
+            if (dir == null || !dir.exists()) return
+            val files = dir.listFiles() ?: return
+            val now = System.currentTimeMillis()
+            for (f in files) {
+                if (f.isDirectory) {
+                    deleteDirContents(f)
+                } else if (now - f.lastModified() > 180_000L) { // older than 3 minutes
+                    try { f.delete() } catch (_: Throwable) {}
+                }
+            }
+        }
+
+        // Clean any leftover uploads and backup temp files before measuring
+        purgeStaleTempUploads(File(context.cacheDir, "uploads"))
+        purgeStaleTempUploads(File(context.cacheDir, "autobackup_temp"))
+
         // Scan all app storage locations on device (each physical file is scanned exactly once)
         scanDirectory(context.cacheDir)
         scanDirectory(context.externalCacheDir)
