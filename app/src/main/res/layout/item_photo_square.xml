@@ -32,6 +32,28 @@
             android:text="📷"
             android:textSize="22sp" />
 
+        <!-- Video Play / Icon Badge Overlay -->
+        <FrameLayout
+            android:id="@+id/badgeVideoOverlay"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="top|start"
+            android:layout_margin="4dp"
+            android:background="@drawable/ic_launcher_background"
+            android:backgroundTint="#99000000"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvBadgeIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="▶"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
         <!-- Loading Spinner -->
         <ProgressBar
             android:id="@+id/pbThumbLoading"

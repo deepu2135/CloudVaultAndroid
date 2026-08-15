@@ -106,20 +106,36 @@ object TelegramRepository {
     ) {
         when (val content = msg.content) {
             is TdApi.MessagePhoto -> {
-                val fullPhoto = content.photo.sizes.lastOrNull() ?: return
-                val thumbPhoto = content.photo.sizes.firstOrNull()
+                val sizes = content.photo.sizes
+                if (sizes.isEmpty()) return
+
+                // Full photo: highest resolution size
+                val fullPhoto = sizes.maxByOrNull {
+                    if (it.photo.size > 0) it.photo.size.toLong() else (it.width.toLong() * it.height)
+                } ?: sizes.last()
+
+                // Thumbnail photo: prefer medium thumbnail for fast grid display
+                val thumbPhoto = sizes.find { it.type == "m" }
+                    ?: sizes.find { it.type == "s" }
+                    ?: sizes.find { it.type == "x" }
+                    ?: sizes.filter { it.photo.id != fullPhoto.photo.id }.minByOrNull { it.width * it.height }
+                    ?: sizes.minByOrNull { it.width * it.height }
+                    ?: fullPhoto
+
+                val photoSize = if (fullPhoto.photo.size > 0) fullPhoto.photo.size.toLong() else fullPhoto.photo.expectedSize.toLong()
+
                 photoList.add(
                     VaultMediaItem(
                         id = "photo_${msg.id}",
                         title = "Photo_${msg.date}.jpg",
-                        sizeBytes = fullPhoto.photo.size.toLong(),
-                        formattedSize = formatSize(fullPhoto.photo.size.toLong()),
+                        sizeBytes = photoSize,
+                        formattedSize = formatSize(photoSize),
                         mimeType = "image/jpeg",
                         type = MediaType.PHOTO,
                         chatId = msg.chatId,
                         messageId = msg.id,
                         fileId = fullPhoto.photo.id,
-                        thumbnailFileId = thumbPhoto?.photo?.id ?: fullPhoto.photo.id,
+                        thumbnailFileId = thumbPhoto.photo.id,
                         dateAdded = msg.date.toLong()
                     )
                 )

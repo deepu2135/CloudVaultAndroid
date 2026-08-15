@@ -8,7 +8,10 @@ import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -41,6 +44,12 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+enum class GridZoomLevel(val spanCount: Int, val label: String) {
+    DAY(3, "📅 Day"),
+    MONTH(5, "📆 Month"),
+    YEAR(9, "🗓️ Year")
+}
 
 enum class VaultSortOrder(val label: String) {
     NEWEST("Newest ⌵"),
@@ -95,7 +104,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mediaAdapter: MediaGridAdapter
     private var currentCategory: MediaType = MediaType.PHOTO
-    private var isGrid3Col = true
+    private var currentZoomLevel: GridZoomLevel = GridZoomLevel.DAY
+    private var lastScaleTime = 0L
 
     private var currentSortOrder: VaultSortOrder = VaultSortOrder.NEWEST
 
@@ -275,10 +285,9 @@ class MainActivity : AppCompatActivity() {
         tabVideosContainer.setOnClickListener { switchCategory(MediaType.VIDEO) }
         tabFilesContainer.setOnClickListener { switchCategory(MediaType.DOCUMENT) }
 
+        btnGridToggle.text = currentZoomLevel.label
         btnGridToggle.setOnClickListener {
-            isGrid3Col = !isGrid3Col
-            val spanCount = if (isGrid3Col) 3 else 2
-            rvMediaGrid.layoutManager = GridLayoutManager(this, spanCount)
+            toggleGridZoom()
         }
 
         btnSortFilter.setOnClickListener {
@@ -345,11 +354,12 @@ class MainActivity : AppCompatActivity() {
             btnSelectAll.text = if (count >= visible.size && visible.isNotEmpty()) "Deselect All" else "Select All"
         }
 
-        val gridLayoutManager = GridLayoutManager(this, 3).apply {
+        val spanCount = currentZoomLevel.spanCount
+        val gridLayoutManager = GridLayoutManager(this, spanCount).apply {
             spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
                 override fun getSpanSize(position: Int): Int {
                     return when (mediaAdapter.getItemViewType(position)) {
-                        MediaGridAdapter.TYPE_HEADER, MediaGridAdapter.TYPE_FILE -> 3
+                        MediaGridAdapter.TYPE_HEADER, MediaGridAdapter.TYPE_FILE -> currentZoomLevel.spanCount
                         else -> 1
                     }
                 }
@@ -357,6 +367,114 @@ class MainActivity : AppCompatActivity() {
         }
         rvMediaGrid.layoutManager = gridLayoutManager
         rvMediaGrid.adapter = mediaAdapter
+
+        setupPinchToZoom()
+    }
+
+    private fun setupPinchToZoom() {
+        val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            private var accumulatedScale = 1.0f
+
+            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                accumulatedScale = 1.0f
+                return true
+            }
+
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                accumulatedScale *= detector.scaleFactor
+                val now = System.currentTimeMillis()
+                if (now - lastScaleTime < 350) return true
+
+                if (accumulatedScale > 1.25f) {
+                    // Zoom In: Pinch open (Year -> Month -> Day)
+                    if (zoomIn()) {
+                        lastScaleTime = now
+                        accumulatedScale = 1.0f
+                        rvMediaGrid.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    }
+                } else if (accumulatedScale < 0.80f) {
+                    // Zoom Out: Pinch close (Day -> Month -> Year)
+                    if (zoomOut()) {
+                        lastScaleTime = now
+                        accumulatedScale = 1.0f
+                        rvMediaGrid.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    }
+                }
+                return true
+            }
+        })
+
+        rvMediaGrid.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+            override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                scaleDetector.onTouchEvent(e)
+                return e.pointerCount >= 2
+            }
+
+            override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {
+                scaleDetector.onTouchEvent(e)
+            }
+        })
+    }
+
+    private fun toggleGridZoom() {
+        val nextLevel = when (currentZoomLevel) {
+            GridZoomLevel.DAY -> GridZoomLevel.MONTH
+            GridZoomLevel.MONTH -> GridZoomLevel.YEAR
+            GridZoomLevel.YEAR -> GridZoomLevel.DAY
+        }
+        setZoomLevel(nextLevel)
+    }
+
+    private fun zoomIn(): Boolean {
+        return when (currentZoomLevel) {
+            GridZoomLevel.YEAR -> {
+                setZoomLevel(GridZoomLevel.MONTH)
+                true
+            }
+            GridZoomLevel.MONTH -> {
+                setZoomLevel(GridZoomLevel.DAY)
+                true
+            }
+            GridZoomLevel.DAY -> false
+        }
+    }
+
+    private fun zoomOut(): Boolean {
+        return when (currentZoomLevel) {
+            GridZoomLevel.DAY -> {
+                setZoomLevel(GridZoomLevel.MONTH)
+                true
+            }
+            GridZoomLevel.MONTH -> {
+                setZoomLevel(GridZoomLevel.YEAR)
+                true
+            }
+            GridZoomLevel.YEAR -> false
+        }
+    }
+
+    private fun setZoomLevel(level: GridZoomLevel) {
+        if (currentZoomLevel == level) return
+        currentZoomLevel = level
+        applyZoomLevel()
+    }
+
+    private fun applyZoomLevel() {
+        val spanCount = currentZoomLevel.spanCount
+        btnGridToggle.text = currentZoomLevel.label
+
+        val layoutManager = GridLayoutManager(this, spanCount).apply {
+            spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int {
+                    return when (mediaAdapter.getItemViewType(position)) {
+                        MediaGridAdapter.TYPE_HEADER, MediaGridAdapter.TYPE_FILE -> currentZoomLevel.spanCount
+                        else -> 1
+                    }
+                }
+            }
+        }
+        rvMediaGrid.layoutManager = layoutManager
+        updateDisplayedItems()
     }
 
     private fun getCurrentVisibleMediaItems(): List<VaultMediaItem> {
@@ -384,26 +502,35 @@ class MainActivity : AppCompatActivity() {
         super.onBackPressed()
     }
 
-    private val sectionDateHeaderFormat = SimpleDateFormat("MMM d", Locale.getDefault())
-    private val sectionDateHeaderYearFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+    private val sectionDateHeaderDayFormat = SimpleDateFormat("MMM d", Locale.getDefault())
+    private val sectionDateHeaderDayYearFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+    private val sectionDateHeaderMonthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+    private val sectionDateHeaderYearFormat = SimpleDateFormat("yyyy", Locale.getDefault())
 
-    private fun formatDateHeader(timestampSecs: Long): String {
+    private fun formatDateHeader(timestampSecs: Long, zoomLevel: GridZoomLevel): String {
         if (timestampSecs <= 0L) return "Earlier"
-        val fileCal = Calendar.getInstance().apply { timeInMillis = timestampSecs * 1000L }
-        val nowCal = Calendar.getInstance()
+        val date = Date(timestampSecs * 1000L)
+        return when (zoomLevel) {
+            GridZoomLevel.YEAR -> sectionDateHeaderYearFormat.format(date)
+            GridZoomLevel.MONTH -> sectionDateHeaderMonthFormat.format(date)
+            GridZoomLevel.DAY -> {
+                val fileCal = Calendar.getInstance().apply { timeInMillis = timestampSecs * 1000L }
+                val nowCal = Calendar.getInstance()
 
-        val isSameYear = fileCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR)
-        val isSameDay = isSameYear && fileCal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
+                val isSameYear = fileCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR)
+                val isSameDay = isSameYear && fileCal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
 
-        val yesterdayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-        val isYesterday = yesterdayCal.get(Calendar.YEAR) == fileCal.get(Calendar.YEAR) &&
-                yesterdayCal.get(Calendar.DAY_OF_YEAR) == fileCal.get(Calendar.DAY_OF_YEAR)
+                val yesterdayCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+                val isYesterday = yesterdayCal.get(Calendar.YEAR) == fileCal.get(Calendar.YEAR) &&
+                        yesterdayCal.get(Calendar.DAY_OF_YEAR) == fileCal.get(Calendar.DAY_OF_YEAR)
 
-        return when {
-            isSameDay -> "Today"
-            isYesterday -> "Yesterday"
-            isSameYear -> sectionDateHeaderFormat.format(Date(timestampSecs * 1000L))
-            else -> sectionDateHeaderYearFormat.format(Date(timestampSecs * 1000L))
+                when {
+                    isSameDay -> "Today"
+                    isYesterday -> "Yesterday"
+                    isSameYear -> sectionDateHeaderDayFormat.format(date)
+                    else -> sectionDateHeaderDayYearFormat.format(date)
+                }
+            }
         }
     }
 
@@ -453,9 +580,9 @@ class MainActivity : AppCompatActivity() {
             VaultSortOrder.SIZE_ASC -> rawItems.sortedBy { it.sizeBytes }
         }
 
-        val displayItems = if (currentCategory == MediaType.PHOTO) {
+        val displayItems = if (currentCategory == MediaType.PHOTO || currentCategory == MediaType.VIDEO) {
             val list = mutableListOf<VaultDisplayItem>()
-            val grouped = items.groupBy { formatDateHeader(it.dateAdded) }
+            val grouped = items.groupBy { formatDateHeader(it.dateAdded, currentZoomLevel) }
             for ((dateHeader, mediaList) in grouped) {
                 list.add(VaultDisplayItem.Header(dateHeader, mediaList.firstOrNull()?.dateAdded ?: 0L))
                 mediaList.forEach { list.add(VaultDisplayItem.Media(it)) }
@@ -699,38 +826,46 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
         dialog.window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
 
-        // Load full resolution photo in background with EXIF orientation correction
+        // 1. Instantly display cached thumbnail if available so user sees image immediately
+        val cachedThumb = MediaGridAdapter.bitmapCache.get(item.thumbnailFileId)
+            ?: (if (item.fileId > 0) MediaGridAdapter.bitmapCache.get(item.fileId) else null)
+
+        if (cachedThumb != null) {
+            ivFullPhoto.setImageBitmap(cachedThumb)
+            ivFullPhoto.post { ivFullPhoto.fitToScreen() }
+        }
+
+        // 2. Load full-resolution photo in background with EXIF orientation correction
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                var tdFile = TelegramClient.sendRequest(TdApi.GetFile(item.fileId)) as TdApi.File
-                if (!tdFile.local.isDownloadingCompleted || tdFile.local.path.isBlank() || !File(tdFile.local.path).exists()) {
-                    TelegramClient.sendRequest(TdApi.DownloadFile(item.fileId, 32, 0L, 0L, false))
-                    var attempts = 0
-                    while (attempts < 40) {
-                        delay(250)
-                        tdFile = TelegramClient.sendRequest(TdApi.GetFile(item.fileId)) as TdApi.File
-                        if (tdFile.local.isDownloadingCompleted && File(tdFile.local.path).exists()) {
-                            break
-                        }
-                        attempts++
-                    }
-                }
-
-                val path = tdFile.local.path
+                val tdFile = TelegramClient.downloadFileAndWait(item.fileId, priority = 32, timeoutMs = 60000L)
+                val path = tdFile?.local?.path.orEmpty()
                 if (path.isNotBlank() && File(path).exists()) {
-                    val bitmap = ImageUtils.decodeOrientedBitmap(path)
+                    val bitmap = ImageUtils.decodeOrientedBitmap(path, maxDimension = 4096)
                     withContext(Dispatchers.Main) {
-                        pbFullPhotoLoading.visibility = View.GONE
                         if (bitmap != null) {
                             ivFullPhoto.setImageBitmap(bitmap)
                             ivFullPhoto.post { ivFullPhoto.fitToScreen() }
+                        } else if (cachedThumb == null) {
+                            Toast.makeText(this@MainActivity, "Could not decode photo", Toast.LENGTH_SHORT).show()
                         }
+                        Unit
+                    }
+                } else if (cachedThumb == null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Could not load full photo from cloud", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Throwable) {
                 withContext(Dispatchers.Main) {
+                    if (cachedThumb == null) {
+                        Toast.makeText(this@MainActivity, "Failed to load full photo: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                    Unit
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
                     pbFullPhotoLoading.visibility = View.GONE
-                    Toast.makeText(this@MainActivity, "Failed to load full photo: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }

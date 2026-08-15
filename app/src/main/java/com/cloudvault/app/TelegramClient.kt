@@ -6,11 +6,19 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import java.io.File
@@ -23,6 +31,12 @@ object TelegramClient {
 
     private val _authState = MutableStateFlow<TelegramAuthState>(TelegramAuthState.Idle)
     val authState: StateFlow<TelegramAuthState> = _authState.asStateFlow()
+
+    private val _fileUpdates = MutableSharedFlow<TdApi.File>(
+        extraBufferCapacity = 128,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val fileUpdates: SharedFlow<TdApi.File> = _fileUpdates.asSharedFlow()
 
     private var client: Client? = null
     private var isLibraryLoaded = false
@@ -103,6 +117,9 @@ object TelegramClient {
                         _authState.value = TelegramAuthState.Idle
                     }
                 }
+            }
+            is TdApi.UpdateFile -> {
+                _fileUpdates.tryEmit(update.file)
             }
             is TdApi.UpdateNewMessage, is TdApi.UpdateMessageContent, is TdApi.UpdateMessageSendSucceeded -> {
                 // Auto-load when new photos, videos, or files are sent/received
@@ -228,6 +245,78 @@ object TelegramClient {
                     @Suppress("UNCHECKED_CAST")
                     continuation.resume(result as T)
                 }
+            }
+        }
+    }
+
+    suspend fun downloadFileAndWait(fileId: Int, priority: Int = 32, timeoutMs: Long = 30000L): TdApi.File? {
+        if (fileId <= 0) return null
+        return withContext(Dispatchers.IO) {
+            try {
+                // 1. Check if already downloaded
+                var file: TdApi.File? = try {
+                    sendRequest(TdApi.GetFile(fileId))
+                } catch (e: Throwable) {
+                    null
+                }
+
+                if (file != null && file.local.isDownloadingCompleted && file.local.path.isNotBlank() && File(file.local.path).exists()) {
+                    return@withContext file
+                }
+
+                // 2. Request download
+                try {
+                    sendRequest(TdApi.DownloadFile(fileId, priority, 0L, 0L, false))
+                } catch (e: Throwable) {
+                    Log.d(TAG, "DownloadFile($fileId) note: ${e.message}")
+                }
+
+                // 3. Wait for completion reactively + gentle fallback polling
+                withTimeoutOrNull(timeoutMs) {
+                    file = try {
+                        sendRequest(TdApi.GetFile(fileId))
+                    } catch (_: Throwable) { null }
+
+                    val current = file
+                    if (current != null && current.local.isDownloadingCompleted && current.local.path.isNotBlank() && File(current.local.path).exists()) {
+                        return@withTimeoutOrNull current
+                    }
+
+                    val updateJob = launch {
+                        _fileUpdates.collect { updatedFile ->
+                            if (updatedFile.id == fileId && updatedFile.local.isDownloadingCompleted && File(updatedFile.local.path).exists()) {
+                                file = updatedFile
+                            }
+                        }
+                    }
+
+                    while (isActive) {
+                        val check = file
+                        if (check != null && check.local.isDownloadingCompleted && check.local.path.isNotBlank() && File(check.local.path).exists()) {
+                            break
+                        }
+                        delay(600)
+                        try {
+                            val polled: TdApi.File = sendRequest(TdApi.GetFile(fileId))
+                            file = polled
+                            if (polled.local.isDownloadingCompleted && polled.local.path.isNotBlank() && File(polled.local.path).exists()) {
+                                break
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                    updateJob.cancel()
+                    file
+                }
+
+                val finalFile = file
+                if (finalFile != null && finalFile.local.isDownloadingCompleted && finalFile.local.path.isNotBlank() && File(finalFile.local.path).exists()) {
+                    finalFile
+                } else {
+                    null
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "downloadFileAndWait failed for fileId=$fileId", e)
+                null
             }
         }
     }

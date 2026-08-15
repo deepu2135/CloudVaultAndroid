@@ -215,8 +215,7 @@ class MediaGridAdapter(
         return when (val item = items[position]) {
             is VaultDisplayItem.Header -> TYPE_HEADER
             is VaultDisplayItem.Media -> when (item.item.type) {
-                MediaType.PHOTO -> TYPE_PHOTO
-                MediaType.VIDEO -> TYPE_VIDEO
+                MediaType.PHOTO, MediaType.VIDEO -> TYPE_PHOTO
                 MediaType.DOCUMENT -> TYPE_FILE
             }
         }
@@ -233,10 +232,6 @@ class MediaGridAdapter(
                 val view = inflater.inflate(R.layout.item_photo_square, parent, false)
                 PhotoSquareViewHolder(view)
             }
-            TYPE_VIDEO -> {
-                val view = inflater.inflate(R.layout.item_media_card, parent, false)
-                MediaViewHolder(view)
-            }
             else -> {
                 val view = inflater.inflate(R.layout.item_file_card, parent, false)
                 FileViewHolder(view)
@@ -250,7 +245,6 @@ class MediaGridAdapter(
             is VaultDisplayItem.Media -> {
                 when (holder) {
                     is PhotoSquareViewHolder -> holder.bind(item.item)
-                    is MediaViewHolder -> holder.bind(item.item)
                     is FileViewHolder -> holder.bind(item.item)
                 }
             }
@@ -302,6 +296,8 @@ class MediaGridAdapter(
         private val viewCheckUnselected: View? = itemView.findViewById(R.id.viewCheckUnselected)
         private val viewCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewCheckSelected)
 
+        private val badgeVideoOverlay: FrameLayout? = itemView.findViewById(R.id.badgeVideoOverlay)
+
         private var loadJob: Job? = null
 
         fun bind(item: VaultMediaItem) {
@@ -313,6 +309,9 @@ class MediaGridAdapter(
             layoutSelectionCheck?.visibility = if (isSelectionMode) View.VISIBLE else View.GONE
             viewCheckUnselected?.visibility = if (!isSelected) View.VISIBLE else View.GONE
             viewCheckSelected?.visibility = if (isSelected) View.VISIBLE else View.GONE
+
+            badgeVideoOverlay?.visibility = if (item.type == MediaType.VIDEO) View.VISIBLE else View.GONE
+            tvPlaceholderIcon.text = if (item.type == MediaType.VIDEO) "🎬" else "📷"
 
             ivThumbnail.setImageDrawable(null)
             ivThumbnail.visibility = View.GONE
@@ -348,10 +347,13 @@ class MediaGridAdapter(
             val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
             if (targetFileId > 0) {
                 val cached = bitmapCache.get(targetFileId)
+                    ?: (if (item.fileId > 0) bitmapCache.get(item.fileId) else null)
+
                 if (cached != null) {
                     ivThumbnail.setImageBitmap(cached)
                     ivThumbnail.visibility = View.VISIBLE
                     tvPlaceholderIcon.visibility = View.GONE
+                    pbThumbLoading.visibility = View.GONE
                 } else {
                     pbThumbLoading.visibility = View.VISIBLE
                     loadJob = scope.launch(Dispatchers.IO) {
@@ -360,13 +362,21 @@ class MediaGridAdapter(
                             pbThumbLoading.visibility = View.GONE
                             if (bitmap != null) {
                                 bitmapCache.put(targetFileId, bitmap)
+                                if (item.fileId > 0) bitmapCache.put(item.fileId, bitmap)
                                 ivThumbnail.setImageBitmap(bitmap)
                                 ivThumbnail.visibility = View.VISIBLE
                                 tvPlaceholderIcon.visibility = View.GONE
+                            } else {
+                                ivThumbnail.visibility = View.GONE
+                                tvPlaceholderIcon.visibility = View.VISIBLE
                             }
                         }
                     }
                 }
+            } else {
+                pbThumbLoading.visibility = View.GONE
+                ivThumbnail.visibility = View.GONE
+                tvPlaceholderIcon.visibility = View.VISIBLE
             }
         }
     }
@@ -448,10 +458,13 @@ class MediaGridAdapter(
 
             if (targetFileId > 0) {
                 val cached = bitmapCache.get(targetFileId)
+                    ?: if (item.fileId > 0) bitmapCache.get(item.fileId) else null
+
                 if (cached != null) {
                     ivThumbnail.setImageBitmap(cached)
                     ivThumbnail.visibility = View.VISIBLE
                     tvPlaceholderIcon.visibility = View.GONE
+                    pbThumbLoading.visibility = View.GONE
                 } else {
                     pbThumbLoading.visibility = View.VISIBLE
                     loadJob = scope.launch(Dispatchers.IO) {
@@ -460,13 +473,21 @@ class MediaGridAdapter(
                             pbThumbLoading.visibility = View.GONE
                             if (bitmap != null) {
                                 bitmapCache.put(targetFileId, bitmap)
+                                if (item.fileId > 0) bitmapCache.put(item.fileId, bitmap)
                                 ivThumbnail.setImageBitmap(bitmap)
                                 ivThumbnail.visibility = View.VISIBLE
                                 tvPlaceholderIcon.visibility = View.GONE
+                            } else {
+                                ivThumbnail.visibility = View.GONE
+                                tvPlaceholderIcon.visibility = View.VISIBLE
                             }
                         }
                     }
                 }
+            } else {
+                pbThumbLoading.visibility = View.GONE
+                ivThumbnail.visibility = View.GONE
+                tvPlaceholderIcon.visibility = View.VISIBLE
             }
         }
     }
@@ -543,32 +564,23 @@ class MediaGridAdapter(
     private suspend fun loadOrDownloadThumbnail(targetFileId: Int, item: VaultMediaItem): Bitmap? {
         return withContext(Dispatchers.IO) {
             try {
-                var tdFile = TelegramClient.sendRequest(TdApi.GetFile(targetFileId)) as TdApi.File
-
-                if (tdFile.local.isDownloadingCompleted && tdFile.local.path.isNotBlank() && File(tdFile.local.path).exists()) {
-                    return@withContext decodeSampledBitmap(tdFile.local.path, 300, 300)
+                // 1. Try targetFileId (thumbnail if available)
+                val tdFile = TelegramClient.downloadFileAndWait(targetFileId, priority = 32, timeoutMs = 15000L)
+                if (tdFile != null && tdFile.local.path.isNotBlank() && File(tdFile.local.path).exists()) {
+                    val bmp = ImageUtils.decodeOrientedBitmap(tdFile.local.path, maxDimension = 400)
+                    if (bmp != null) return@withContext bmp
                 }
 
-                TelegramClient.sendRequest(
-                    TdApi.DownloadFile(
-                        targetFileId,
-                        32,
-                        0L,
-                        0L,
-                        false
-                    )
-                )
-
-                var attempts = 0
-                while (attempts < 25) {
-                    delay(200)
-                    tdFile = TelegramClient.sendRequest(TdApi.GetFile(targetFileId)) as TdApi.File
-                    if (tdFile.local.isDownloadingCompleted && File(tdFile.local.path).exists()) {
-                        return@withContext decodeSampledBitmap(tdFile.local.path, 300, 300)
+                // 2. If targetFileId was a thumbnail and failed, try main fileId as fallback
+                if (targetFileId != item.fileId && item.fileId > 0) {
+                    val mainFile = TelegramClient.downloadFileAndWait(item.fileId, priority = 24, timeoutMs = 20000L)
+                    if (mainFile != null && mainFile.local.path.isNotBlank() && File(mainFile.local.path).exists()) {
+                        val bmp = ImageUtils.decodeOrientedBitmap(mainFile.local.path, maxDimension = 400)
+                        if (bmp != null) return@withContext bmp
                     }
-                    attempts++
                 }
 
+                // 3. For video, try proxy video frame extraction if available
                 if (item.type == MediaType.VIDEO && TelegramStreamingProxy.port > 0) {
                     return@withContext extractVideoFrameFromProxy(item.fileId, item.title)
                 }
