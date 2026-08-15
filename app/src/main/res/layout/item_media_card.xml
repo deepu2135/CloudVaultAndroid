@@ -89,6 +89,52 @@
                 android:layout_height="20dp"
                 android:layout_gravity="center"
                 android:visibility="gone" />
+
+            <!-- Selection Overlay Dimmer -->
+            <View
+                android:id="@+id/selectionDimOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#4D2563EB"
+                android:visibility="gone" />
+
+            <!-- Selection Check Circle Container -->
+            <FrameLayout
+                android:id="@+id/layoutSelectionCheck"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="4dp"
+                android:visibility="gone">
+
+                <!-- Unselected Ring -->
+                <View
+                    android:id="@+id/viewCheckUnselected"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_selection_circle_unselected" />
+
+                <!-- Selected Blue Circle with Checkmark -->
+                <FrameLayout
+                    android:id="@+id/viewCheckSelected"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_selection_circle_selected"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="✓"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+            </FrameLayout>
+
         </FrameLayout>
 
         <!-- Media Info Label -->

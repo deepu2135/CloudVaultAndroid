@@ -6,8 +6,9 @@
     android:orientation="vertical"
     android:background="@color/bg_dark">
 
-    <!-- Top Action Bar -->
+    <!-- Normal Top Action Bar -->
     <LinearLayout
+        android:id="@+id/layoutNormalTopBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
@@ -98,6 +99,61 @@
             app:strokeColor="@color/card_border"
             app:strokeWidth="1dp"
             android:padding="0dp"
+            style="@style/Widget.MaterialComponents.Button" />
+    </LinearLayout>
+
+    <!-- Selection Top Action Bar (Visible in Selection Mode) -->
+    <LinearLayout
+        android:id="@+id/layoutSelectionTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone"
+        android:background="#0A0F1D">
+
+        <!-- Close Selection Mode Button -->
+        <TextView
+            android:id="@+id/btnCloseSelection"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:text="✕"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+
+        <!-- Selected Count -->
+        <TextView
+            android:id="@+id/tvSelectionCount"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="1 item selected"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- Select All / Deselect All Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSelectAll"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:text="Select All"
+            android:textColor="#38BDF8"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:cornerRadius="19dp"
+            app:backgroundTint="#16263D"
+            app:strokeColor="#1E293B"
+            app:strokeWidth="1dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             style="@style/Widget.MaterialComponents.Button" />
     </LinearLayout>
 
@@ -284,11 +340,27 @@
             android:paddingEnd="8dp"
             style="@style/Widget.MaterialComponents.Button" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStartSelect"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginStart="6dp"
+            android:text="☑ Select"
+            android:textColor="@color/accent_cyan_bright"
+            android:textSize="11sp"
+            app:cornerRadius="8dp"
+            app:backgroundTint="#162234"
+            app:strokeColor="@color/card_border"
+            app:strokeWidth="1dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            style="@style/Widget.MaterialComponents.Button" />
+
         <TextView
             android:id="@+id/btnGridToggle"
             android:layout_width="32dp"
             android:layout_height="32dp"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="6dp"
             android:gravity="center"
             android:text="☷"
             android:textColor="@color/text_secondary"
@@ -376,6 +448,62 @@
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
             style="@style/Widget.MaterialComponents.Button" />
+
+        <!-- Bottom Floating Selection Action Bar -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/layoutSelectionBottomBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="8dp"
+            app:cardBackgroundColor="#0F172A"
+            app:strokeColor="#1E293B"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:padding="8dp">
+
+                <!-- Download Selected Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDownloadSelected"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="⬇ Download"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="#2563EB"
+                    app:cornerRadius="24dp"
+                    style="@style/Widget.MaterialComponents.Button" />
+
+                <!-- Delete Selected Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDeleteSelected"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="🗑 Delete"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="#DC2626"
+                    app:cornerRadius="24dp"
+                    style="@style/Widget.MaterialComponents.Button" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
     </FrameLayout>
 

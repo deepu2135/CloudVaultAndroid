@@ -14,118 +14,167 @@
     app:strokeColor="@color/card_border"
     app:strokeWidth="1dp">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="12dp">
+        android:layout_height="wrap_content">
 
-        <!-- File Icon Container -->
-        <FrameLayout
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/ic_launcher_background"
-            android:backgroundTint="#162234">
+        <!-- Selection Overlay Dimmer -->
+        <View
+            android:id="@+id/selectionDimOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#332563EB"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvFileIcon"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="📄"
-                android:textSize="22sp" />
-        </FrameLayout>
-
-        <!-- File Info Column -->
         <LinearLayout
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="8dp"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp">
 
-            <!-- File Name -->
-            <TextView
-                android:id="@+id/tvFileName"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="alwaysShowDownloadManager.plugin"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
+            <!-- File Icon Container -->
+            <FrameLayout
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/ic_launcher_background"
+                android:backgroundTint="#162234">
 
-            <!-- Subtitle Row: Badge + Size + Date -->
+                <TextView
+                    android:id="@+id/tvFileIcon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="📄"
+                    android:textSize="22sp" />
+            </FrameLayout>
+
+            <!-- File Info Column -->
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="8dp"
+                android:orientation="vertical">
 
-                <!-- File Type Pill Badge -->
+                <!-- File Name -->
                 <TextView
-                    android:id="@+id/tvFileBadge"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvFileName"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="PLUGIN"
-                    android:textColor="@color/accent_cyan_bright"
-                    android:textSize="9sp"
+                    android:text="alwaysShowDownloadManager.plugin"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
                     android:textStyle="bold"
-                    android:background="#16263D"
-                    android:paddingStart="5dp"
-                    android:paddingEnd="5dp"
-                    android:paddingTop="1dp"
-                    android:paddingBottom="1dp" />
-
-                <!-- File Size -->
-                <TextView
-                    android:id="@+id/tvFileSize"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:text="1008 B"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
-
-                <!-- Dot Separator -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="4dp"
-                    android:text="•"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10sp" />
-
-                <!-- Date Timestamp -->
-                <TextView
-                    android:id="@+id/tvFileDate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="12 May 2024 • 11:32 AM"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
                     android:maxLines="1"
                     android:ellipsize="end" />
+
+                <!-- Subtitle Row: Badge + Size + Date -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <!-- File Type Pill Badge -->
+                    <TextView
+                        android:id="@+id/tvFileBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="PLUGIN"
+                        android:textColor="@color/accent_cyan_bright"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:background="#16263D"
+                        android:paddingStart="5dp"
+                        android:paddingEnd="5dp"
+                        android:paddingTop="1dp"
+                        android:paddingBottom="1dp" />
+
+                    <!-- File Size -->
+                    <TextView
+                        android:id="@+id/tvFileSize"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="1008 B"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <!-- Dot Separator -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:text="•"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="10sp" />
+
+                    <!-- Date Timestamp -->
+                    <TextView
+                        android:id="@+id/tvFileDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="12 May 2024 • 11:32 AM"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+                </LinearLayout>
+
             </LinearLayout>
+
+            <!-- 3-Dot Overflow Menu -->
+            <TextView
+                android:id="@+id/btnFileMenu"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:gravity="center"
+                android:text="⋮"
+                android:textColor="@color/text_secondary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <!-- Selection Check Circle Container -->
+            <FrameLayout
+                android:id="@+id/layoutSelectionCheck"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:visibility="gone">
+
+                <!-- Unselected Ring -->
+                <View
+                    android:id="@+id/viewCheckUnselected"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_selection_circle_unselected" />
+
+                <!-- Selected Blue Circle with Checkmark -->
+                <FrameLayout
+                    android:id="@+id/viewCheckSelected"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_selection_circle_selected"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="✓"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+            </FrameLayout>
 
         </LinearLayout>
 
-        <!-- 3-Dot Overflow Menu -->
-        <TextView
-            android:id="@+id/btnFileMenu"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:gravity="center"
-            android:text="⋮"
-            android:textColor="@color/text_secondary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-    </LinearLayout>
+    </FrameLayout>
 
 </com.google.android.material.card.MaterialCardView>

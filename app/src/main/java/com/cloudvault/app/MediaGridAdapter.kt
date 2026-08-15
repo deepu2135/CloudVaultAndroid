@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.util.LruCache
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -53,6 +54,140 @@ class MediaGridAdapter(
     }
 
     private var items: List<VaultDisplayItem> = emptyList()
+
+    var isSelectionMode: Boolean = false
+        private set
+
+    private val selectedItemIds = mutableSetOf<String>()
+    private val selectedItemsMap = mutableMapOf<String, VaultMediaItem>()
+
+    var onItemMenuClick: ((VaultMediaItem, View) -> Unit)? = null
+    var onSelectionModeChangeListener: ((Boolean) -> Unit)? = null
+    var onSelectionChangedListener: ((Set<VaultMediaItem>) -> Unit)? = null
+
+    fun enterSelectionMode() {
+        isSelectionMode = true
+        notifyDataSetChanged()
+        onSelectionModeChangeListener?.invoke(true)
+        onSelectionChangedListener?.invoke(getSelectedItems())
+    }
+
+    fun startSelection(initialItem: VaultMediaItem) {
+        isSelectionMode = true
+        selectedItemIds.clear()
+        selectedItemsMap.clear()
+        selectedItemIds.add(initialItem.id)
+        selectedItemsMap[initialItem.id] = initialItem
+        notifyDataSetChanged()
+        onSelectionModeChangeListener?.invoke(true)
+        onSelectionChangedListener?.invoke(getSelectedItems())
+    }
+
+    fun toggleSelection(item: VaultMediaItem) {
+        if (selectedItemIds.contains(item.id)) {
+            selectedItemIds.remove(item.id)
+            selectedItemsMap.remove(item.id)
+        } else {
+            selectedItemIds.add(item.id)
+            selectedItemsMap[item.id] = item
+        }
+
+        if (selectedItemIds.isEmpty()) {
+            isSelectionMode = false
+            notifyDataSetChanged()
+            onSelectionModeChangeListener?.invoke(false)
+            onSelectionChangedListener?.invoke(emptySet())
+        } else {
+            isSelectionMode = true
+            notifyDataSetChanged()
+            onSelectionChangedListener?.invoke(getSelectedItems())
+        }
+    }
+
+    fun toggleDateGroupSelection(dateTitle: String) {
+        val dateItems = getItemsForDateHeader(dateTitle)
+        if (dateItems.isEmpty()) return
+
+        val allSelected = dateItems.all { selectedItemIds.contains(it.id) }
+        if (allSelected) {
+            dateItems.forEach {
+                selectedItemIds.remove(it.id)
+                selectedItemsMap.remove(it.id)
+            }
+        } else {
+            isSelectionMode = true
+            dateItems.forEach {
+                selectedItemIds.add(it.id)
+                selectedItemsMap[it.id] = it
+            }
+        }
+
+        if (selectedItemIds.isEmpty()) {
+            isSelectionMode = false
+            notifyDataSetChanged()
+            onSelectionModeChangeListener?.invoke(false)
+            onSelectionChangedListener?.invoke(emptySet())
+        } else {
+            isSelectionMode = true
+            notifyDataSetChanged()
+            onSelectionModeChangeListener?.invoke(true)
+            onSelectionChangedListener?.invoke(getSelectedItems())
+        }
+    }
+
+    fun getItemsForDateHeader(dateTitle: String): List<VaultMediaItem> {
+        val result = mutableListOf<VaultMediaItem>()
+        var foundHeader = false
+        for (item in items) {
+            if (item is VaultDisplayItem.Header) {
+                if (item.dateTitle == dateTitle) {
+                    foundHeader = true
+                } else if (foundHeader) {
+                    break
+                }
+            } else if (foundHeader && item is VaultDisplayItem.Media) {
+                result.add(item.item)
+            }
+        }
+        return result
+    }
+
+    fun selectAll(visibleMediaItems: List<VaultMediaItem>) {
+        isSelectionMode = true
+        selectedItemIds.clear()
+        selectedItemsMap.clear()
+        visibleMediaItems.forEach {
+            selectedItemIds.add(it.id)
+            selectedItemsMap[it.id] = it
+        }
+        notifyDataSetChanged()
+        onSelectionModeChangeListener?.invoke(true)
+        onSelectionChangedListener?.invoke(getSelectedItems())
+    }
+
+    fun clearSelection() {
+        isSelectionMode = false
+        selectedItemIds.clear()
+        selectedItemsMap.clear()
+        notifyDataSetChanged()
+        onSelectionModeChangeListener?.invoke(false)
+        onSelectionChangedListener?.invoke(emptySet())
+    }
+
+    fun getSelectedItems(): Set<VaultMediaItem> {
+        val result = mutableSetOf<VaultMediaItem>()
+        result.addAll(selectedItemsMap.values)
+        val mediaMap = items.filterIsInstance<VaultDisplayItem.Media>().map { it.item }.associateBy { it.id }
+        for (id in selectedItemIds) {
+            val found = mediaMap[id]
+            if (found != null) {
+                result.add(found)
+            }
+        }
+        return result
+    }
+
+    fun getSelectedCount(): Int = selectedItemIds.size
 
     fun submitList(newItems: List<VaultDisplayItem>) {
         val diffCallback = object : DiffUtil.Callback() {
@@ -126,9 +261,35 @@ class MediaGridAdapter(
 
     inner class HeaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvDateHeader: TextView = itemView.findViewById(R.id.tvDateHeader)
+        private val layoutDateSelectionCheck: FrameLayout? = itemView.findViewById(R.id.layoutDateSelectionCheck)
+        private val viewDateCheckUnselected: View? = itemView.findViewById(R.id.viewDateCheckUnselected)
+        private val viewDateCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewDateCheckSelected)
 
         fun bind(header: VaultDisplayItem.Header) {
             tvDateHeader.text = header.dateTitle
+
+            val dateItems = getItemsForDateHeader(header.dateTitle)
+            val isAllDateItemsSelected = dateItems.isNotEmpty() && dateItems.all { selectedItemIds.contains(it.id) }
+
+            layoutDateSelectionCheck?.visibility = if (isSelectionMode) View.VISIBLE else View.GONE
+            viewDateCheckSelected?.visibility = if (isAllDateItemsSelected) View.VISIBLE else View.GONE
+            viewDateCheckUnselected?.visibility = if (!isAllDateItemsSelected) View.VISIBLE else View.GONE
+
+            itemView.setOnClickListener {
+                if (isSelectionMode) {
+                    toggleDateGroupSelection(header.dateTitle)
+                }
+            }
+
+            itemView.setOnLongClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                toggleDateGroupSelection(header.dateTitle)
+                true
+            }
+
+            layoutDateSelectionCheck?.setOnClickListener {
+                toggleDateGroupSelection(header.dateTitle)
+            }
         }
     }
 
@@ -136,17 +297,53 @@ class MediaGridAdapter(
         private val ivThumbnail: ImageView = itemView.findViewById(R.id.ivThumbnail)
         private val tvPlaceholderIcon: TextView = itemView.findViewById(R.id.tvPlaceholderIcon)
         private val pbThumbLoading: ProgressBar = itemView.findViewById(R.id.pbThumbLoading)
+        private val selectionDimOverlay: View? = itemView.findViewById(R.id.selectionDimOverlay)
+        private val layoutSelectionCheck: FrameLayout? = itemView.findViewById(R.id.layoutSelectionCheck)
+        private val viewCheckUnselected: View? = itemView.findViewById(R.id.viewCheckUnselected)
+        private val viewCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewCheckSelected)
+
         private var loadJob: Job? = null
 
         fun bind(item: VaultMediaItem) {
             loadJob?.cancel()
+
+            val isSelected = selectedItemIds.contains(item.id)
+
+            selectionDimOverlay?.visibility = if (isSelected) View.VISIBLE else View.GONE
+            layoutSelectionCheck?.visibility = if (isSelectionMode) View.VISIBLE else View.GONE
+            viewCheckUnselected?.visibility = if (!isSelected) View.VISIBLE else View.GONE
+            viewCheckSelected?.visibility = if (isSelected) View.VISIBLE else View.GONE
 
             ivThumbnail.setImageDrawable(null)
             ivThumbnail.visibility = View.GONE
             tvPlaceholderIcon.visibility = View.VISIBLE
             pbThumbLoading.visibility = View.GONE
 
-            itemView.setOnClickListener { onItemClick(item) }
+            itemView.setOnClickListener {
+                if (isSelectionMode) {
+                    toggleSelection(item)
+                } else {
+                    onItemClick(item)
+                }
+            }
+
+            itemView.setOnLongClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                if (!isSelectionMode) {
+                    startSelection(item)
+                } else {
+                    toggleSelection(item)
+                }
+                true
+            }
+
+            layoutSelectionCheck?.setOnClickListener {
+                if (!isSelectionMode) {
+                    startSelection(item)
+                } else {
+                    toggleSelection(item)
+                }
+            }
 
             val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
             if (targetFileId > 0) {
@@ -183,11 +380,22 @@ class MediaGridAdapter(
         private val tvMediaTitle: TextView = itemView.findViewById(R.id.tvMediaTitle)
         private val tvMediaSize: TextView = itemView.findViewById(R.id.tvMediaSize)
         private val btnItemMenu: TextView = itemView.findViewById(R.id.btnItemMenu)
+        private val selectionDimOverlay: View? = itemView.findViewById(R.id.selectionDimOverlay)
+        private val layoutSelectionCheck: FrameLayout? = itemView.findViewById(R.id.layoutSelectionCheck)
+        private val viewCheckUnselected: View? = itemView.findViewById(R.id.viewCheckUnselected)
+        private val viewCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewCheckSelected)
 
         private var loadJob: Job? = null
 
         fun bind(item: VaultMediaItem) {
             loadJob?.cancel()
+
+            val isSelected = selectedItemIds.contains(item.id)
+
+            selectionDimOverlay?.visibility = if (isSelected) View.VISIBLE else View.GONE
+            layoutSelectionCheck?.visibility = if (isSelectionMode) View.VISIBLE else View.GONE
+            viewCheckUnselected?.visibility = if (!isSelected) View.VISIBLE else View.GONE
+            viewCheckSelected?.visibility = if (isSelected) View.VISIBLE else View.GONE
 
             tvMediaTitle.text = item.title
             tvMediaSize.text = item.formattedSize
@@ -202,8 +410,39 @@ class MediaGridAdapter(
             tvBadgeIcon.text = "🎬"
             badgeVideoOverlay.visibility = View.VISIBLE
 
-            itemView.setOnClickListener { onItemClick(item) }
-            btnItemMenu.setOnClickListener { onItemClick(item) }
+            itemView.setOnClickListener {
+                if (isSelectionMode) {
+                    toggleSelection(item)
+                } else {
+                    onItemClick(item)
+                }
+            }
+
+            itemView.setOnLongClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                if (!isSelectionMode) {
+                    startSelection(item)
+                } else {
+                    toggleSelection(item)
+                }
+                true
+            }
+
+            layoutSelectionCheck?.setOnClickListener {
+                if (!isSelectionMode) {
+                    startSelection(item)
+                } else {
+                    toggleSelection(item)
+                }
+            }
+
+            btnItemMenu.setOnClickListener { view ->
+                if (isSelectionMode) {
+                    toggleSelection(item)
+                } else {
+                    onItemMenuClick?.invoke(item, view) ?: onItemClick(item)
+                }
+            }
 
             val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
 
@@ -238,8 +477,20 @@ class MediaGridAdapter(
         private val tvFileSize: TextView = itemView.findViewById(R.id.tvFileSize)
         private val tvFileDate: TextView = itemView.findViewById(R.id.tvFileDate)
         private val btnFileMenu: TextView = itemView.findViewById(R.id.btnFileMenu)
+        private val selectionDimOverlay: View? = itemView.findViewById(R.id.selectionDimOverlay)
+        private val layoutSelectionCheck: FrameLayout? = itemView.findViewById(R.id.layoutSelectionCheck)
+        private val viewCheckUnselected: View? = itemView.findViewById(R.id.viewCheckUnselected)
+        private val viewCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewCheckSelected)
 
         fun bind(item: VaultMediaItem) {
+            val isSelected = selectedItemIds.contains(item.id)
+
+            selectionDimOverlay?.visibility = if (isSelected) View.VISIBLE else View.GONE
+            btnFileMenu.visibility = if (isSelectionMode) View.GONE else View.VISIBLE
+            layoutSelectionCheck?.visibility = if (isSelectionMode) View.VISIBLE else View.GONE
+            viewCheckUnselected?.visibility = if (!isSelected) View.VISIBLE else View.GONE
+            viewCheckSelected?.visibility = if (isSelected) View.VISIBLE else View.GONE
+
             tvFileName.text = item.title
             tvFileSize.text = item.formattedSize
 
@@ -253,8 +504,39 @@ class MediaGridAdapter(
             }
             tvFileDate.text = formattedDate
 
-            itemView.setOnClickListener { onItemClick(item) }
-            btnFileMenu.setOnClickListener { onItemClick(item) }
+            itemView.setOnClickListener {
+                if (isSelectionMode) {
+                    toggleSelection(item)
+                } else {
+                    onItemClick(item)
+                }
+            }
+
+            itemView.setOnLongClickListener {
+                it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                if (!isSelectionMode) {
+                    startSelection(item)
+                } else {
+                    toggleSelection(item)
+                }
+                true
+            }
+
+            layoutSelectionCheck?.setOnClickListener {
+                if (!isSelectionMode) {
+                    startSelection(item)
+                } else {
+                    toggleSelection(item)
+                }
+            }
+
+            btnFileMenu.setOnClickListener { view ->
+                if (isSelectionMode) {
+                    toggleSelection(item)
+                } else {
+                    onItemMenuClick?.invoke(item, view) ?: onItemClick(item)
+                }
+            }
         }
     }
 

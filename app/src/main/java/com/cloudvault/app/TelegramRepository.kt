@@ -278,6 +278,30 @@ object TelegramRepository {
         }
     }
 
+    suspend fun deleteMediaItems(items: List<VaultMediaItem>): Boolean {
+        if (items.isEmpty()) return true
+        return try {
+            val byChat = items.groupBy { it.chatId }
+            for ((chatId, chatItems) in byChat) {
+                val targetChatId = if (chatId != 0L) chatId else getSavedMessagesChatId() ?: continue
+                val msgIds = chatItems.map { it.messageId }.filter { it != 0L }.toLongArray()
+                if (msgIds.isNotEmpty()) {
+                    TelegramClient.sendRequest(TdApi.DeleteMessages(targetChatId, msgIds, true))
+                }
+            }
+
+            // Immediately update reactive StateFlows in memory
+            val deletedIds = items.map { it.id }.toSet()
+            _photos.value = _photos.value.filterNot { deletedIds.contains(it.id) }
+            _videos.value = _videos.value.filterNot { deletedIds.contains(it.id) }
+            _files.value = _files.value.filterNot { deletedIds.contains(it.id) }
+            true
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed to delete media items", e)
+            false
+        }
+    }
+
     private suspend fun getSavedMessagesChatId(): Long? {
         return try {
             val me = TelegramClient.sendRequest(TdApi.GetMe()) as TdApi.User

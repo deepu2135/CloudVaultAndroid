@@ -82,6 +82,24 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- Delete Photo Action Button -->
+        <FrameLayout
+            android:id="@+id/btnDeletePhoto"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/ic_launcher_background"
+            android:backgroundTint="#33EF4444">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="🗑"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp" />
+        </FrameLayout>
+
         <!-- Download Action Button -->
         <FrameLayout
             android:id="@+id/btnDownloadPhoto"

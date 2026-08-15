@@ -60,6 +60,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnSettings: MaterialButton
     private lateinit var fabUpload: MaterialButton
 
+    private lateinit var layoutNormalTopBar: LinearLayout
+    private lateinit var layoutSelectionTopBar: LinearLayout
+    private lateinit var btnCloseSelection: TextView
+    private lateinit var tvSelectionCount: TextView
+    private lateinit var btnSelectAll: MaterialButton
+    private lateinit var layoutSelectionBottomBar: MaterialCardView
+    private lateinit var btnDownloadSelected: MaterialButton
+    private lateinit var btnDeleteSelected: MaterialButton
+
     private lateinit var tabPhotosContainer: LinearLayout
     private lateinit var tvTabPhotosLabel: TextView
     private lateinit var tabPhotosIndicator: View
@@ -74,6 +83,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvSectionTitle: TextView
     private lateinit var btnSortFilter: MaterialButton
+    private lateinit var btnStartSelect: MaterialButton
     private lateinit var btnGridToggle: TextView
 
     private lateinit var rvMediaGrid: RecyclerView
@@ -133,6 +143,80 @@ class MainActivity : AppCompatActivity() {
         btnSettings = findViewById(R.id.btnSettings)
         fabUpload = findViewById(R.id.fabUpload)
 
+        layoutNormalTopBar = findViewById(R.id.layoutNormalTopBar)
+        layoutSelectionTopBar = findViewById(R.id.layoutSelectionTopBar)
+        btnCloseSelection = findViewById(R.id.btnCloseSelection)
+        tvSelectionCount = findViewById(R.id.tvSelectionCount)
+        btnSelectAll = findViewById(R.id.btnSelectAll)
+        layoutSelectionBottomBar = findViewById(R.id.layoutSelectionBottomBar)
+        btnDownloadSelected = findViewById(R.id.btnDownloadSelected)
+        btnDeleteSelected = findViewById(R.id.btnDeleteSelected)
+
+        btnCloseSelection.setOnClickListener {
+            mediaAdapter.clearSelection()
+        }
+
+        btnSelectAll.setOnClickListener {
+            val visible = getCurrentVisibleMediaItems()
+            if (mediaAdapter.getSelectedCount() >= visible.size && visible.isNotEmpty()) {
+                mediaAdapter.clearSelection()
+            } else {
+                mediaAdapter.selectAll(visible)
+            }
+        }
+
+        btnDownloadSelected.setOnClickListener {
+            val selected = mediaAdapter.getSelectedItems().toList()
+            if (selected.isEmpty()) return@setOnClickListener
+            val count = selected.size
+            Toast.makeText(this, "Downloading $count item(s) to Downloads/CloudVault... ⬇️", Toast.LENGTH_LONG).show()
+            mediaAdapter.clearSelection()
+
+            DownloadManager.startBatchDownload(
+                this,
+                selected,
+                onProgress = { current, total, currentName ->
+                    UploadNotificationManager.showProgress(applicationContext, current, total, "Downloading: $currentName")
+                },
+                onComplete = { successCount, total ->
+                    if (successCount > 0) {
+                        UploadNotificationManager.showComplete(applicationContext, successCount, total)
+                    }
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Saved $successCount of $total item(s) to Downloads/CloudVault! 📁",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            )
+        }
+
+        btnDeleteSelected.setOnClickListener {
+            val selected = mediaAdapter.getSelectedItems().toList()
+            if (selected.isEmpty()) return@setOnClickListener
+
+            AlertDialog.Builder(this)
+                .setTitle("Delete ${selected.size} item(s)?")
+                .setMessage("Are you sure you want to permanently delete the selected ${selected.size} item(s) from your Cloud Vault and Telegram Saved Messages?")
+                .setPositiveButton("Delete") { _, _ ->
+                    pbLoading.visibility = View.VISIBLE
+                    lifecycleScope.launch {
+                        val success = TelegramRepository.deleteMediaItems(selected)
+                        pbLoading.visibility = View.GONE
+                        mediaAdapter.clearSelection()
+                        if (success) {
+                            Toast.makeText(this@MainActivity, "Deleted ${selected.size} item(s) 🗑️", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@MainActivity, "Failed to delete some items", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
         tabPhotosContainer = findViewById(R.id.tabPhotosContainer)
         tvTabPhotosLabel = findViewById(R.id.tvTabPhotosLabel)
         tabPhotosIndicator = findViewById(R.id.tabPhotosIndicator)
@@ -147,7 +231,12 @@ class MainActivity : AppCompatActivity() {
 
         tvSectionTitle = findViewById(R.id.tvSectionTitle)
         btnSortFilter = findViewById(R.id.btnSortFilter)
+        btnStartSelect = findViewById(R.id.btnStartSelect)
         btnGridToggle = findViewById(R.id.btnGridToggle)
+
+        btnStartSelect.setOnClickListener {
+            mediaAdapter.enterSelectionMode()
+        }
 
         rvMediaGrid = findViewById(R.id.rvMediaGrid)
         layoutEmptyState = findViewById(R.id.layoutEmptyState)
@@ -241,6 +330,27 @@ class MainActivity : AppCompatActivity() {
         mediaAdapter = MediaGridAdapter(lifecycleScope) { item ->
             handleMediaItemClick(item)
         }
+
+        mediaAdapter.onItemMenuClick = { item, anchorView ->
+            showItemPopupMenu(item, anchorView)
+        }
+
+        mediaAdapter.onSelectionModeChangeListener = { isSelection ->
+            layoutNormalTopBar.visibility = if (isSelection) View.GONE else View.VISIBLE
+            layoutSelectionTopBar.visibility = if (isSelection) View.VISIBLE else View.GONE
+            layoutSelectionBottomBar.visibility = if (isSelection) View.VISIBLE else View.GONE
+            fabUpload.visibility = if (isSelection) View.GONE else View.VISIBLE
+        }
+
+        mediaAdapter.onSelectionChangedListener = { selected ->
+            val count = selected.size
+            tvSelectionCount.text = "$count item${if (count != 1) "s" else ""} selected"
+            btnDownloadSelected.text = "⬇ Download ($count)"
+            btnDeleteSelected.text = "🗑 Delete ($count)"
+            val visible = getCurrentVisibleMediaItems()
+            btnSelectAll.text = if (count >= visible.size && visible.isNotEmpty()) "Deselect All" else "Select All"
+        }
+
         val gridLayoutManager = GridLayoutManager(this, 3).apply {
             spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
                 override fun getSpanSize(position: Int): Int {
@@ -253,6 +363,31 @@ class MainActivity : AppCompatActivity() {
         }
         rvMediaGrid.layoutManager = gridLayoutManager
         rvMediaGrid.adapter = mediaAdapter
+    }
+
+    private fun getCurrentVisibleMediaItems(): List<VaultMediaItem> {
+        val rawItems = when (currentCategory) {
+            MediaType.PHOTO -> TelegramRepository.photos.value
+            MediaType.VIDEO -> TelegramRepository.videos.value
+            MediaType.DOCUMENT -> TelegramRepository.files.value
+        }
+        return when (currentSortOrder) {
+            VaultSortOrder.NEWEST -> rawItems.sortedByDescending { it.dateAdded }
+            VaultSortOrder.OLDEST -> rawItems.sortedBy { it.dateAdded }
+            VaultSortOrder.NAME_ASC -> rawItems.sortedBy { it.title.lowercase() }
+            VaultSortOrder.NAME_DESC -> rawItems.sortedByDescending { it.title.lowercase() }
+            VaultSortOrder.SIZE_DESC -> rawItems.sortedByDescending { it.sizeBytes }
+            VaultSortOrder.SIZE_ASC -> rawItems.sortedBy { it.sizeBytes }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (mediaAdapter.isSelectionMode) {
+            mediaAdapter.clearSelection()
+            return
+        }
+        super.onBackPressed()
     }
 
     private val sectionDateHeaderFormat = SimpleDateFormat("MMM d", Locale.getDefault())
@@ -279,6 +414,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun switchCategory(category: MediaType) {
+        if (mediaAdapter.isSelectionMode) {
+            mediaAdapter.clearSelection()
+        }
         currentCategory = category
 
         val cyanBright = getColor(R.color.accent_cyan_bright)
@@ -450,6 +588,54 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showItemPopupMenu(item: VaultMediaItem, anchorView: View) {
+        val popup = androidx.appcompat.widget.PopupMenu(this, anchorView)
+        popup.menu.add(0, 1, 0, "⬇ Download")
+        popup.menu.add(0, 2, 1, "🗑 Delete")
+        popup.menu.add(0, 3, 2, "☑ Select")
+        if (item.type == MediaType.VIDEO) {
+            popup.menu.add(0, 4, 3, "▶ Play Video")
+        }
+
+        popup.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                1 -> {
+                    Toast.makeText(this, "Downloading ${item.title} to Downloads/CloudVault...", Toast.LENGTH_SHORT).show()
+                    DownloadManager.startDownload(this, item)
+                    true
+                }
+                2 -> {
+                    AlertDialog.Builder(this)
+                        .setTitle("Delete ${item.title}?")
+                        .setMessage("Are you sure you want to permanently delete this item from your Cloud Vault and Telegram?")
+                        .setPositiveButton("Delete") { _, _ ->
+                            lifecycleScope.launch {
+                                val success = TelegramRepository.deleteMediaItems(listOf(item))
+                                if (success) {
+                                    Toast.makeText(this@MainActivity, "Deleted 🗑️", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(this@MainActivity, "Failed to delete item", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                    true
+                }
+                3 -> {
+                    mediaAdapter.startSelection(item)
+                    true
+                }
+                4 -> {
+                    playVideoViaProxy(item)
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
     private fun handleMediaItemClick(item: VaultMediaItem) {
         when (item.type) {
             MediaType.PHOTO -> showPhotoViewerDialog(item)
@@ -466,6 +652,7 @@ class MainActivity : AppCompatActivity() {
         val pbFullPhotoLoading: ProgressBar = dialogView.findViewById(R.id.pbFullPhotoLoading)
         val tvViewerTitle: TextView = dialogView.findViewById(R.id.tvViewerTitle)
         val tvViewerSize: TextView = dialogView.findViewById(R.id.tvViewerSize)
+        val btnDeletePhoto: FrameLayout? = dialogView.findViewById(R.id.btnDeletePhoto)
         val btnDownloadPhoto: FrameLayout = dialogView.findViewById(R.id.btnDownloadPhoto)
         val btnCloseViewer: FrameLayout = dialogView.findViewById(R.id.btnCloseViewer)
 
@@ -486,9 +673,29 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnCloseViewer.setOnClickListener { dialog.dismiss() }
+
+        btnDeletePhoto?.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Delete Photo?")
+                .setMessage("Are you sure you want to delete ${item.title} from Cloud Vault and Telegram?")
+                .setPositiveButton("Delete") { _, _ ->
+                    lifecycleScope.launch {
+                        val success = TelegramRepository.deleteMediaItems(listOf(item))
+                        dialog.dismiss()
+                        if (success) {
+                            Toast.makeText(this@MainActivity, "Deleted photo 🗑️", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@MainActivity, "Failed to delete photo", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
         btnDownloadPhoto.setOnClickListener {
             DownloadManager.startDownload(this, item)
-            Toast.makeText(this, "Downloading ${item.title} to storage...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Downloading ${item.title} to Downloads/CloudVault...", Toast.LENGTH_SHORT).show()
         }
 
         dialog.show()

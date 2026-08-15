@@ -46,78 +46,95 @@ object CacheManager {
     }
 
     suspend fun calculateCacheStats(context: Context): CacheStats = withContext(Dispatchers.IO) {
-        var tdVideos = 0L
-        var tdDocs = 0L
-        var tdPhotos = 0L
-        var tdOthers = 0L
+        var videoBytes = 0L
+        var documentBytes = 0L
+        var photoBytes = 0L
+        var otherBytes = 0L
 
-        // 1. Fetch TDLib storage statistics
-        try {
-            val tdStats = TelegramClient.sendRequest(TdApi.GetStorageStatistics(100)) as? TdApi.StorageStatistics
-            if (tdStats != null && tdStats.byChat != null) {
-                for (chatStats in tdStats.byChat) {
-                    if (chatStats.byFileType == null) continue
-                    for (fileTypeStats in chatStats.byFileType) {
-                        val size = fileTypeStats.size
-                        when (fileTypeStats.fileType) {
-                            is TdApi.FileTypeVideo,
-                            is TdApi.FileTypeVideoNote,
-                            is TdApi.FileTypeVideoStory,
-                            is TdApi.FileTypeLivePhotoVideo,
-                            is TdApi.FileTypeSelfDestructingVideo,
-                            is TdApi.FileTypeSelfDestructingVideoNote -> tdVideos += size
+        fun classifyFile(file: File) {
+            if (!file.exists() || file.isDirectory) return
+            val length = file.length()
+            if (length <= 0L) return
 
-                            is TdApi.FileTypeDocument,
-                            is TdApi.FileTypeAudio,
-                            is TdApi.FileTypeVoiceNote,
-                            is TdApi.FileTypeSelfDestructingVoiceNote -> tdDocs += size
+            val path = file.absolutePath.lowercase()
+            val name = file.name.lowercase()
 
-                            is TdApi.FileTypePhoto,
-                            is TdApi.FileTypePhotoStory,
-                            is TdApi.FileTypeThumbnail,
-                            is TdApi.FileTypeProfilePhoto,
-                            is TdApi.FileTypeSelfDestructingPhoto,
-                            is TdApi.FileTypeSecretThumbnail -> tdPhotos += size
+            when {
+                // Videos
+                path.contains("/videos/") || path.contains("/video_notes/") ||
+                        name.endsWith(".mp4") || name.endsWith(".mkv") || name.endsWith(".webm") ||
+                        name.endsWith(".mov") || name.endsWith(".avi") || name.endsWith(".ts") ||
+                        name.endsWith(".3gp") || name.endsWith(".wmv") || name.endsWith(".m4v") ||
+                        name.endsWith(".flv") || name.endsWith(".m2ts") -> {
+                    videoBytes += length
+                }
 
-                            else -> tdOthers += size
-                        }
-                    }
+                // Photos & Thumbnails
+                path.contains("/photos/") || path.contains("/thumbnails/") || path.contains("/thumbs/") ||
+                        path.contains("/profile_photos/") ||
+                        name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") ||
+                        name.endsWith(".webp") || name.endsWith(".heic") || name.endsWith(".bmp") ||
+                        name.endsWith(".gif") -> {
+                    photoBytes += length
+                }
+
+                // Documents & Audio & Archives
+                path.contains("/documents/") || path.contains("/voice/") || path.contains("/music/") ||
+                        name.endsWith(".pdf") || name.endsWith(".doc") || name.endsWith(".docx") ||
+                        name.endsWith(".xls") || name.endsWith(".xlsx") || name.endsWith(".ppt") ||
+                        name.endsWith(".pptx") || name.endsWith(".txt") || name.endsWith(".zip") ||
+                        name.endsWith(".rar") || name.endsWith(".7z") || name.endsWith(".tar") ||
+                        name.endsWith(".gz") || name.endsWith(".apk") || name.endsWith(".mp3") ||
+                        name.endsWith(".wav") || name.endsWith(".ogg") || name.endsWith(".flac") ||
+                        name.endsWith(".aac") || name.endsWith(".m4a") || name.endsWith(".plugin") ||
+                        name.endsWith(".iso") || name.endsWith(".exe") || (name.endsWith(".bin") && !path.contains("tdlib_db")) -> {
+                    documentBytes += length
+                }
+
+                // App Database, Cache, and Other internal files
+                else -> {
+                    otherBytes += length
                 }
             }
-        } catch (e: Throwable) {
-            Log.w(TAG, "Failed to get TDLib storage statistics", e)
         }
 
-        // 2. Scan App Cache Directory for thumbnails, temp streams & proxy files
-        val localCacheSize = getFolderSize(context.cacheDir) + getFolderSize(context.externalCacheDir)
-        tdOthers += localCacheSize
-
-        // 3. Scan TDLib directory if TDLib didn't report everything
-        val filesDir = context.filesDir
-        val tdlibDir = File(filesDir, "tdlib")
-        if (tdlibDir.exists() && (tdVideos + tdDocs + tdPhotos + tdOthers) == 0L) {
-            tdOthers += getFolderSize(tdlibDir)
+        fun scanDirectory(dir: File?) {
+            if (dir == null || !dir.exists()) return
+            val list = dir.listFiles() ?: return
+            for (f in list) {
+                if (f.isDirectory) {
+                    scanDirectory(f)
+                } else {
+                    classifyFile(f)
+                }
+            }
         }
 
-        val totalCache = tdVideos + tdDocs + tdPhotos + tdOthers
+        // Scan all app storage locations on device (each physical file is scanned exactly once)
+        scanDirectory(context.cacheDir)
+        scanDirectory(context.externalCacheDir)
+        scanDirectory(context.filesDir)
 
-        // 4. Calculate Device Storage Percentage
+        val totalCache = videoBytes + documentBytes + photoBytes + otherBytes
+
+        // Calculate Device Storage Percentage
         var percentUsed = 0
         try {
             val stat = StatFs(Environment.getDataDirectory().path)
             val totalDeviceBytes = stat.blockCountLong * stat.blockSizeLong
             if (totalDeviceBytes > 0L) {
-                percentUsed = ((totalCache.toDouble() / totalDeviceBytes.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+                val pct = ((totalCache.toDouble() / totalDeviceBytes.toDouble()) * 100.0).toInt()
+                percentUsed = pct.coerceIn(0, 100)
             }
         } catch (e: Throwable) {
             Log.w(TAG, "Failed to calculate device storage percent", e)
         }
 
         CacheStats(
-            videoBytes = tdVideos,
-            documentBytes = tdDocs,
-            photoBytes = tdPhotos,
-            otherBytes = tdOthers,
+            videoBytes = videoBytes,
+            documentBytes = documentBytes,
+            photoBytes = photoBytes,
+            otherBytes = otherBytes,
             totalBytes = totalCache,
             deviceUsagePercent = percentUsed
         )
@@ -202,15 +219,42 @@ object CacheManager {
             }
         }
 
-        // Clean local cache folders if other is checked
-        if (clearOther || (clearVideos && clearDocuments && clearPhotos)) {
-            try {
-                deleteDirContents(context.cacheDir)
-                context.externalCacheDir?.let { deleteDirContents(it) }
-            } catch (e: Throwable) {
-                Log.w(TAG, "Failed cleaning local cache dir", e)
+        // Delete physical files from cache based on selected categories
+        fun cleanMatchingFiles(dir: File?) {
+            if (dir == null || !dir.exists()) return
+            val files = dir.listFiles() ?: return
+            for (file in files) {
+                if (file.isDirectory) {
+                    val dirName = file.name.lowercase()
+                    if ((clearVideos && (dirName == "videos" || dirName == "video_notes")) ||
+                        (clearPhotos && (dirName == "photos" || dirName == "thumbnails" || dirName == "thumbs" || dirName == "profile_photos")) ||
+                        (clearDocuments && (dirName == "documents" || dirName == "voice" || dirName == "music")) ||
+                        (clearOther && (dirName == "animations" || dirName == "stickers" || dirName == "temp" || dirName == "uploads" || dirName == "autobackup_temp"))
+                    ) {
+                        deleteDirContents(file)
+                    } else {
+                        cleanMatchingFiles(file)
+                    }
+                } else {
+                    val path = file.absolutePath.lowercase()
+                    val name = file.name.lowercase()
+                    val isVideo = name.endsWith(".mp4") || name.endsWith(".mkv") || name.endsWith(".webm") || name.endsWith(".mov") || name.endsWith(".avi")
+                    val isPhoto = name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")
+                    val isDoc = name.endsWith(".pdf") || name.endsWith(".zip") || name.endsWith(".rar") || name.endsWith(".doc") || name.endsWith(".mp3")
+                    
+                    if ((clearVideos && isVideo) ||
+                        (clearPhotos && isPhoto) ||
+                        (clearDocuments && isDoc) ||
+                        (clearOther && !isVideo && !isPhoto && !isDoc && !path.contains("tdlib_db"))
+                    ) {
+                        try { file.delete() } catch (_: Throwable) {}
+                    }
+                }
             }
         }
+
+        cleanMatchingFiles(context.cacheDir)
+        cleanMatchingFiles(context.externalCacheDir)
 
         // Recalculate stats
         calculateCacheStats(context)
