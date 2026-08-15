@@ -22,8 +22,8 @@ class ZoomableImageView @JvmOverloads constructor(
     private val last = PointF()
     private val start = PointF()
     private var minScale = 1f
-    private var maxScale = 4f
-    private var m: FloatArray = FloatArray(9)
+    private var maxScale = 5f
+    private val m = FloatArray(9)
 
     private var viewWidth = 0
     private var viewHeight = 0
@@ -44,8 +44,6 @@ class ZoomableImageView @JvmOverloads constructor(
         super.setClickable(true)
         scaleDetector = ScaleGestureDetector(context, ScaleListener())
         gestureDetector = GestureDetector(context, GestureListener())
-        matrix.setTranslate(1f, 1f)
-        imageMatrix = matrix
         scaleType = ScaleType.MATRIX
     }
 
@@ -56,24 +54,25 @@ class ZoomableImageView @JvmOverloads constructor(
         }
 
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            var mScaleFactor = detector.scaleFactor
-            val origScale = saveScale
-            saveScale *= mScaleFactor
+            var scaleFactor = detector.scaleFactor
+            val prevScale = saveScale
+            saveScale *= scaleFactor
+
             if (saveScale > maxScale) {
                 saveScale = maxScale
-                mScaleFactor = maxScale / origScale
+                scaleFactor = maxScale / prevScale
             } else if (saveScale < minScale) {
                 saveScale = minScale
-                mScaleFactor = minScale / origScale
+                scaleFactor = minScale / prevScale
             }
 
-            if (origWidth * saveScale <= viewWidth || origHeight * saveScale <= viewHeight) {
-                matrix.postScale(mScaleFactor, mScaleFactor, viewWidth / 2f, viewHeight / 2f)
-            } else {
-                matrix.postScale(mScaleFactor, mScaleFactor, detector.focusX, detector.focusY)
-            }
+            val focusX = if (origWidth * saveScale <= viewWidth) viewWidth / 2f else detector.focusX
+            val focusY = if (origHeight * saveScale <= viewHeight) viewHeight / 2f else detector.focusY
 
+            matrix.postScale(scaleFactor, scaleFactor, focusX, focusY)
             fixTrans()
+            imageMatrix = matrix
+            invalidate()
             return true
         }
     }
@@ -88,9 +87,9 @@ class ZoomableImageView @JvmOverloads constructor(
                 saveScale = targetScale
                 matrix.postScale(factor, factor, e.x, e.y)
                 fixTrans()
+                imageMatrix = matrix
+                invalidate()
             }
-            imageMatrix = matrix
-            invalidate()
             return true
         }
     }
@@ -104,60 +103,72 @@ class ZoomableImageView @JvmOverloads constructor(
         matrix.getValues(m)
         val transX = m[Matrix.MTRANS_X]
         val transY = m[Matrix.MTRANS_Y]
-        val fixTransX = getFixTrans(transX, viewWidth.toFloat(), origWidth * saveScale)
-        val fixTransY = getFixTrans(transY, viewHeight.toFloat(), origHeight * saveScale)
-        if (fixTransX != 0f || fixTransY != 0f) {
-            matrix.postTranslate(fixTransX, fixTransY)
+
+        val contentW = origWidth * saveScale
+        val contentH = origHeight * saveScale
+
+        val fixX = getFixTranslation(transX, viewWidth.toFloat(), contentW)
+        val fixY = getFixTranslation(transY, viewHeight.toFloat(), contentH)
+
+        if (fixX != 0f || fixY != 0f) {
+            matrix.postTranslate(fixX, fixY)
         }
     }
 
-    private fun getFixTrans(trans: Float, viewSize: Float, contentSize: Float): Float {
-        val minTrans: Float
-        val maxTrans: Float
+    private fun getFixTranslation(trans: Float, viewSize: Float, contentSize: Float): Float {
         if (contentSize <= viewSize) {
-            minTrans = 0f
-            maxTrans = viewSize - contentSize
-        } else {
-            minTrans = viewSize - contentSize
-            maxTrans = 0f
+            // When content is smaller or equal to screen, keep it perfectly centered!
+            val targetCenter = (viewSize - contentSize) / 2f
+            return targetCenter - trans
         }
-        if (trans < minTrans) return -trans + minTrans
-        if (trans > maxTrans) return -trans + maxTrans
-        return 0f
+        // When content is larger than screen (zoomed in), clamp to edges
+        val minTrans = viewSize - contentSize
+        val maxTrans = 0f
+
+        return when {
+            trans < minTrans -> minTrans - trans
+            trans > maxTrans -> maxTrans - trans
+            else -> 0f
+        }
     }
 
     private fun fitToScreen() {
-        val drawable = drawable ?: return
-        val bmWidth = drawable.intrinsicWidth
-        val bmHeight = drawable.intrinsicHeight
-        if (bmWidth == 0 || bmHeight == 0 || viewWidth == 0 || viewHeight == 0) return
+        val d = drawable ?: return
+        val bmW = d.intrinsicWidth
+        val bmH = d.intrinsicHeight
+        if (bmW <= 0 || bmH <= 0 || viewWidth <= 0 || viewHeight <= 0) return
 
-        val scaleX = viewWidth.toFloat() / bmWidth.toFloat()
-        val scaleY = viewHeight.toFloat() / bmHeight.toFloat()
+        val scaleX = viewWidth.toFloat() / bmW.toFloat()
+        val scaleY = viewHeight.toFloat() / bmH.toFloat()
         val scale = scaleX.coerceAtMost(scaleY)
 
         matrix.setScale(scale, scale)
 
-        val redundantYSpace = viewHeight.toFloat() - scale * bmHeight.toFloat()
-        val redundantXSpace = viewWidth.toFloat() - scale * bmWidth.toFloat()
+        val displayedW = scale * bmW.toFloat()
+        val displayedH = scale * bmH.toFloat()
 
-        matrix.postTranslate(redundantXSpace / 2f, redundantYSpace / 2f)
+        val redundantX = (viewWidth.toFloat() - displayedW) / 2f
+        val redundantY = (viewHeight.toFloat() - displayedH) / 2f
 
-        origWidth = viewWidth - redundantXSpace
-        origHeight = viewHeight - redundantYSpace
+        matrix.postTranslate(redundantX, redundantY)
+
+        origWidth = displayedW
+        origHeight = displayedH
+        saveScale = 1f
+
         imageMatrix = matrix
+        invalidate()
     }
 
     override fun setImageDrawable(drawable: Drawable?) {
         super.setImageDrawable(drawable)
-        saveScale = 1f
         fitToScreen()
     }
 
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        viewWidth = MeasureSpec.getSize(widthMeasureSpec)
-        viewHeight = MeasureSpec.getSize(heightMeasureSpec)
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        viewWidth = w
+        viewHeight = h
         fitToScreen()
     }
 
@@ -177,23 +188,24 @@ class ZoomableImageView @JvmOverloads constructor(
                 if (mode == DRAG) {
                     val deltaX = curr.x - last.x
                     val deltaY = curr.y - last.y
-                    val fixTransX = getFixDragTrans(deltaX, viewWidth.toFloat(), origWidth * saveScale)
-                    val fixTransY = getFixDragTrans(deltaY, viewHeight.toFloat(), origHeight * saveScale)
-                    matrix.postTranslate(fixTransX, fixTransY)
+
+                    val contentW = origWidth * saveScale
+                    val contentH = origHeight * saveScale
+
+                    val dragX = if (contentW <= viewWidth) 0f else deltaX
+                    val dragY = if (contentH <= viewHeight) 0f else deltaY
+
+                    matrix.postTranslate(dragX, dragY)
                     fixTrans()
                     last.set(curr.x, curr.y)
+                    imageMatrix = matrix
+                    invalidate()
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 mode = NONE
             }
         }
-        imageMatrix = matrix
-        invalidate()
         return true
-    }
-
-    private fun getFixDragTrans(delta: Float, viewSize: Float, contentSize: Float): Float {
-        return if (contentSize <= viewSize) 0f else delta
     }
 }
