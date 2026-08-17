@@ -1533,16 +1533,15 @@ object TelegramStreamingProxy {
                     }
                 }
 
-                // Re-trigger DownloadFile on attempt 0, when not actively downloading, or on periodic check
-                if (attempts == 0 || !isDownloading || attempts % 40 == 0) {
+                val isStalled = attempts >= 100 && attempts % 100 == 0
+                // Re-trigger DownloadFile on attempt 0, or on periodic check
+                if (attempts == 0 || attempts % 40 == 0 || isStalled || (!isDownloading && attempts % 10 == 0)) {
                     metrics?.chunksRetried = (metrics?.chunksRetried ?: 0) + 1
                     val fileInfo = getFileInfo(activeFileId)
                     val totalSize = fileInfo?.second?.takeIf { it > 0 } ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
                     val alignedOffset = offset - (offset % (1024 * 1024))
                     val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, prefetchSizeMb, limit)
 
-                    // A real stall is when ReadFilePart gets no data for >5 seconds (attempts >= 100 with 50ms polling = ~5s)
-                    val isStalled = attempts >= 100 && attempts % 100 == 0
                     if (isStalled) {
                         TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Refreshing message location and elevating TDLib priority...")
                         val refreshed = refreshFileId(activeFileId, force = true)
@@ -1555,7 +1554,7 @@ object TelegramStreamingProxy {
                         lastDownloadRequestTime.remove(fileId)
                     }
 
-                    val forceRequest = (attempts == 0 || isStalled || !isDownloading)
+                    val forceRequest = (attempts == 0 || isStalled)
                     triggerTdlibDownload(activeFileId, alignedOffset, safeLimit, force = forceRequest)
 
                     val winEnd = if (safeLimit == 0L) Long.MAX_VALUE else alignedOffset + safeLimit
