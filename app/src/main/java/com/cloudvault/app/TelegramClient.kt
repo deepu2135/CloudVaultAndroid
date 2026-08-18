@@ -129,18 +129,27 @@ object TelegramClient {
             }
             is TdApi.UpdateMessageSendSucceeded -> {
                 _messageUpdates.tryEmit(update)
-                TelegramRepository.addOrUpdateMessage(update.message)
+                val targetChatId = TelegramRepository.getCachedTargetChatId()
+                if (targetChatId == null || update.message.chatId == targetChatId) {
+                    TelegramRepository.addOrUpdateMessage(update.message)
+                }
             }
             is TdApi.UpdateMessageSendFailed -> {
                 _messageUpdates.tryEmit(update)
             }
             is TdApi.UpdateNewMessage -> {
                 _messageUpdates.tryEmit(update)
-                TelegramRepository.addOrUpdateMessage(update.message)
+                val targetChatId = TelegramRepository.getCachedTargetChatId()
+                if (targetChatId != null && update.message.chatId == targetChatId) {
+                    TelegramRepository.addOrUpdateMessage(update.message)
+                }
             }
             is TdApi.UpdateChatLastMessage -> {
-                update.lastMessage?.let {
-                    TelegramRepository.addOrUpdateMessage(it)
+                update.lastMessage?.let { msg ->
+                    val targetChatId = TelegramRepository.getCachedTargetChatId()
+                    if (targetChatId != null && msg.chatId == targetChatId) {
+                        TelegramRepository.addOrUpdateMessage(msg)
+                    }
                 }
             }
             is TdApi.UpdateMessageContent -> {

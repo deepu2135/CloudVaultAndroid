@@ -50,8 +50,15 @@ object TelegramRepository {
 
     private var lastVaultLoadTime = 0L
 
+    fun getCachedTargetChatId(): Long? = cachedSavedMessagesChatId
+
     fun addOrUpdateMessage(msg: TdApi.Message) {
         if (msg.sendingState is TdApi.MessageSendingStateFailed) return
+        val targetChatId = cachedSavedMessagesChatId
+        // STRICT CHECK: Reject any message from other chats, groups, or channels!
+        if (targetChatId != null && targetChatId != 0L && msg.chatId != targetChatId) {
+            return
+        }
         val photoList = _photos.value.toMutableList()
         val videoList = _videos.value.toMutableList()
         val fileList = _files.value.toMutableList()
