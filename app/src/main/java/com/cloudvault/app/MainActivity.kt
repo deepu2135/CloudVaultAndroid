@@ -1530,8 +1530,7 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             }
 
-            val items = folders.map { "${it.bucketName} (${it.totalCount} items)" }.toTypedArray()
-            val checkedItems = folders.map { it.isSelected }.toBooleanArray()
+
 
             withContext(Dispatchers.Main) {
                 val dialog = android.app.Dialog(this@MainActivity)
