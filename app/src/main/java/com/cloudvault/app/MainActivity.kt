@@ -331,7 +331,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Toast.makeText(this, "Refreshing Vault...", Toast.LENGTH_SHORT).show()
                 lifecycleScope.launch {
-                    TelegramRepository.loadVaultItems()
+                    TelegramRepository.loadVaultItems(force = true)
                 }
             }
         }
@@ -1028,7 +1028,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     is TelegramAuthState.Ready -> {
                         tvStatus.text = "Status: Connected to Telegram Cloud"
-                        TelegramRepository.loadVaultItems()
+                        TelegramRepository.loadVaultItems(force = true)
                     }
                     is TelegramAuthState.Error -> {
                         tvStatus.text = "Status: Error (${state.message})"
@@ -1750,6 +1750,20 @@ class MainActivity : AppCompatActivity() {
         }
         builder.setNegativeButton("Cancel", null)
         builder.show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (TelegramClient.authState.value is TelegramAuthState.Ready) {
+            val isVaultEmpty = TelegramRepository.photos.value.isEmpty() &&
+                    TelegramRepository.videos.value.isEmpty() &&
+                    TelegramRepository.files.value.isEmpty()
+            if (isVaultEmpty) {
+                lifecycleScope.launch {
+                    TelegramRepository.loadVaultItems(force = true)
+                }
+            }
+        }
     }
 
     override fun onDestroy() {

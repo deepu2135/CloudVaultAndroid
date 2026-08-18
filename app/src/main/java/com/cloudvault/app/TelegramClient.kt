@@ -114,7 +114,7 @@ object TelegramClient {
                         TdlibManager.setSessionActive(context, true)
                         // Auto-load vault items automatically upon connection
                         scope.launch {
-                            TelegramRepository.loadVaultItems()
+                            TelegramRepository.loadVaultItems(force = true)
                         }
                     }
                     is TdApi.AuthorizationStateClosed -> {
@@ -137,6 +137,11 @@ object TelegramClient {
             is TdApi.UpdateNewMessage -> {
                 _messageUpdates.tryEmit(update)
                 TelegramRepository.addOrUpdateMessage(update.message)
+            }
+            is TdApi.UpdateChatLastMessage -> {
+                update.lastMessage?.let {
+                    TelegramRepository.addOrUpdateMessage(it)
+                }
             }
             is TdApi.UpdateMessageContent -> {
                 _messageUpdates.tryEmit(update)

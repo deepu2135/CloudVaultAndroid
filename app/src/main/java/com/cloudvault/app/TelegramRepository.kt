@@ -73,13 +73,20 @@ object TelegramRepository {
     suspend fun loadVaultItems(chatId: Long = 0L, force: Boolean = false) {
         val targetChatId = if (chatId != 0L) chatId else getSavedMessagesChatId() ?: return
         val now = System.currentTimeMillis()
-        if (!force && now - lastVaultLoadTime < 10_000L && (_photos.value.isNotEmpty() || _videos.value.isNotEmpty() || _files.value.isNotEmpty())) {
+        if (!force && now - lastVaultLoadTime < 5_000L && (_photos.value.isNotEmpty() || _videos.value.isNotEmpty() || _files.value.isNotEmpty())) {
             return
         }
         lastVaultLoadTime = now
         _isLoadingVault.value = true
 
         try {
+            // Actively open chat to instruct TDLib to sync history from Telegram server
+            try {
+                TelegramClient.sendRequest(TdApi.OpenChat(targetChatId))
+            } catch (e: Throwable) {
+                Log.d(TAG, "OpenChat note: ${e.message}")
+            }
+
             val photoList = mutableListOf<VaultMediaItem>()
             val videoList = mutableListOf<VaultMediaItem>()
             val fileList = mutableListOf<VaultMediaItem>()
@@ -102,8 +109,14 @@ object TelegramRepository {
                 }
 
                 if (history == null || history.messages.isEmpty()) {
-                    consecutiveEmptyBatches++
-                    if (consecutiveEmptyBatches >= 1) break
+                    // If initial fetch is empty, TDLib might still be downloading history from Telegram servers.
+                    // Wait and retry up to 5 times.
+                    if (scannedCount == 0 && consecutiveEmptyBatches < 5) {
+                        consecutiveEmptyBatches++
+                        kotlinx.coroutines.delay(400L)
+                        continue
+                    }
+                    break
                 } else {
                     consecutiveEmptyBatches = 0
                     for (msg in history.messages) {
@@ -120,6 +133,7 @@ object TelegramRepository {
                 }
             }
 
+            // Always update state flows with loaded media
             _photos.value = photoList.sortedByDescending { it.dateAdded }
             _videos.value = videoList.sortedByDescending { it.dateAdded }
             _files.value = fileList.sortedByDescending { it.dateAdded }
