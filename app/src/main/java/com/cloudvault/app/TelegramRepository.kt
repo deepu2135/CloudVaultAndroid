@@ -313,7 +313,7 @@ object TelegramRepository {
                 ?: throw IllegalStateException("SendMessage returned null")
 
             val tempMsgId = sentMsg.id
-            Log.d(TAG, "uploadFile dispatched SendMessage tempMsgId=$tempMsgId, waiting for TDLib upload...")
+            TeleflixLogger.log(TAG, "uploadFile dispatched SendMessage tempMsgId=$tempMsgId, waiting for TDLib upload...")
 
             if (sentMsg.sendingState == null) {
                 // Immediate success (e.g. instantly cached)
@@ -323,7 +323,7 @@ object TelegramRepository {
             }
 
             if (sentMsg.sendingState is TdApi.MessageSendingStateFailed) {
-                Log.e(TAG, "uploadFile: message failed immediately")
+                TeleflixLogger.log(TAG, "uploadFile: message failed immediately", isError = true)
                 return@withContext false
             }
 
@@ -358,7 +358,7 @@ object TelegramRepository {
                         when (update) {
                             is TdApi.UpdateMessageSendSucceeded -> {
                                 if (update.oldMessageId == tempMsgId || update.message.id == tempMsgId) {
-                                    Log.d(TAG, "uploadFile: received UpdateMessageSendSucceeded for tempMsgId=$tempMsgId")
+                                    TeleflixLogger.log(TAG, "uploadFile: received UpdateMessageSendSucceeded for tempMsgId=$tempMsgId")
                                     isDone = true
                                 }
                             }
@@ -366,7 +366,7 @@ object TelegramRepository {
                                 if (update.oldMessageId == tempMsgId || update.message.id == tempMsgId) {
                                     val errCode = update.error?.code ?: 0
                                     val errMsg = update.error?.message ?: "unknown"
-                                    Log.e(TAG, "uploadFile: received UpdateMessageSendFailed [$errCode]: $errMsg")
+                                    TeleflixLogger.log(TAG, "uploadFile: received UpdateMessageSendFailed [$errCode]: $errMsg", isError = true)
                                     isError = true
                                 }
                             }
@@ -418,14 +418,14 @@ object TelegramRepository {
             if (uploadSuccess) {
                 onProgress?.invoke(totalFileSize, totalFileSize)
                 loadVaultItems(chatId)
-                Log.d(TAG, "uploadFile completed successfully to Telegram Cloud! tempMsgId=$tempMsgId")
+                TeleflixLogger.log(TAG, "uploadFile completed successfully to Telegram Cloud! tempMsgId=$tempMsgId")
                 true
             } else {
-                Log.e(TAG, "uploadFile failed or timed out for $localPath")
+                TeleflixLogger.log(TAG, "uploadFile failed or timed out for $localPath", isError = true)
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to upload file to Telegram cloud", e)
+            TeleflixLogger.log(TAG, "Failed to upload file to Telegram cloud: ${e.message}", isError = true)
             false
         }
     }

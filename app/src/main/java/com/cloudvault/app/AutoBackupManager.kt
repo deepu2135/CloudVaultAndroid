@@ -220,7 +220,7 @@ object AutoBackupManager {
 
             true
         } catch (e: Throwable) {
-            Log.e(TAG, "performBackupSync error", e)
+            TeleflixLogger.log(TAG, "performBackupSync error: ${e.message}", isError = true)
             _backupStatus.value = "Backup error: ${e.message}"
             false
         } finally {

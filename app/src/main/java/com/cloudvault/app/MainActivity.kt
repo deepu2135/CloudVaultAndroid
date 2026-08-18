@@ -737,7 +737,7 @@ class MainActivity : AppCompatActivity() {
             }
             Pair(tempFile, fileName)
         } catch (e: Throwable) {
-            android.util.Log.e("MainActivity", "copyUriToTempFile failed", e)
+            TeleflixLogger.log("MainActivity", "copyUriToTempFile failed for uri $uri: ${e.message}", isError = true)
             null
         }
     }
