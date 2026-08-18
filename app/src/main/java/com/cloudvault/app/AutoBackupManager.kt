@@ -159,7 +159,7 @@ object AutoBackupManager {
             var successCount = 0
             _backupStatus.value = "Backing up $total new item(s)..."
 
-            val semaphore = kotlinx.coroutines.sync.Semaphore(3)
+            val semaphore = kotlinx.coroutines.sync.Semaphore(5)
             val successCountAtomic = java.util.concurrent.atomic.AtomicInteger(0)
             val completedCountAtomic = java.util.concurrent.atomic.AtomicInteger(0)
             
