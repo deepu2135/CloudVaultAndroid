@@ -68,8 +68,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
     private lateinit var cardStatusBanner: MaterialCardView
-    private lateinit var btnTopUpload: MaterialButton
-    private lateinit var btnQuickAdd: MaterialButton
+    private lateinit var etSearch: android.widget.EditText
     private lateinit var btnSettings: MaterialButton
     private lateinit var fabUpload: MaterialButton
 
@@ -112,6 +111,7 @@ class MainActivity : AppCompatActivity() {
     private var lastScaleTime = 0L
 
     private var currentSortOrder: VaultSortOrder = VaultSortOrder.NEWEST
+    private var searchQuery: String = ""
 
     // Activity Result Launchers for picking single or multiple media items
     private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri>? ->
@@ -152,8 +152,7 @@ class MainActivity : AppCompatActivity() {
 
         tvStatus = findViewById(R.id.tvStatus)
         cardStatusBanner = findViewById(R.id.cardStatusBanner)
-        btnTopUpload = findViewById(R.id.btnTopUpload)
-        btnQuickAdd = findViewById(R.id.btnQuickAdd)
+        etSearch = findViewById(R.id.etSearch)
         btnSettings = findViewById(R.id.btnSettings)
         fabUpload = findViewById(R.id.fabUpload)
 
@@ -269,8 +268,14 @@ class MainActivity : AppCompatActivity() {
             tvStatus.text = "Init Warning: ${e.message}"
         }
 
-        btnTopUpload.setOnClickListener { showUploadChoiceDialog() }
-        btnQuickAdd.setOnClickListener { showUploadChoiceDialog() }
+        etSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                searchQuery = s?.toString() ?: ""
+                updateDisplayedItems()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
         fabUpload.setOnClickListener { showUploadChoiceDialog() }
 
         btnSettings.setOnClickListener { showSettingsDialog() }
@@ -575,13 +580,20 @@ class MainActivity : AppCompatActivity() {
             MediaType.DOCUMENT -> TelegramRepository.files.value
         }
 
+        val filteredItems = if (searchQuery.isNotBlank()) {
+            val query = searchQuery.lowercase()
+            rawItems.filter { it.title.lowercase().contains(query) }
+        } else {
+            rawItems
+        }
+
         val items = when (currentSortOrder) {
-            VaultSortOrder.NEWEST -> rawItems.sortedByDescending { it.dateAdded }
-            VaultSortOrder.OLDEST -> rawItems.sortedBy { it.dateAdded }
-            VaultSortOrder.NAME_ASC -> rawItems.sortedBy { it.title.lowercase() }
-            VaultSortOrder.NAME_DESC -> rawItems.sortedByDescending { it.title.lowercase() }
-            VaultSortOrder.SIZE_DESC -> rawItems.sortedByDescending { it.sizeBytes }
-            VaultSortOrder.SIZE_ASC -> rawItems.sortedBy { it.sizeBytes }
+            VaultSortOrder.NEWEST -> filteredItems.sortedByDescending { it.dateAdded }
+            VaultSortOrder.OLDEST -> filteredItems.sortedBy { it.dateAdded }
+            VaultSortOrder.NAME_ASC -> filteredItems.sortedBy { it.title.lowercase() }
+            VaultSortOrder.NAME_DESC -> filteredItems.sortedByDescending { it.title.lowercase() }
+            VaultSortOrder.SIZE_DESC -> filteredItems.sortedByDescending { it.sizeBytes }
+            VaultSortOrder.SIZE_ASC -> filteredItems.sortedBy { it.sizeBytes }
         }
 
         val displayItems = if (currentCategory == MediaType.PHOTO || currentCategory == MediaType.VIDEO) {
@@ -601,21 +613,27 @@ class MainActivity : AppCompatActivity() {
         if (items.isEmpty()) {
             layoutEmptyState.visibility = View.VISIBLE
             rvMediaGrid.visibility = View.GONE
-            when (currentCategory) {
-                MediaType.PHOTO -> {
-                    tvEmptyEmoji.text = "📷"
-                    tvEmptyTitle.text = "No Photos Found"
-                    tvEmptySubtitle.text = "Photos sent to your Telegram Saved Messages will appear here."
-                }
-                MediaType.VIDEO -> {
-                    tvEmptyEmoji.text = "🎬"
-                    tvEmptyTitle.text = "No Videos Found"
-                    tvEmptySubtitle.text = "Videos in your Telegram Cloud will appear here ready to stream."
-                }
-                MediaType.DOCUMENT -> {
-                    tvEmptyEmoji.text = "📄"
-                    tvEmptyTitle.text = "No Files Found"
-                    tvEmptySubtitle.text = "Documents and files from your Telegram Vault will appear here."
+            if (searchQuery.isNotBlank()) {
+                tvEmptyEmoji.text = "🔍"
+                tvEmptyTitle.text = "No Results Found"
+                tvEmptySubtitle.text = "No items matched your search \"$searchQuery\"."
+            } else {
+                when (currentCategory) {
+                    MediaType.PHOTO -> {
+                        tvEmptyEmoji.text = "📷"
+                        tvEmptyTitle.text = "No Photos Found"
+                        tvEmptySubtitle.text = "Photos sent to your Telegram Saved Messages will appear here."
+                    }
+                    MediaType.VIDEO -> {
+                        tvEmptyEmoji.text = "🎬"
+                        tvEmptyTitle.text = "No Videos Found"
+                        tvEmptySubtitle.text = "Videos in your Telegram Cloud will appear here ready to stream."
+                    }
+                    MediaType.DOCUMENT -> {
+                        tvEmptyEmoji.text = "📄"
+                        tvEmptyTitle.text = "No Files Found"
+                        tvEmptySubtitle.text = "Documents and files from your Telegram Vault will appear here."
+                    }
                 }
             }
         } else {

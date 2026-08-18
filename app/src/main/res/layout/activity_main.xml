@@ -49,41 +49,22 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <View
+        <EditText
+            android:id="@+id/etSearch"
             android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <!-- Top Upload Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnTopUpload"
-            android:layout_width="wrap_content"
             android:layout_height="38dp"
-            android:text="↑ UPLOAD"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_search"
+            android:hint="Search files..."
+            android:textColorHint="#94A3B8"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            app:cornerRadius="19dp"
-            app:backgroundTint="@color/accent_cyan"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            style="@style/Widget.MaterialComponents.Button" />
-
-        <!-- Plus Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnQuickAdd"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:layout_marginStart="8dp"
-            android:text="+"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            app:cornerRadius="10dp"
-            app:backgroundTint="#162234"
-            app:strokeColor="@color/card_border"
-            app:strokeWidth="1dp"
-            android:padding="0dp"
-            style="@style/Widget.MaterialComponents.Button" />
+            android:textSize="14sp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:singleLine="true"
+            android:imeOptions="actionSearch" />
 
         <!-- Settings Button -->
         <com.google.android.material.button.MaterialButton
