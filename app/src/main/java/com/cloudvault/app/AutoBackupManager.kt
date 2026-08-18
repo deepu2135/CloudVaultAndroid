@@ -26,6 +26,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.coroutineScope
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -160,9 +163,9 @@ object AutoBackupManager {
             val successCountAtomic = java.util.concurrent.atomic.AtomicInteger(0)
             val completedCountAtomic = java.util.concurrent.atomic.AtomicInteger(0)
             
-            kotlinx.coroutines.coroutineScope {
+            coroutineScope {
                 unbackedFiles.map { file ->
-                    kotlinx.coroutines.async {
+                    async {
                         semaphore.withPermit {
                             val current = completedCountAtomic.get() + 1
                             _backupStatus.value = "Backing up ($current/$total): ${file.displayName}"
@@ -217,12 +220,13 @@ object AutoBackupManager {
                             } else {
                                 completedCountAtomic.incrementAndGet()
                             }
+                            Unit
                         }
                     }
                 }.awaitAll()
             }
             
-            var successCount = successCountAtomic.get()
+            successCount = successCountAtomic.get()
 
             AutoBackupPreferences.setLastBackupTime(context, System.currentTimeMillis())
 
