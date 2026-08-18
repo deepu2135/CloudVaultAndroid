@@ -259,12 +259,13 @@ object TelegramRepository {
                 photoWidth = options.outWidth
                 photoHeight = options.outHeight
                 
-                if (totalFileSize > 10485760L || photoWidth + photoHeight > 10000 || photoWidth > 10000 || photoHeight > 10000) {
+                if (photoWidth <= 0 || photoHeight <= 0 || totalFileSize > 10485760L || photoWidth + photoHeight > 10000 || photoWidth > 10000 || photoHeight > 10000) {
                     actualMediaType = MediaType.DOCUMENT
-                    TeleflixLogger.log(TAG, "Photo exceeds Telegram limits (size: $totalFileSize, dim: ${photoWidth}x${photoHeight}), sending as document")
+                    TeleflixLogger.log(TAG, "Photo exceeds limits or invalid (size: $totalFileSize, dim: ${photoWidth}x${photoHeight}), sending as document")
                 }
             } catch (e: Throwable) {
                 Log.w(TAG, "Could not decode photo bounds", e)
+                actualMediaType = MediaType.DOCUMENT
             }
         }
 
