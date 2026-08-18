@@ -20,5 +20,13 @@ data class LocalMediaFile(
     val bucketId: String,
     val bucketName: String
 ) {
-    val signature: String get() = "${filePath.ifBlank { displayName }}_${sizeBytes}_${displayName}"
+    val displayNameWithoutExt: String
+        get() = displayName.substringBeforeLast(".", displayName)
+
+    val signature: String
+        get() = "${displayName.lowercase().trim()}_${sizeBytes}"
+
+    val legacySignature: String
+        get() = "${filePath.ifBlank { displayName }}_${sizeBytes}_${displayName}"
 }
+

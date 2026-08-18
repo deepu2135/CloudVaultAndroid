@@ -139,6 +139,30 @@
                     app:backgroundTint="@color/accent_cyan"
                     app:cornerRadius="10dp" />
 
+                <!-- Index / Match Cloud Vault Media -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnIndexCloudMedia"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="🔍 Index &amp; Match Cloud Vault"
+                    android:textColor="#FFFFFF"
+                    app:backgroundTint="#1E293B"
+                    app:cornerRadius="10dp" />
+
+                <!-- Mark All Existing Media As Backed Up -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMarkAllBackedUp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="✅ Mark Device Media as Backed Up"
+                    android:textColor="#94A3B8"
+                    app:backgroundTint="#0F172A"
+                    app:strokeColor="#334155"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="10dp" />
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

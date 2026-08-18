@@ -1495,6 +1495,9 @@ class MainActivity : AppCompatActivity() {
         val btnBackupNow: MaterialButton = dialogView.findViewById(R.id.btnBackupNow)
         val btnBackFromAutoBackup: TextView = dialogView.findViewById(R.id.btnBackFromAutoBackup)
 
+        val btnIndexCloudMedia: MaterialButton? = dialogView.findViewById(R.id.btnIndexCloudMedia)
+        val btnMarkAllBackedUp: MaterialButton? = dialogView.findViewById(R.id.btnMarkAllBackedUp)
+
         val isBackupOn = AutoBackupPreferences.isEnabled(this)
         switchAutoBackup.isChecked = isBackupOn
         switchWifiOnly.isChecked = AutoBackupPreferences.isWifiOnly(this)
@@ -1550,12 +1553,51 @@ class MainActivity : AppCompatActivity() {
             AutoBackupManager.triggerImmediateSync(this)
         }
 
+        btnIndexCloudMedia?.setOnClickListener {
+            Toast.makeText(this, "Indexing Cloud Vault to prevent duplicate backups...", Toast.LENGTH_SHORT).show()
+            lifecycleScope.launch(Dispatchers.IO) {
+                if (TelegramClient.authState.value is TelegramAuthState.Ready) {
+                    TelegramRepository.loadVaultItems()
+                }
+                val unbacked = AutoBackupManager.scanUnbackedMedia(this@MainActivity)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Cloud index refreshed! Found ${unbacked.size} unbacked item(s).", Toast.LENGTH_LONG).show()
+                    tvBackupStatus.text = "${unbacked.size} item(s) need backup • Tap 'Back Up Now' to sync"
+                }
+            }
+        }
+
+        btnMarkAllBackedUp?.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Mark Device Media as Backed Up?")
+                .setMessage("This will mark all photos, videos, and documents currently on your device as already backed up. CloudVault will only back up new media taken/saved from now on.")
+                .setPositiveButton("Mark All as Backed Up") { _, _ ->
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val count = AutoBackupManager.markAllCurrentMediaAsBackedUp(this@MainActivity)
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@MainActivity, "Marked $count device item(s) as backed up! ☁️", Toast.LENGTH_LONG).show()
+                            tvBackupStatus.text = "All current device media marked as backed up ☁️"
+                        }
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .create()
 
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        val statusJob = lifecycleScope.launch {
+            AutoBackupManager.backupStatus.collect { status ->
+                if (status.isNotBlank()) {
+                    tvBackupStatus.text = status
+                }
+            }
+        }
         dialog.setOnDismissListener {
+            statusJob.cancel()
             onDismissCallback?.invoke()
         }
 

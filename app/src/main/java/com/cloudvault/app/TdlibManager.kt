@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 data class VaultMediaItem(
     val id: String,
     val title: String,
+    val caption: String = "",
     val sizeBytes: Long,
     val formattedSize: String,
     val mimeType: String,

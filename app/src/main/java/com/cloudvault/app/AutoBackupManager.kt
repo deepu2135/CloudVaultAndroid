@@ -147,6 +147,18 @@ object AutoBackupManager {
                 return@withContext true
             }
 
+            // Ensure cloud vault items are loaded before scanning so we don't re-upload existing cloud media
+            if (TelegramClient.authState.value is TelegramAuthState.Ready) {
+                if (TelegramRepository.photos.value.isEmpty() && TelegramRepository.videos.value.isEmpty() && TelegramRepository.files.value.isEmpty()) {
+                    _backupStatus.value = "Syncing with Telegram Cloud..."
+                    try {
+                        TelegramRepository.loadVaultItems()
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "Could not load vault items prior to backup", e)
+                    }
+                }
+            }
+
             _backupStatus.value = "Scanning for new media..."
             val unbackedFiles = scanUnbackedMedia(context)
 
@@ -174,7 +186,7 @@ object AutoBackupManager {
                                 return@withPermit
                             }
                             // Double-check signature wasn't marked backed up while waiting for semaphore
-                            if (AutoBackupPreferences.hasSignature(context, file.signature)) {
+                            if (AutoBackupPreferences.isBackedUp(context, file)) {
                                 inFlightSignatures.remove(file.signature)
                                 completedCountAtomic.incrementAndGet()
                                 return@withPermit
@@ -220,7 +232,7 @@ object AutoBackupManager {
                                         }
                                     )
                                     if (success) {
-                                        AutoBackupPreferences.markSignatureBackedUp(context, file.signature)
+                                        AutoBackupPreferences.markFileBackedUp(context, file)
                                         successCountAtomic.incrementAndGet()
                                     }
                                 } finally {
@@ -317,14 +329,26 @@ object AutoBackupManager {
     fun scanUnbackedMedia(context: Context): List<LocalMediaFile> {
         val selectedBucketIds = AutoBackupPreferences.getSelectedBucketIds(context)
         val unbackedList = mutableListOf<LocalMediaFile>()
-        val seenFilePaths = mutableSetOf<String>()
+        val seenSignatures = mutableSetOf<String>()
 
         // Get cloud vault items to prevent duplicate uploads if already in Telegram
         val cloudVaultSizes = mutableSetOf<Long>()
         val cloudVaultNames = mutableSetOf<String>()
-        (TelegramRepository.photos.value + TelegramRepository.videos.value + TelegramRepository.files.value).forEach { item ->
+        val cloudVaultNamesWithoutExt = mutableSetOf<String>()
+
+        val allCloudItems = TelegramRepository.photos.value + TelegramRepository.videos.value + TelegramRepository.files.value
+        allCloudItems.forEach { item ->
             if (item.sizeBytes > 0) cloudVaultSizes.add(item.sizeBytes)
-            if (item.title.isNotBlank()) cloudVaultNames.add(item.title.lowercase())
+            val titleClean = item.title.lowercase().trim()
+            if (titleClean.isNotBlank()) {
+                cloudVaultNames.add(titleClean)
+                cloudVaultNamesWithoutExt.add(titleClean.substringBeforeLast(".", titleClean))
+            }
+            val captionClean = item.caption.lowercase().trim()
+            if (captionClean.isNotBlank()) {
+                cloudVaultNames.add(captionClean)
+                cloudVaultNamesWithoutExt.add(captionClean.substringBeforeLast(".", captionClean))
+            }
         }
 
         fun queryMedia(uri: Uri, mediaType: MediaType, selection: String? = null, selectionArgs: Array<String>? = null) {
@@ -343,7 +367,7 @@ object AutoBackupManager {
                 projection,
                 selection,
                 selectionArgs,
-                "${MediaStore.MediaColumns.DATE_MODIFIED} ASC"
+                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
                 val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
@@ -380,20 +404,26 @@ object AutoBackupManager {
                         bucketName = bucketName
                     )
 
-                    // 1. Check local backup signature
-                    if (AutoBackupPreferences.hasSignature(context, localFile.signature)) {
+                    // 1. Check local backup signature / memory cache
+                    if (AutoBackupPreferences.isBackedUp(context, localFile)) {
                         continue
                     }
 
-                    // 2. Check if already uploaded to Telegram Cloud (matching size and name)
-                    if (cloudVaultSizes.contains(localFile.sizeBytes) && cloudVaultNames.contains(localFile.displayName.lowercase())) {
-                        AutoBackupPreferences.markSignatureBackedUp(context, localFile.signature)
+                    val nameLower = localFile.displayName.lowercase().trim()
+                    val nameNoExt = localFile.displayNameWithoutExt.lowercase().trim()
+
+                    // 2. Check if already uploaded to Telegram Cloud (matching name, base name, caption, or size)
+                    val isNameInCloud = (nameLower.isNotBlank() && cloudVaultNames.contains(nameLower)) ||
+                            (nameNoExt.isNotBlank() && cloudVaultNamesWithoutExt.contains(nameNoExt))
+                    val isSizeInCloud = localFile.sizeBytes > 0 && cloudVaultSizes.contains(localFile.sizeBytes)
+
+                    if (isNameInCloud || (isSizeInCloud && (localFile.mediaType != MediaType.PHOTO || cloudVaultNames.any { it.contains(nameNoExt) }))) {
+                        AutoBackupPreferences.markFileBackedUp(context, localFile)
                         continue
                     }
 
-                    // 3. Skip if we've already seen this file path in this scan
-                    val dedupeKey = if (path.isNotBlank()) path else "${name}_${size}"
-                    if (!seenFilePaths.add(dedupeKey)) {
+                    // 3. Skip if we've already seen this signature in this scan
+                    if (!seenSignatures.add(localFile.signature)) {
                         continue
                     }
 
@@ -420,8 +450,85 @@ object AutoBackupManager {
             Log.e(TAG, "scanUnbackedMedia query error", e)
         }
 
-        // Ensure strictly sorted oldest first and deduplicated by signature
-        return unbackedList.distinctBy { it.signature }.sortedBy { it.dateModified }
+        // Prioritize newest photos/videos first so recent memories are backed up immediately!
+        return unbackedList.distinctBy { it.signature }.sortedByDescending { it.dateModified }
+    }
+
+    fun markAllCurrentMediaAsBackedUp(context: Context): Int {
+        val selectedBucketIds = AutoBackupPreferences.getSelectedBucketIds(context)
+        val allDeviceFiles = mutableListOf<LocalMediaFile>()
+
+        fun queryAll(uri: Uri, mediaType: MediaType, selection: String? = null, selectionArgs: Array<String>? = null) {
+            val projection = arrayOf(
+                MediaStore.MediaColumns._ID,
+                MediaStore.MediaColumns.DATA,
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.SIZE,
+                MediaStore.MediaColumns.DATE_MODIFIED,
+                MediaStore.MediaColumns.BUCKET_ID,
+                MediaStore.MediaColumns.BUCKET_DISPLAY_NAME
+            )
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
+                val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                val nameCol = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                val sizeCol = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                val dateCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED)
+                val bucketIdCol = cursor.getColumnIndex(MediaStore.MediaColumns.BUCKET_ID)
+                val bucketNameCol = cursor.getColumnIndex(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
+
+                while (cursor.moveToNext()) {
+                    val id = if (idCol >= 0) cursor.getLong(idCol) else 0L
+                    val path = if (dataCol >= 0) cursor.getString(dataCol) ?: "" else ""
+                    val name = if (nameCol >= 0) cursor.getString(nameCol) ?: "media_${id}" else "media_${id}"
+                    val size = if (sizeCol >= 0) cursor.getLong(sizeCol) else 0L
+                    val date = if (dateCol >= 0) cursor.getLong(dateCol) else 0L
+                    val bucketId = if (bucketIdCol >= 0) cursor.getString(bucketIdCol) ?: "" else ""
+                    val bucketName = if (bucketNameCol >= 0) cursor.getString(bucketNameCol) ?: "Storage" else "Storage"
+
+                    if (selectedBucketIds != null && !selectedBucketIds.contains(bucketId)) {
+                        continue
+                    }
+
+                    val itemUri = ContentUris.withAppendedId(uri, id)
+                    allDeviceFiles.add(
+                        LocalMediaFile(
+                            id = id,
+                            uri = itemUri,
+                            filePath = path,
+                            displayName = name,
+                            sizeBytes = size,
+                            dateModified = date,
+                            mediaType = mediaType,
+                            bucketId = bucketId,
+                            bucketName = bucketName
+                        )
+                    )
+                }
+            }
+        }
+
+        try {
+            queryAll(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaType.PHOTO)
+            queryAll(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaType.VIDEO)
+            val docSelection = "${MediaStore.MediaColumns.MIME_TYPE} IN (?, ?, ?, ?, ?, ?)"
+            val docArgs = arrayOf(
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "text/plain"
+            )
+            queryAll(MediaStore.Files.getContentUri("external"), MediaType.DOCUMENT, docSelection, docArgs)
+        } catch (e: Throwable) {
+            Log.e(TAG, "markAllCurrentMediaAsBackedUp query error", e)
+        }
+
+        AutoBackupPreferences.markMultipleFilesBackedUp(context, allDeviceFiles)
+        AutoBackupPreferences.setLastBackupTime(context, System.currentTimeMillis())
+        _backupStatus.value = "Marked ${allDeviceFiles.size} item(s) as backed up ☁️"
+        return allDeviceFiles.size
     }
 
     private fun copyUriToCache(context: Context, uri: Uri, fileName: String): File? {

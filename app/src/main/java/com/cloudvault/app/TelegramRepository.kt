@@ -134,11 +134,14 @@ object TelegramRepository {
                     ?: fullPhoto
 
                 val photoSize = if (fullPhoto.photo.size > 0) fullPhoto.photo.size.toLong() else fullPhoto.photo.expectedSize.toLong()
+                val caption = content.caption?.text.orEmpty().trim()
+                val photoTitle = if (caption.isNotBlank()) caption else "Photo_${msg.date}.jpg"
 
                 photoList.add(
                     VaultMediaItem(
                         id = "photo_${msg.id}",
-                        title = "Photo_${msg.date}.jpg",
+                        title = photoTitle,
+                        caption = caption,
                         sizeBytes = photoSize,
                         formattedSize = formatSize(photoSize),
                         mimeType = "image/jpeg",
@@ -152,10 +155,20 @@ object TelegramRepository {
                 )
             }
             is TdApi.MessageVideo -> {
+                val caption = content.caption?.text.orEmpty().trim()
+                val videoTitle = if (content.video.fileName.isNotBlank()) {
+                    content.video.fileName
+                } else if (caption.isNotBlank()) {
+                    caption
+                } else {
+                    "Video_${msg.date}.mp4"
+                }
+
                 videoList.add(
                     VaultMediaItem(
                         id = "video_${msg.id}",
-                        title = content.video.fileName.ifBlank { "Video_${msg.date}.mp4" },
+                        title = videoTitle,
+                        caption = caption,
                         sizeBytes = content.video.video.size.toLong(),
                         formattedSize = formatSize(content.video.video.size.toLong()),
                         mimeType = content.video.mimeType.ifBlank { "video/mp4" },
@@ -173,6 +186,7 @@ object TelegramRepository {
                 val doc = content.document
                 val mime = doc.mimeType.ifBlank { "application/octet-stream" }.lowercase()
                 val name = doc.fileName.lowercase()
+                val caption = content.caption?.text.orEmpty().trim()
 
                 val isVideo = mime.startsWith("video/") ||
                         mime.contains("matroska") ||
@@ -207,9 +221,18 @@ object TelegramRepository {
                     else -> MediaType.DOCUMENT
                 }
 
+                val docTitle = if (doc.fileName.isNotBlank()) {
+                    doc.fileName
+                } else if (caption.isNotBlank()) {
+                    caption
+                } else {
+                    "File_${msg.date}"
+                }
+
                 val item = VaultMediaItem(
                     id = "doc_${msg.id}",
-                    title = doc.fileName.ifBlank { "File_${msg.date}" },
+                    title = docTitle,
+                    caption = caption,
                     sizeBytes = doc.document.size.toLong(),
                     formattedSize = formatSize(doc.document.size.toLong()),
                     mimeType = doc.mimeType.ifBlank { "application/octet-stream" },
