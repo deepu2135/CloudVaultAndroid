@@ -112,6 +112,30 @@ class MainActivity : AppCompatActivity() {
 
     private var currentSortOrder: VaultSortOrder = VaultSortOrder.NEWEST
     private var searchQuery: String = ""
+    private lateinit var swipeDetector: android.view.GestureDetector
+
+    private fun handleSwipeLeft() {
+        when (currentCategory) {
+            MediaType.PHOTO -> switchCategory(MediaType.VIDEO)
+            MediaType.VIDEO -> switchCategory(MediaType.DOCUMENT)
+            MediaType.DOCUMENT -> {}
+        }
+    }
+
+    private fun handleSwipeRight() {
+        when (currentCategory) {
+            MediaType.DOCUMENT -> switchCategory(MediaType.VIDEO)
+            MediaType.VIDEO -> switchCategory(MediaType.PHOTO)
+            MediaType.PHOTO -> {}
+        }
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (::swipeDetector.isInitialized && swipeDetector.onTouchEvent(ev)) {
+            return true
+        }
+        return super.dispatchTouchEvent(ev)
+    }
 
     // Activity Result Launchers for picking single or multiple media items
     private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri>? ->
@@ -139,6 +163,28 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        swipeDetector = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            private val SWIPE_THRESHOLD = 150
+            private val SWIPE_VELOCITY_THRESHOLD = 150
+
+            override fun onFling(e1: android.view.MotionEvent?, e2: android.view.MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 == null) return false
+                val diffY = e2.y - e1.y
+                val diffX = e2.x - e1.x
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                        if (diffX > 0) {
+                            handleSwipeRight()
+                        } else {
+                            handleSwipeLeft()
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+        })
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             if (androidx.core.content.ContextCompat.checkSelfPermission(
