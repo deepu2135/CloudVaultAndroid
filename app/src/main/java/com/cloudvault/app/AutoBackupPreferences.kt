@@ -46,18 +46,20 @@ object AutoBackupPreferences {
         return set?.contains(signature) == true
     }
 
+    @Synchronized
     fun markSignatureBackedUp(context: Context, signature: String) {
         val prefs = getPrefs(context)
         val currentSet = HashSet(prefs.getStringSet(KEY_BACKED_UP_SIGNATURES, emptySet()) ?: emptySet())
         currentSet.add(signature)
-        prefs.edit().putStringSet(KEY_BACKED_UP_SIGNATURES, currentSet).apply()
+        prefs.edit().putStringSet(KEY_BACKED_UP_SIGNATURES, currentSet).commit()
     }
 
+    @Synchronized
     fun markMultipleSignaturesBackedUp(context: Context, signatures: Collection<String>) {
         val prefs = getPrefs(context)
         val currentSet = HashSet(prefs.getStringSet(KEY_BACKED_UP_SIGNATURES, emptySet()) ?: emptySet())
         currentSet.addAll(signatures)
-        prefs.edit().putStringSet(KEY_BACKED_UP_SIGNATURES, currentSet).apply()
+        prefs.edit().putStringSet(KEY_BACKED_UP_SIGNATURES, currentSet).commit()
     }
 
     fun getLastBackupTime(context: Context): Long {
