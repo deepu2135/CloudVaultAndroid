@@ -258,7 +258,7 @@ object AutoBackupManager {
             if (successCount > 0) {
                 UploadNotificationManager.showComplete(context, successCount, total)
                 _backupStatus.value = "Backed up $successCount item(s) to Telegram Cloud ☁️"
-                TelegramRepository.loadVaultItems()
+                TelegramRepository.loadVaultItems(force = true)
             } else {
                 _backupStatus.value = "Auto Backup encountered issues"
             }

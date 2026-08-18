@@ -129,19 +129,17 @@ object TelegramClient {
             }
             is TdApi.UpdateMessageSendSucceeded -> {
                 _messageUpdates.tryEmit(update)
-                scope.launch {
-                    TelegramRepository.loadVaultItems()
-                }
+                TelegramRepository.addOrUpdateMessage(update.message)
             }
             is TdApi.UpdateMessageSendFailed -> {
                 _messageUpdates.tryEmit(update)
             }
-            is TdApi.UpdateNewMessage, is TdApi.UpdateMessageContent -> {
+            is TdApi.UpdateNewMessage -> {
                 _messageUpdates.tryEmit(update)
-                // Auto-load when new photos, videos, or files are sent/received
-                scope.launch {
-                    TelegramRepository.loadVaultItems()
-                }
+                TelegramRepository.addOrUpdateMessage(update.message)
+            }
+            is TdApi.UpdateMessageContent -> {
+                _messageUpdates.tryEmit(update)
             }
         }
     }

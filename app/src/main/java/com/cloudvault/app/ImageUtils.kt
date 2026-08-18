@@ -72,4 +72,40 @@ object ImageUtils {
             }
         }
     }
+
+    fun preparePhotoForTelegramUpload(context: android.content.Context, localPath: String, maxDimension: Int = 2560): Pair<java.io.File, Boolean> {
+        val originalFile = java.io.File(localPath)
+        if (!originalFile.exists() || originalFile.length() <= 0L) {
+            return Pair(originalFile, false)
+        }
+
+        try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(localPath, options)
+            val width = options.outWidth
+            val height = options.outHeight
+
+            // If dimensions are within Telegram's native photo limits and size is already reasonable, use original directly
+            if (width > 0 && height > 0 && width <= maxDimension && height <= maxDimension && (width + height) <= 6000 && originalFile.length() <= 4_000_000L) {
+                return Pair(originalFile, false)
+            }
+
+            // Downsample and compress to fast, high-quality JPEG (e.g. max 2560px, 88% quality)
+            val bitmap = decodeOrientedBitmap(localPath, maxDimension = maxDimension)
+            if (bitmap != null) {
+                val compressDir = java.io.File(context.cacheDir, "autobackup_compressed").apply { if (!exists()) mkdirs() }
+                val tempFile = java.io.File(compressDir, "opt_${System.currentTimeMillis()}_${originalFile.name}")
+                java.io.FileOutputStream(tempFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 88, out)
+                }
+                bitmap.recycle()
+                if (tempFile.exists() && tempFile.length() > 0L) {
+                    return Pair(tempFile, true)
+                }
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "preparePhotoForTelegramUpload fallback for $localPath", e)
+        }
+        return Pair(originalFile, false)
+    }
 }

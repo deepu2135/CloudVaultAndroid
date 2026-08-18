@@ -48,8 +48,35 @@ object TelegramRepository {
         return String.format("%.1f %cB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
     }
 
-    suspend fun loadVaultItems(chatId: Long = 0L) {
+    private var lastVaultLoadTime = 0L
+
+    fun addOrUpdateMessage(msg: TdApi.Message) {
+        if (msg.sendingState is TdApi.MessageSendingStateFailed) return
+        val photoList = _photos.value.toMutableList()
+        val videoList = _videos.value.toMutableList()
+        val fileList = _files.value.toMutableList()
+        val initialCounts = Triple(photoList.size, videoList.size, fileList.size)
+
+        parseAndClassifyMessage(msg, photoList, videoList, fileList)
+
+        if (photoList.size != initialCounts.first) {
+            _photos.value = photoList.distinctBy { it.id }.sortedByDescending { it.dateAdded }
+        }
+        if (videoList.size != initialCounts.second) {
+            _videos.value = videoList.distinctBy { it.id }.sortedByDescending { it.dateAdded }
+        }
+        if (fileList.size != initialCounts.third) {
+            _files.value = fileList.distinctBy { it.id }.sortedByDescending { it.dateAdded }
+        }
+    }
+
+    suspend fun loadVaultItems(chatId: Long = 0L, force: Boolean = false) {
         val targetChatId = if (chatId != 0L) chatId else getSavedMessagesChatId() ?: return
+        val now = System.currentTimeMillis()
+        if (!force && now - lastVaultLoadTime < 10_000L && (_photos.value.isNotEmpty() || _videos.value.isNotEmpty() || _files.value.isNotEmpty())) {
+            return
+        }
+        lastVaultLoadTime = now
         _isLoadingVault.value = true
 
         try {
@@ -265,26 +292,31 @@ object TelegramRepository {
             Log.e(TAG, "uploadFile failed: file does not exist or is empty at $localPath")
             return@withContext false
         }
-        val totalFileSize = targetFile.length()
 
         val chatId = if (targetChatId != 0L) targetChatId else getSavedMessagesChatId() ?: return@withContext false
-        val inputFile = TdApi.InputFileLocal(localPath)
         val formattedCaption = TdApi.FormattedText(captionText, emptyArray())
 
         var actualMediaType = mediaType
         var photoWidth = 0
         var photoHeight = 0
-        
+        var finalUploadPath = localPath
+        var isCompressedTemp = false
+
         if (actualMediaType == MediaType.PHOTO) {
+            val (preparedFile, isTemp) = ImageUtils.preparePhotoForTelegramUpload(CloudVaultApp.instance, localPath, maxDimension = 2560)
+            finalUploadPath = preparedFile.absolutePath
+            isCompressedTemp = isTemp
+
             try {
                 val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                android.graphics.BitmapFactory.decodeFile(localPath, options)
+                android.graphics.BitmapFactory.decodeFile(finalUploadPath, options)
                 photoWidth = options.outWidth
                 photoHeight = options.outHeight
-                
-                if (photoWidth <= 0 || photoHeight <= 0 || totalFileSize > 10485760L || photoWidth + photoHeight > 10000 || photoWidth > 10000 || photoHeight > 10000) {
+
+                val preparedSize = File(finalUploadPath).length()
+                if (photoWidth <= 0 || photoHeight <= 0 || preparedSize > 10485760L || photoWidth + photoHeight > 10000 || photoWidth > 10000 || photoHeight > 10000) {
                     actualMediaType = MediaType.DOCUMENT
-                    TeleflixLogger.log(TAG, "Photo exceeds limits or invalid (size: $totalFileSize, dim: ${photoWidth}x${photoHeight}), sending as document")
+                    TeleflixLogger.log(TAG, "Photo exceeds limits or invalid (size: $preparedSize, dim: ${photoWidth}x${photoHeight}), sending as document")
                 }
             } catch (e: Throwable) {
                 Log.w(TAG, "Could not decode photo bounds", e)
@@ -292,7 +324,10 @@ object TelegramRepository {
             }
         }
 
-        val inputContent: TdApi.InputMessageContent = when (val finalMediaType = actualMediaType) {
+        val totalFileSize = File(finalUploadPath).length()
+        val inputFile = TdApi.InputFileLocal(finalUploadPath)
+
+        val inputContent: TdApi.InputMessageContent = when (actualMediaType) {
             MediaType.PHOTO -> TdApi.InputMessagePhoto().apply {
                 val inputPhoto = TdApi.InputPhoto().apply {
                     photo = inputFile
@@ -356,7 +391,6 @@ object TelegramRepository {
             if (sentMsg.sendingState == null) {
                 // Immediate success (e.g. instantly cached)
                 onProgress?.invoke(totalFileSize, totalFileSize)
-                loadVaultItems(chatId)
                 return@withContext true
             }
 
@@ -455,7 +489,6 @@ object TelegramRepository {
 
             if (uploadSuccess) {
                 onProgress?.invoke(totalFileSize, totalFileSize)
-                loadVaultItems(chatId)
                 TeleflixLogger.log(TAG, "uploadFile completed successfully to Telegram Cloud! tempMsgId=$tempMsgId")
                 true
             } else {
@@ -465,6 +498,10 @@ object TelegramRepository {
         } catch (e: Exception) {
             TeleflixLogger.log(TAG, "Failed to upload file to Telegram cloud: ${e.message}", isError = true)
             false
+        } finally {
+            if (isCompressedTemp) {
+                runCatching { File(finalUploadPath).delete() }
+            }
         }
     }
 
