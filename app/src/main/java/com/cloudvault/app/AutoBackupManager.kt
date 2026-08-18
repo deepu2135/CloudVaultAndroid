@@ -367,7 +367,7 @@ object AutoBackupManager {
                 projection,
                 selection,
                 selectionArgs,
-                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
+                "${MediaStore.MediaColumns.DATE_MODIFIED} ASC"
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
                 val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
@@ -450,8 +450,8 @@ object AutoBackupManager {
             Log.e(TAG, "scanUnbackedMedia query error", e)
         }
 
-        // Prioritize newest photos/videos first so recent memories are backed up immediately!
-        return unbackedList.distinctBy { it.signature }.sortedByDescending { it.dateModified }
+        // Strictly sorted oldest first (chronological order) and deduplicated
+        return unbackedList.distinctBy { it.signature }.sortedBy { it.dateModified }
     }
 
     fun markAllCurrentMediaAsBackedUp(context: Context): Int {
