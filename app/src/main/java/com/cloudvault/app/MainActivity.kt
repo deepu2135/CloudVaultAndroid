@@ -1534,23 +1534,50 @@ class MainActivity : AppCompatActivity() {
             val checkedItems = folders.map { it.isSelected }.toBooleanArray()
 
             withContext(Dispatchers.Main) {
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Select Folders to Back Up")
-                    .setMultiChoiceItems(items, checkedItems) { _, which, isChecked ->
-                        checkedItems[which] = isChecked
-                    }
-                    .setPositiveButton("Save Selection") { _, _ ->
-                        val selectedBucketIds = mutableSetOf<String>()
-                        for (i in folders.indices) {
-                            if (checkedItems[i]) {
-                                selectedBucketIds.add(folders[i].bucketId)
-                            }
+                val dialog = android.app.Dialog(this@MainActivity)
+                dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+                dialog.setContentView(R.layout.dialog_folder_selection)
+                dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+                dialog.window?.setLayout(
+                    (resources.displayMetrics.widthPixels * 0.95).toInt(),
+                    (resources.displayMetrics.heightPixels * 0.85).toInt()
+                )
+
+                val etFolderSearch = dialog.findViewById<android.widget.EditText>(R.id.etFolderSearch)
+                val rvFolders = dialog.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rvFolders)
+                val btnCancel = dialog.findViewById<android.view.View>(R.id.btnCancelSelection)
+                val btnSave = dialog.findViewById<android.view.View>(R.id.btnSaveSelection)
+
+                rvFolders.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this@MainActivity)
+                val adapter = FolderSelectionAdapter(folders) { _ -> }
+                rvFolders.adapter = adapter
+
+                etFolderSearch.addTextChangedListener(object : android.text.TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                        val query = s?.toString()?.lowercase() ?: ""
+                        val filtered = if (query.isBlank()) {
+                            folders
+                        } else {
+                            folders.filter { it.bucketName.lowercase().contains(query) }
                         }
-                        AutoBackupPreferences.setSelectedBucketIds(this@MainActivity, selectedBucketIds)
-                        Toast.makeText(this@MainActivity, "Backup folders updated (${selectedBucketIds.size} folders)", Toast.LENGTH_SHORT).show()
+                        adapter.updateData(filtered)
                     }
-                    .setNegativeButton("Cancel", null)
-                    .show()
+                    override fun afterTextChanged(s: android.text.Editable?) {}
+                })
+
+                btnCancel.setOnClickListener {
+                    dialog.dismiss()
+                }
+
+                btnSave.setOnClickListener {
+                    val selectedBucketIds = folders.filter { it.isSelected }.map { it.bucketId }.toSet()
+                    AutoBackupPreferences.setSelectedBucketIds(this@MainActivity, selectedBucketIds)
+                    Toast.makeText(this@MainActivity, "Backup folders updated (${selectedBucketIds.size} folders)", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+
+                dialog.show()
             }
         }
     }

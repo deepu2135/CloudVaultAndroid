@@ -6,7 +6,7 @@ data class DeviceFolderInfo(
     val bucketId: String,
     val bucketName: String,
     val totalCount: Int,
-    val isSelected: Boolean
+    var isSelected: Boolean
 )
 
 data class LocalMediaFile(
