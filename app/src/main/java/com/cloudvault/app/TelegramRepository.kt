@@ -269,7 +269,7 @@ object TelegramRepository {
             }
         }
 
-        val inputContent: TdApi.InputMessageContent = when (actualMediaType) {
+        val inputContent: TdApi.InputMessageContent = when (val finalMediaType = actualMediaType) {
             MediaType.PHOTO -> TdApi.InputMessagePhoto().apply {
                 val inputPhoto = TdApi.InputPhoto().apply {
                     photo = inputFile

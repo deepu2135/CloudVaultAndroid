@@ -232,12 +232,12 @@ object AutoBackupManager {
         val folderMap = mutableMapOf<String, Pair<String, Int>>() // bucketId -> (bucketName, count)
         val selectedBucketIds = AutoBackupPreferences.getSelectedBucketIds(context)
 
-        fun queryMediaStore(uri: Uri) {
+        fun queryMediaStore(uri: Uri, selection: String? = null, selectionArgs: Array<String>? = null) {
             val projection = arrayOf(
                 MediaStore.MediaColumns.BUCKET_ID,
                 MediaStore.MediaColumns.BUCKET_DISPLAY_NAME
             )
-            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
                 val bucketIdCol = cursor.getColumnIndex(MediaStore.MediaColumns.BUCKET_ID)
                 val bucketNameCol = cursor.getColumnIndex(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
 
@@ -255,6 +255,17 @@ object AutoBackupManager {
         try {
             queryMediaStore(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
             queryMediaStore(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+            
+            val docSelection = "${MediaStore.MediaColumns.MIME_TYPE} IN (?, ?, ?, ?, ?, ?)"
+            val docArgs = arrayOf(
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "text/plain"
+            )
+            queryMediaStore(MediaStore.Files.getContentUri("external"), docSelection, docArgs)
         } catch (e: Throwable) {
             Log.e(TAG, "scanAvailableFolders query error", e)
         }
@@ -282,7 +293,7 @@ object AutoBackupManager {
             if (item.title.isNotBlank()) cloudVaultNames.add(item.title.lowercase())
         }
 
-        fun queryMedia(uri: Uri, isVideo: Boolean) {
+        fun queryMedia(uri: Uri, mediaType: MediaType, selection: String? = null, selectionArgs: Array<String>? = null) {
             val projection = arrayOf(
                 MediaStore.MediaColumns._ID,
                 MediaStore.MediaColumns.DATA,
@@ -296,8 +307,8 @@ object AutoBackupManager {
             context.contentResolver.query(
                 uri,
                 projection,
-                null,
-                null,
+                selection,
+                selectionArgs,
                 "${MediaStore.MediaColumns.DATE_MODIFIED} ASC"
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
@@ -322,7 +333,6 @@ object AutoBackupManager {
                         continue
                     }
 
-                    val mediaType = if (isVideo) MediaType.VIDEO else MediaType.PHOTO
                     val itemUri = ContentUris.withAppendedId(uri, id)
                     val localFile = LocalMediaFile(
                         id = id,
@@ -353,8 +363,19 @@ object AutoBackupManager {
         }
 
         try {
-            queryMedia(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, false)
-            queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true)
+            queryMedia(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaType.PHOTO)
+            queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaType.VIDEO)
+            
+            val docSelection = "${MediaStore.MediaColumns.MIME_TYPE} IN (?, ?, ?, ?, ?, ?)"
+            val docArgs = arrayOf(
+                "application/pdf",
+                "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "text/plain"
+            )
+            queryMedia(MediaStore.Files.getContentUri("external"), MediaType.DOCUMENT, docSelection, docArgs)
         } catch (e: Throwable) {
             Log.e(TAG, "scanUnbackedMedia query error", e)
         }
