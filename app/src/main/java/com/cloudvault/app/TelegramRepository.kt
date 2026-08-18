@@ -77,7 +77,13 @@ object TelegramRepository {
         }
     }
 
+    private val vaultLoadMutex = kotlinx.coroutines.sync.Mutex()
+
     suspend fun loadVaultItems(chatId: Long = 0L, force: Boolean = false) {
+        if (!vaultLoadMutex.tryLock()) {
+            // Already actively loading vault history, avoid duplicate concurrent full scans
+            return
+        }
         _isLoadingVault.value = true
         try {
             val targetChatId = if (chatId != 0L) chatId else getSavedMessagesChatId() ?: run {
@@ -166,6 +172,7 @@ object TelegramRepository {
             TeleflixLogger.log(TAG, "Failed to load vault items: ${e.message}", isError = true)
         } finally {
             _isLoadingVault.value = false
+            vaultLoadMutex.unlock()
         }
     }
 

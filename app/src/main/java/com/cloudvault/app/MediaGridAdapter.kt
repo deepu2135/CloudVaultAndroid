@@ -344,7 +344,14 @@ class MediaGridAdapter(
                 }
             }
 
-            val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
+            val targetFileId = if (item.thumbnailFileId > 0) {
+                item.thumbnailFileId
+            } else if (item.type == MediaType.PHOTO) {
+                item.fileId
+            } else {
+                0
+            }
+
             if (targetFileId > 0) {
                 val cached = bitmapCache.get(targetFileId)
                     ?: (if (item.fileId > 0) bitmapCache.get(item.fileId) else null)
@@ -454,7 +461,13 @@ class MediaGridAdapter(
                 }
             }
 
-            val targetFileId = if (item.thumbnailFileId > 0) item.thumbnailFileId else item.fileId
+            val targetFileId = if (item.thumbnailFileId > 0) {
+                item.thumbnailFileId
+            } else if (item.type == MediaType.PHOTO) {
+                item.fileId
+            } else {
+                0
+            }
 
             if (targetFileId > 0) {
                 val cached = bitmapCache.get(targetFileId)
@@ -561,28 +574,33 @@ class MediaGridAdapter(
         }
     }
 
+    private val thumbnailSemaphore = kotlinx.coroutines.sync.Semaphore(6)
+
     private suspend fun loadOrDownloadThumbnail(targetFileId: Int, item: VaultMediaItem): Bitmap? {
+        if (targetFileId <= 0) return null
         return withContext(Dispatchers.IO) {
-            try {
-                // 1. Try targetFileId (thumbnail if available)
-                val tdFile = TelegramClient.downloadFileAndWait(targetFileId, priority = 32, timeoutMs = 15000L)
-                if (tdFile != null && tdFile.local.path.isNotBlank() && File(tdFile.local.path).exists()) {
-                    val bmp = ImageUtils.decodeOrientedBitmap(tdFile.local.path, maxDimension = 400)
-                    if (bmp != null) return@withContext bmp
-                }
-
-                // 2. If targetFileId was a thumbnail and failed, try main fileId as fallback
-                if (targetFileId != item.fileId && item.fileId > 0) {
-                    val mainFile = TelegramClient.downloadFileAndWait(item.fileId, priority = 24, timeoutMs = 20000L)
-                    if (mainFile != null && mainFile.local.path.isNotBlank() && File(mainFile.local.path).exists()) {
-                        val bmp = ImageUtils.decodeOrientedBitmap(mainFile.local.path, maxDimension = 400)
-                        if (bmp != null) return@withContext bmp
+            thumbnailSemaphore.withPermit {
+                try {
+                    // 1. Try targetFileId (fast lightweight thumbnail)
+                    val tdFile = TelegramClient.downloadFileAndWait(targetFileId, priority = 32, timeoutMs = 8000L)
+                    if (tdFile != null && tdFile.local.path.isNotBlank() && File(tdFile.local.path).exists()) {
+                        val bmp = ImageUtils.decodeOrientedBitmap(tdFile.local.path, maxDimension = 400)
+                        if (bmp != null) return@withPermit bmp
                     }
-                }
 
-                null
-            } catch (_: Throwable) {
-                null
+                    // 2. Only for small photos: fallback to main file if <= 5MB
+                    if (item.type == MediaType.PHOTO && targetFileId != item.fileId && item.fileId > 0 && item.sizeBytes in 1..5_000_000L) {
+                        val mainFile = TelegramClient.downloadFileAndWait(item.fileId, priority = 24, timeoutMs = 10000L)
+                        if (mainFile != null && mainFile.local.path.isNotBlank() && File(mainFile.local.path).exists()) {
+                            val bmp = ImageUtils.decodeOrientedBitmap(mainFile.local.path, maxDimension = 400)
+                            if (bmp != null) return@withPermit bmp
+                        }
+                    }
+
+                    null
+                } catch (_: Throwable) {
+                    null
+                }
             }
         }
     }
