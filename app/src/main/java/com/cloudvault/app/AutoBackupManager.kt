@@ -41,6 +41,7 @@ object AutoBackupManager {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val isSyncing = AtomicBoolean(false)
+    private val inFlightSignatures = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     private val _backupStatus = MutableStateFlow("Idle")
     val backupStatus: StateFlow<String> = _backupStatus
@@ -167,6 +168,17 @@ object AutoBackupManager {
                 unbackedFiles.map { file ->
                     async {
                         semaphore.withPermit {
+                            // Skip if another worker already claimed this signature
+                            if (!inFlightSignatures.add(file.signature)) {
+                                completedCountAtomic.incrementAndGet()
+                                return@withPermit
+                            }
+                            // Double-check signature wasn't marked backed up while waiting for semaphore
+                            if (AutoBackupPreferences.hasSignature(context, file.signature)) {
+                                inFlightSignatures.remove(file.signature)
+                                completedCountAtomic.incrementAndGet()
+                                return@withPermit
+                            }
                             val current = completedCountAtomic.get() + 1
                             _backupStatus.value = "Backing up ($current/$total): ${file.displayName}"
                             UploadNotificationManager.showProgress(context, current, total, "Auto Backup: ${file.displayName}")
@@ -212,6 +224,7 @@ object AutoBackupManager {
                                         successCountAtomic.incrementAndGet()
                                     }
                                 } finally {
+                                    inFlightSignatures.remove(file.signature)
                                     completedCountAtomic.incrementAndGet()
                                     if (uploadPath.contains("autobackup_temp")) {
                                         runCatching { File(uploadPath).delete() }
@@ -400,8 +413,8 @@ object AutoBackupManager {
             Log.e(TAG, "scanUnbackedMedia query error", e)
         }
 
-        // Ensure strictly sorted oldest first
-        return unbackedList.sortedBy { it.dateModified }
+        // Ensure strictly sorted oldest first and deduplicated by signature
+        return unbackedList.distinctBy { it.signature }.sortedBy { it.dateModified }
     }
 
     private fun copyUriToCache(context: Context, uri: Uri, fileName: String): File? {
