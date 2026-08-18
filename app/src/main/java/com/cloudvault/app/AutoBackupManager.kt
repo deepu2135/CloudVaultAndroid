@@ -317,6 +317,7 @@ object AutoBackupManager {
     fun scanUnbackedMedia(context: Context): List<LocalMediaFile> {
         val selectedBucketIds = AutoBackupPreferences.getSelectedBucketIds(context)
         val unbackedList = mutableListOf<LocalMediaFile>()
+        val seenFilePaths = mutableSetOf<String>()
 
         // Get cloud vault items to prevent duplicate uploads if already in Telegram
         val cloudVaultSizes = mutableSetOf<Long>()
@@ -387,6 +388,12 @@ object AutoBackupManager {
                     // 2. Check if already uploaded to Telegram Cloud (matching size and name)
                     if (cloudVaultSizes.contains(localFile.sizeBytes) && cloudVaultNames.contains(localFile.displayName.lowercase())) {
                         AutoBackupPreferences.markSignatureBackedUp(context, localFile.signature)
+                        continue
+                    }
+
+                    // 3. Skip if we've already seen this file path in this scan
+                    val dedupeKey = if (path.isNotBlank()) path else "${name}_${size}"
+                    if (!seenFilePaths.add(dedupeKey)) {
                         continue
                     }
 

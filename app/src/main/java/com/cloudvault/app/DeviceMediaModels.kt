@@ -20,5 +20,5 @@ data class LocalMediaFile(
     val bucketId: String,
     val bucketName: String
 ) {
-    val signature: String get() = "${id}_${sizeBytes}_${dateModified}_${displayName}"
+    val signature: String get() = "${filePath.ifBlank { displayName }}_${sizeBytes}_${displayName}"
 }
