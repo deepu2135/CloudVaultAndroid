@@ -71,16 +71,24 @@ object TelegramRepository {
     }
 
     suspend fun loadVaultItems(chatId: Long = 0L, force: Boolean = false) {
-        val targetChatId = if (chatId != 0L) chatId else getSavedMessagesChatId() ?: return
-        val now = System.currentTimeMillis()
-        if (!force && now - lastVaultLoadTime < 5_000L && (_photos.value.isNotEmpty() || _videos.value.isNotEmpty() || _files.value.isNotEmpty())) {
-            return
-        }
-        lastVaultLoadTime = now
         _isLoadingVault.value = true
-
         try {
-            // Actively open chat to instruct TDLib to sync history from Telegram server
+            val targetChatId = if (chatId != 0L) chatId else getSavedMessagesChatId() ?: run {
+                TeleflixLogger.log(TAG, "Cannot load vault items: targetChatId is null", isError = true)
+                return
+            }
+            val now = System.currentTimeMillis()
+            if (!force && now - lastVaultLoadTime < 3_000L && (_photos.value.isNotEmpty() || _videos.value.isNotEmpty() || _files.value.isNotEmpty())) {
+                return
+            }
+            lastVaultLoadTime = now
+
+            // Ensure chat is loaded & actively open chat in TDLib
+            try {
+                TelegramClient.sendRequest(TdApi.GetChat(targetChatId))
+            } catch (e: Throwable) {
+                Log.d(TAG, "GetChat note: ${e.message}")
+            }
             try {
                 TelegramClient.sendRequest(TdApi.OpenChat(targetChatId))
             } catch (e: Throwable) {
@@ -104,7 +112,7 @@ object TelegramRepository {
                         TdApi.GetChatHistory(targetChatId, fromMessageId, 0, batchSize, false)
                     ) as? TdApi.Messages
                 } catch (e: Throwable) {
-                    Log.w(TAG, "GetChatHistory error at fromMessageId=$fromMessageId", e)
+                    Log.w(TAG, "GetChatHistory error at fromMessageId=$fromMessageId: ${e.message}")
                     null
                 }
 
@@ -113,7 +121,7 @@ object TelegramRepository {
                     // Wait and retry up to 5 times.
                     if (scannedCount == 0 && consecutiveEmptyBatches < 5) {
                         consecutiveEmptyBatches++
-                        kotlinx.coroutines.delay(400L)
+                        kotlinx.coroutines.delay(350L)
                         continue
                     }
                     break
@@ -138,10 +146,10 @@ object TelegramRepository {
             _videos.value = videoList.sortedByDescending { it.dateAdded }
             _files.value = fileList.sortedByDescending { it.dateAdded }
 
-            Log.d(TAG, "Vault loaded: ${photoList.size} photos, ${videoList.size} videos, ${fileList.size} files (scanned $scannedCount messages)")
+            TeleflixLogger.log(TAG, "Vault loaded: ${photoList.size} photos, ${videoList.size} videos, ${fileList.size} files (scanned $scannedCount messages from chat $targetChatId)")
 
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load vault items", e)
+            TeleflixLogger.log(TAG, "Failed to load vault items: ${e.message}", isError = true)
         } finally {
             _isLoadingVault.value = false
         }
@@ -290,6 +298,71 @@ object TelegramRepository {
                     MediaType.PHOTO -> photoList.add(item)
                     MediaType.DOCUMENT -> fileList.add(item)
                 }
+            }
+            is TdApi.MessageAnimation -> {
+                val anim = content.animation
+                val caption = content.caption?.text.orEmpty().trim()
+                val animTitle = if (anim.fileName.isNotBlank()) anim.fileName else if (caption.isNotBlank()) caption else "GIF_${msg.date}.mp4"
+                videoList.add(
+                    VaultMediaItem(
+                        id = "anim_${msg.id}",
+                        title = animTitle,
+                        caption = caption,
+                        sizeBytes = anim.animation.size.toLong(),
+                        formattedSize = formatSize(anim.animation.size.toLong()),
+                        mimeType = anim.mimeType.ifBlank { "video/mp4" },
+                        type = MediaType.VIDEO,
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        fileId = anim.animation.id,
+                        thumbnailFileId = anim.thumbnail?.file?.id ?: 0,
+                        dateAdded = msg.date.toLong(),
+                        durationSeconds = anim.duration
+                    )
+                )
+            }
+            is TdApi.MessageAudio -> {
+                val audio = content.audio
+                val caption = content.caption?.text.orEmpty().trim()
+                val audioTitle = if (audio.fileName.isNotBlank()) audio.fileName else if (audio.title.isNotBlank()) audio.title else "Audio_${msg.date}.mp3"
+                fileList.add(
+                    VaultMediaItem(
+                        id = "audio_${msg.id}",
+                        title = audioTitle,
+                        caption = caption,
+                        sizeBytes = audio.audio.size.toLong(),
+                        formattedSize = formatSize(audio.audio.size.toLong()),
+                        mimeType = audio.mimeType.ifBlank { "audio/mpeg" },
+                        type = MediaType.DOCUMENT,
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        fileId = audio.audio.id,
+                        thumbnailFileId = audio.albumCoverThumbnail?.file?.id ?: 0,
+                        dateAdded = msg.date.toLong(),
+                        durationSeconds = audio.duration
+                    )
+                )
+            }
+            is TdApi.MessageVoiceNote -> {
+                val voice = content.voiceNote
+                val caption = content.caption?.text.orEmpty().trim()
+                fileList.add(
+                    VaultMediaItem(
+                        id = "voice_${msg.id}",
+                        title = if (caption.isNotBlank()) caption else "Voice_${msg.date}.ogg",
+                        caption = caption,
+                        sizeBytes = voice.voice.size.toLong(),
+                        formattedSize = formatSize(voice.voice.size.toLong()),
+                        mimeType = voice.mimeType.ifBlank { "audio/ogg" },
+                        type = MediaType.DOCUMENT,
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        fileId = voice.voice.id,
+                        thumbnailFileId = 0,
+                        dateAdded = msg.date.toLong(),
+                        durationSeconds = voice.duration
+                    )
+                )
             }
         }
     }
@@ -543,13 +616,41 @@ object TelegramRepository {
         }
     }
 
-    private suspend fun getSavedMessagesChatId(): Long? {
+    private var cachedSavedMessagesChatId: Long? = null
+
+    suspend fun getSavedMessagesChatId(): Long? {
+        if (cachedSavedMessagesChatId != null && cachedSavedMessagesChatId != 0L) {
+            return cachedSavedMessagesChatId
+        }
         return try {
-            val me = TelegramClient.sendRequest(TdApi.GetMe()) as TdApi.User
-            val chat = TelegramClient.sendRequest(TdApi.CreatePrivateChat(me.id, false)) as TdApi.Chat
-            chat.id
+            val me = TelegramClient.sendRequest(TdApi.GetMe()) as? TdApi.User
+            if (me != null) {
+                val myUserId = me.id
+                var resolvedChatId = myUserId
+                try {
+                    val chat = TelegramClient.sendRequest(TdApi.CreatePrivateChat(myUserId, false)) as? TdApi.Chat
+                    if (chat != null && chat.id != 0L) {
+                        resolvedChatId = chat.id
+                    }
+                } catch (e: Throwable) {
+                    try {
+                        val chat = TelegramClient.sendRequest(TdApi.GetChat(myUserId)) as? TdApi.Chat
+                        if (chat != null && chat.id != 0L) {
+                            resolvedChatId = chat.id
+                        }
+                    } catch (_: Throwable) {
+                        // fallback to myUserId
+                    }
+                }
+                cachedSavedMessagesChatId = resolvedChatId
+                TeleflixLogger.log(TAG, "Resolved Saved Messages chat ID: $resolvedChatId (myUserId=$myUserId)")
+                resolvedChatId
+            } else {
+                TeleflixLogger.log(TAG, "GetMe returned non-user or null", isError = true)
+                null
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to resolve Saved Messages chat ID", e)
+            TeleflixLogger.log(TAG, "Failed to resolve Saved Messages chat ID: ${e.message}", isError = true)
             null
         }
     }
