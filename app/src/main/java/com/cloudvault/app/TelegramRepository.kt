@@ -248,18 +248,32 @@ object TelegramRepository {
         val inputFile = TdApi.InputFileLocal(localPath)
         val formattedCaption = TdApi.FormattedText(captionText, emptyArray())
 
-        val inputContent: TdApi.InputMessageContent = when (mediaType) {
+        var actualMediaType = mediaType
+        var photoWidth = 0
+        var photoHeight = 0
+        
+        if (actualMediaType == MediaType.PHOTO) {
+            try {
+                val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(localPath, options)
+                photoWidth = options.outWidth
+                photoHeight = options.outHeight
+                
+                if (totalFileSize > 10485760L || photoWidth + photoHeight > 10000 || photoWidth > 10000 || photoHeight > 10000) {
+                    actualMediaType = MediaType.DOCUMENT
+                    TeleflixLogger.log(TAG, "Photo exceeds Telegram limits (size: $totalFileSize, dim: ${photoWidth}x${photoHeight}), sending as document")
+                }
+            } catch (e: Throwable) {
+                Log.w(TAG, "Could not decode photo bounds", e)
+            }
+        }
+
+        val inputContent: TdApi.InputMessageContent = when (actualMediaType) {
             MediaType.PHOTO -> TdApi.InputMessagePhoto().apply {
                 val inputPhoto = TdApi.InputPhoto().apply {
                     photo = inputFile
-                    try {
-                        val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                        android.graphics.BitmapFactory.decodeFile(localPath, options)
-                        width = options.outWidth
-                        height = options.outHeight
-                    } catch (e: Throwable) {
-                        Log.w(TAG, "Could not decode photo bounds", e)
-                    }
+                    width = photoWidth
+                    height = photoHeight
                 }
                 photo = inputPhoto
                 caption = formattedCaption
