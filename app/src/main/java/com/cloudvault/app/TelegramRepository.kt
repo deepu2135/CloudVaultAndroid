@@ -110,7 +110,7 @@ object TelegramRepository {
             var fromMessageId = 0L
             var consecutiveEmptyBatches = 0
             val batchSize = 100
-            val maxMessagesToScan = 20000
+            val maxMessagesToScan = 50000
 
             var scannedCount = 0
             while (scannedCount < maxMessagesToScan) {
@@ -124,31 +124,38 @@ object TelegramRepository {
                 }
 
                 if (history == null || history.messages.isEmpty()) {
-                    // If initial fetch is empty, TDLib might still be downloading history from Telegram servers.
-                    // Wait and retry up to 5 times.
-                    if (scannedCount == 0 && consecutiveEmptyBatches < 5) {
-                        consecutiveEmptyBatches++
-                        kotlinx.coroutines.delay(350L)
+                    consecutiveEmptyBatches++
+                    if (consecutiveEmptyBatches < 4) {
+                        kotlinx.coroutines.delay(300L)
                         continue
                     }
+                    // End of history reached
                     break
-                } else {
-                    consecutiveEmptyBatches = 0
-                    for (msg in history.messages) {
-                        if (seenMessageIds.add(msg.id)) {
-                            parseAndClassifyMessage(msg, photoList, videoList, fileList)
-                        }
-                    }
-                    scannedCount += history.messages.size
-                    fromMessageId = history.messages.last().id
+                }
 
-                    if (history.messages.size < batchSize) {
-                        break
+                consecutiveEmptyBatches = 0
+                for (msg in history.messages) {
+                    if (seenMessageIds.add(msg.id)) {
+                        parseAndClassifyMessage(msg, photoList, videoList, fileList)
                     }
+                }
+                scannedCount += history.messages.size
+                val lastId = history.messages.last().id
+                if (lastId == fromMessageId) {
+                    // Prevent infinite loop if ID didn't change
+                    break
+                }
+                fromMessageId = lastId
+
+                // Progressively update UI state flows as batches load
+                if (scannedCount % 200 == 0 || scannedCount <= 100) {
+                    _photos.value = photoList.sortedByDescending { it.dateAdded }
+                    _videos.value = videoList.sortedByDescending { it.dateAdded }
+                    _files.value = fileList.sortedByDescending { it.dateAdded }
                 }
             }
 
-            // Always update state flows with loaded media
+            // Final state flow update
             _photos.value = photoList.sortedByDescending { it.dateAdded }
             _videos.value = videoList.sortedByDescending { it.dateAdded }
             _files.value = fileList.sortedByDescending { it.dateAdded }
@@ -368,6 +375,26 @@ object TelegramRepository {
                         thumbnailFileId = 0,
                         dateAdded = msg.date.toLong(),
                         durationSeconds = voice.duration
+                    )
+                )
+            }
+            is TdApi.MessageVideoNote -> {
+                val videoNote = content.videoNote
+                videoList.add(
+                    VaultMediaItem(
+                        id = "videonote_${msg.id}",
+                        title = "VideoNote_${msg.date}.mp4",
+                        caption = "",
+                        sizeBytes = videoNote.video.size.toLong(),
+                        formattedSize = formatSize(videoNote.video.size.toLong()),
+                        mimeType = "video/mp4",
+                        type = MediaType.VIDEO,
+                        chatId = msg.chatId,
+                        messageId = msg.id,
+                        fileId = videoNote.video.id,
+                        thumbnailFileId = videoNote.thumbnail?.file?.id ?: 0,
+                        dateAdded = msg.date.toLong(),
+                        durationSeconds = videoNote.duration
                     )
                 )
             }
