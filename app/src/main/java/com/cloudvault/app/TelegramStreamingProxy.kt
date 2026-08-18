@@ -138,15 +138,15 @@ object TelegramStreamingProxy {
         }
     }
 
-    private suspend fun triggerTdlibDownload(fileId: Int, offset: Long, limit: Long, force: Boolean = false) {
+    private suspend fun triggerTdlibDownload(fileId: Int, offset: Long, limit: Long = 0L, force: Boolean = false) {
         val now = System.currentTimeMillis()
         val lastOffset = lastDownloadRequestOffset[fileId]
         val lastTime = lastDownloadRequestTime[fileId] ?: 0L
 
-        val isOffsetJump = lastOffset != null && Math.abs(offset - lastOffset) > 1_000_000L
+        val isOffsetJump = lastOffset != null && Math.abs(offset - lastOffset) > 500_000L
 
-        // Strict rate limit: never issue DownloadFile for the exact same offset more than once per 2,000ms unless forced
-        if (!force && !isOffsetJump && lastOffset == offset && (now - lastTime) < 2000L) {
+        // Strict rate limit: do NOT re-issue DownloadFile for the exact same offset within 8,000ms unless forced or seeking
+        if (!force && !isOffsetJump && lastOffset == offset && (now - lastTime) < 8000L) {
             return
         }
 
@@ -159,13 +159,13 @@ object TelegramStreamingProxy {
                     req.fileId = fileId
                     req.priority = DOWNLOAD_PRIORITY
                     req.offset = offset
-                    req.limit = if (limit > 0L) limit else 0L
+                    req.limit = 0L // 0 means continuous uninterrupted stream to end of file
                     req.synchronous = false
                 })
                 if (res is TdApi.Error) {
-                    TeleflixLogger.log(TAG, "[TDLib Error] DownloadFile fileId=$fileId offset=$offset limit=$limit: code=${res.code} message=${res.message}", isError = true)
+                    TeleflixLogger.log(TAG, "[TDLib Error] DownloadFile fileId=$fileId offset=$offset: code=${res.code} message=${res.message}", isError = true)
                 } else {
-                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset limit=$limit force=$force jump=$isOffsetJump")
+                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset force=$force jump=$isOffsetJump")
                 }
             } catch (e: Exception) {
                 TeleflixLogger.log(TAG, "[TDLib Exception] DownloadFile fileId=$fileId: ${e.message}", isError = true)
@@ -1439,14 +1439,9 @@ object TelegramStreamingProxy {
             while (attempts < 2000 && running) {
                 activeFileId = resolveFileId(activeFileId)
                 val readRes = try {
-                    val lockStart = System.currentTimeMillis()
-                    getFileMutex(activeFileId).withLock {
-                        val waitMs = System.currentTimeMillis() - lockStart
-                        metrics?.totalQueueWaitMs = (metrics?.totalQueueWaitMs ?: 0L) + waitMs
-                        TelegramClient.sendRequest(
-                            TdApi.ReadFilePart(activeFileId, offset, limit.toLong())
-                        )
-                    }
+                    TelegramClient.sendRequest(
+                        TdApi.ReadFilePart(activeFileId, offset, limit.toLong())
+                    )
                 } catch (e: Exception) {
                     null
                 }
@@ -1455,12 +1450,10 @@ object TelegramStreamingProxy {
                     val tdlibMs = System.currentTimeMillis() - chunkStartMs
                     metrics?.chunksOk = (metrics?.chunksOk ?: 0) + 1
                     val count = metrics?.chunksOk ?: 1
-                    if (tdlibMs > 500L || count % 5 == 0 || count == 1) {
+                    if (tdlibMs > 500L || count % 10 == 0 || count == 1) {
                         TeleflixLogger.log(TAG, "[TDLib] chunk #$count fileId=$activeFileId offset=$offset size=${readRes.data.size} tdlibMs=$tdlibMs status=ok")
                     }
                     return@withTimeoutOrNull readRes.data
-                } else if (readRes is TdApi.Error && (attempts == 0 || attempts % 100 == 0)) {
-                    TeleflixLogger.log(TAG, "[TDLib ReadFilePart Error] fileId=$activeFileId offset=$offset: code=${readRes.code} msg=${readRes.message}", isError = true)
                 }
                 
                 val file = try {
@@ -1494,15 +1487,6 @@ object TelegramStreamingProxy {
                     return@withTimeoutOrNull null
                 }
 
-                if (consecutiveGetFileErrors >= 200 && attempts >= 200) {
-                    TeleflixLogger.log(TAG, "fileId=$activeFileId invalid or not found in TDLib after ${attempts + 1} attempts, failing fast", isError = true)
-                    isFileNotFound = true
-                    if (metrics != null) {
-                        metrics.exitReason = "file_not_found"
-                    }
-                    return@withTimeoutOrNull null
-                }
-
                 if (file?.local?.isDownloadingCompleted == true) {
                     val localFileExists = !file.local.path.isNullOrBlank() && java.io.File(file.local.path).exists()
                     if (localFileExists) {
@@ -1513,8 +1497,6 @@ object TelegramStreamingProxy {
                             return@withTimeoutOrNull finalData.data
                         }
                     } else {
-                        // The local file on device storage was deleted (e.g. by user to free local space).
-                        // Tell TDLib to reset its local cache record so it can stream the file chunks from Telegram Cloud!
                         if (attempts == 0) {
                             TeleflixLogger.log(TAG, "Local file for fileId=$activeFileId missing from disk, resetting local state via DeleteFile to stream from Telegram Cloud")
                             runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(activeFileId)) }
@@ -1522,43 +1504,16 @@ object TelegramStreamingProxy {
                     }
                 }
 
-                // Check if download is active
-                val isDownloading = file?.local?.isDownloadingActive == true
-
-                // Pre-warm / refresh message if TDLib is not actively downloading
-                if ((attempts == 0 || !isDownloading) && fileMsgRef != null) {
-                    val refreshed = refreshFileId(activeFileId)
+                // If stall detected after 100 attempts (5 full seconds of no data), refresh message & re-elevate TDLib priority
+                val isStalled = attempts >= 100 && attempts % 100 == 0
+                if (isStalled) {
+                    metrics?.chunksRetried = (metrics?.chunksRetried ?: 0) + 1
+                    TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Refreshing message location and elevating TDLib priority...")
+                    val refreshed = refreshFileId(activeFileId, force = true)
                     if (refreshed != null && refreshed != 0) {
                         activeFileId = refreshed
                     }
-                }
-
-                val isStalled = attempts >= 100 && attempts % 100 == 0
-                // Re-trigger DownloadFile on attempt 0, or on periodic check
-                if (attempts == 0 || attempts % 40 == 0 || isStalled || (!isDownloading && attempts % 10 == 0)) {
-                    metrics?.chunksRetried = (metrics?.chunksRetried ?: 0) + 1
-                    val fileInfo = getFileInfo(activeFileId)
-                    val totalSize = fileInfo?.second?.takeIf { it > 0 } ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
-                    val alignedOffset = offset - (offset % (1024 * 1024))
-                    val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, prefetchSizeMb, limit)
-
-                    if (isStalled) {
-                        TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Refreshing message location and elevating TDLib priority...")
-                        val refreshed = refreshFileId(activeFileId, force = true)
-                        if (refreshed != null && refreshed != 0) {
-                            activeFileId = refreshed
-                        }
-                        lastDownloadRequestOffset.remove(activeFileId)
-                        lastDownloadRequestTime.remove(activeFileId)
-                        lastDownloadRequestOffset.remove(fileId)
-                        lastDownloadRequestTime.remove(fileId)
-                    }
-
-                    val forceRequest = (attempts == 0 || isStalled)
-                    triggerTdlibDownload(activeFileId, alignedOffset, safeLimit, force = forceRequest)
-
-                    val winEnd = if (safeLimit == 0L) Long.MAX_VALUE else alignedOffset + safeLimit
-                    activeDownloadWindows[activeFileId] = Pair(alignedOffset, winEnd)
+                    triggerTdlibDownload(activeFileId, offset, force = true)
                 }
                 
                 delay(50L)
