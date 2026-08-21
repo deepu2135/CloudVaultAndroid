@@ -586,6 +586,10 @@ class VlcPlayerActivity : AppCompatActivity() {
                                         val formatted = formatTime(target)
                                         showGestureHud("⏱️", "Resumed from $formatted", -1)
                                         Toast.makeText(this@VlcPlayerActivity, "Resumed playback from $formatted", Toast.LENGTH_SHORT).show()
+                                    } else if (length > 0L) {
+                                        pendingResumePos = 0L
+                                        hasResumedPosition = true
+                                        PlayerPreferences.clearPlaybackPosition(this@VlcPlayerActivity, currentFileId)
                                     }
                                 }
 

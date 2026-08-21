@@ -145,7 +145,7 @@ object TelegramStreamingProxy {
         }
     }
 
-    private suspend fun triggerTdlibDownload(fileId: Int, offset: Long, limit: Long = 0L, force: Boolean = false) {
+    private suspend fun triggerTdlibDownload(fileId: Int, offset: Long, limit: Long = 0L, force: Boolean = false, priority: Int = DOWNLOAD_PRIORITY) {
         val now = System.currentTimeMillis()
         val lastOffset = lastDownloadRequestOffset[fileId]
         val lastTime = lastDownloadRequestTime[fileId] ?: 0L
@@ -164,7 +164,7 @@ object TelegramStreamingProxy {
             try {
                 val res = TelegramClient.sendRequest(TdApi.DownloadFile().also { req ->
                     req.fileId = fileId
-                    req.priority = DOWNLOAD_PRIORITY
+                    req.priority = priority
                     req.offset = offset
                     req.limit = limit
                     req.synchronous = false
@@ -172,7 +172,7 @@ object TelegramStreamingProxy {
                 if (res is TdApi.Error) {
                     TeleflixLogger.log(TAG, "[TDLib Error] DownloadFile fileId=$fileId offset=$offset limit=$limit: code=${res.code} message=${res.message}", isError = true)
                 } else {
-                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset limit=$limit force=$force jump=$isOffsetJump")
+                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset limit=$limit force=$force jump=$isOffsetJump priority=$priority")
                 }
             } catch (e: Exception) {
                 TeleflixLogger.log(TAG, "[TDLib Exception] DownloadFile fileId=$fileId: ${e.message}", isError = true)
@@ -518,18 +518,20 @@ object TelegramStreamingProxy {
             }
 
             var activeDownloadEnd = -1L
+            val isNormalOrSeek = (m.requestType == "normal_stream" || m.requestType == "seek_stream")
 
             var offset = start
             while (offset <= end && running) {
                 val chunkSize = minOf(CHUNK_SIZE.toLong(), end - offset + 1).toInt()
                 val alignedOffset = offset - (offset % (1024 * 1024))
-                // Fast-start: request 4MB prefetch for initial chunks for instant playback, then 32MB continuous buffer
+                // Fast-start: request 4MB prefetch for initial chunks for instant playback, then continuous buffer
                 val currentPrefetch = if (m.chunksOk < 2) minOf(4L, prefetchSizeMb) else prefetchSizeMb
                 val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, currentPrefetch, chunkSize)
 
                 if (activeDownloadEnd < 0L || offset >= activeDownloadEnd - maxOf(CHUNK_SIZE.toLong(), safeLimit / 4)) {
                     val isFirstTrigger = activeDownloadEnd < 0L
-                    triggerTdlibDownload(fileId, alignedOffset, safeLimit, force = isFirstTrigger)
+                    val p = if (m.requestType == "seek_probe") 32 else DOWNLOAD_PRIORITY
+                    triggerTdlibDownload(fileId, alignedOffset, safeLimit, force = isFirstTrigger, priority = p)
                     activeDownloadEnd = if (safeLimit == 0L) totalSize else alignedOffset + safeLimit
                     activeDownloadWindows[fileId] = Pair(alignedOffset, activeDownloadEnd)
                 }
@@ -547,6 +549,11 @@ object TelegramStreamingProxy {
                     offset += bytes.size
                     m.totalBytesServed += bytes.size
                     m.chunksOk++
+
+                    // For large video files (>20MB), throttle socket bursts after fast-start (first 4MB) to prevent LibVLC demuxer queue overruns
+                    if (isNormalOrSeek && totalSize > 20_000_000L && m.chunksOk > 8) {
+                        delay(12L) // ~40 MB/s max socket throughput (8x real-time 1080p bitrate)
+                    }
                 } catch (e: Exception) {
                     m.exitReason = "client_disconnect"
                     break

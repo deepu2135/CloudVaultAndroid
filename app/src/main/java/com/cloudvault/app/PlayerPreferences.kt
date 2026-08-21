@@ -72,14 +72,17 @@ object PlayerPreferences {
         val savedDur = prefs.getLong("dur_$fileId", 0L)
         val effectiveDur = if (durationMs > 0L) durationMs else savedDur
 
-        if (pos < 5000L) {
+        // Discard invalid / legacy positions (less than 5s, greater than 24h, or duration unknown)
+        if (pos < 5000L || pos > 86_400_000L) {
+            clearPlaybackPosition(context, fileId)
             return 0L
         }
-        if (effectiveDur > 0L) {
-            if (pos >= effectiveDur - 10000L || (pos.toFloat() / effectiveDur.toFloat()) >= 0.90f) {
-                clearPlaybackPosition(context, fileId)
-                return 0L
-            }
+        if (effectiveDur <= 0L) {
+            return 0L
+        }
+        if (pos >= effectiveDur - 10000L || (pos.toFloat() / effectiveDur.toFloat()) >= 0.90f) {
+            clearPlaybackPosition(context, fileId)
+            return 0L
         }
         return pos
     }
