@@ -45,6 +45,163 @@ object CacheManager {
             .edit().putLong(KEY_MAX_CACHE_MB, mb).apply()
     }
 
+    enum class FileCategory {
+        VIDEO,
+        DOCUMENT,
+        PHOTO,
+        OTHER
+    }
+
+    private fun readHeaderBytes(file: File): ByteArray? {
+        return try {
+            java.io.FileInputStream(file).use { input ->
+                val buffer = ByteArray(16)
+                val read = input.read(buffer)
+                if (read > 0) buffer.copyOf(read) else null
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun detectCategoryFromHeader(bytes: ByteArray): FileCategory? {
+        if (bytes.size < 4) return null
+
+        // JPEG: FF D8 FF
+        if (bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() && bytes[2] == 0xFF.toByte()) {
+            return FileCategory.PHOTO
+        }
+        // PNG: 89 50 4E 47
+        if (bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() && bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte()) {
+            return FileCategory.PHOTO
+        }
+        // GIF: 47 49 46 ('GIF')
+        if (bytes[0] == 0x47.toByte() && bytes[1] == 0x49.toByte() && bytes[2] == 0x46.toByte()) {
+            return FileCategory.PHOTO
+        }
+        // BMP: 42 4D ('BM')
+        if (bytes[0] == 0x42.toByte() && bytes[1] == 0x4D.toByte()) {
+            return FileCategory.PHOTO
+        }
+        // WebP / AVI / WAV: RIFF ...
+        if (bytes.size >= 12 && bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() && bytes[2] == 0x46.toByte() && bytes[3] == 0x46.toByte()) {
+            val isWebp = bytes[8] == 0x57.toByte() && bytes[9] == 0x45.toByte() && bytes[10] == 0x42.toByte() && bytes[11] == 0x50.toByte()
+            val isAvi = bytes[8] == 0x41.toByte() && bytes[9] == 0x56.toByte() && bytes[10] == 0x49.toByte()
+            val isWave = bytes[8] == 0x57.toByte() && bytes[9] == 0x41.toByte() && bytes[10] == 0x56.toByte() && bytes[11] == 0x45.toByte()
+            if (isWebp) return FileCategory.PHOTO
+            if (isAvi) return FileCategory.VIDEO
+            if (isWave) return FileCategory.DOCUMENT
+        }
+        // Matroska / WebM: 1A 45 DF A3
+        if (bytes[0] == 0x1A.toByte() && bytes[1] == 0x45.toByte() && bytes[2] == 0xDF.toByte() && bytes[3] == 0xA3.toByte()) {
+            return FileCategory.VIDEO
+        }
+        // MP4 / MOV / HEIF: bytes 4..7 == 'ftyp'
+        if (bytes.size >= 8 && bytes[4] == 0x66.toByte() && bytes[5] == 0x74.toByte() && bytes[6] == 0x79.toByte() && bytes[7] == 0x70.toByte()) {
+            if (bytes.size >= 12) {
+                val brand = String(bytes, 8, 4, java.nio.charset.StandardCharsets.US_ASCII).lowercase()
+                if (brand.startsWith("heic") || brand.startsWith("mif1") || brand.startsWith("msf1") || brand.startsWith("hevc")) {
+                    return FileCategory.PHOTO
+                }
+            }
+            return FileCategory.VIDEO
+        }
+        // PDF: %PDF (25 50 44 46)
+        if (bytes[0] == 0x25.toByte() && bytes[1] == 0x50.toByte() && bytes[2] == 0x44.toByte() && bytes[3] == 0x46.toByte()) {
+            return FileCategory.DOCUMENT
+        }
+        // ZIP / APK / Office XML: PK.. (50 4B 03 04)
+        if (bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() && bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()) {
+            return FileCategory.DOCUMENT
+        }
+        // ID3 (MP3): 49 44 33
+        if (bytes[0] == 0x49.toByte() && bytes[1] == 0x44.toByte() && bytes[2] == 0x33.toByte()) {
+            return FileCategory.DOCUMENT
+        }
+        // OGG: OggS (4F 67 67 53)
+        if (bytes[0] == 0x4F.toByte() && bytes[1] == 0x67.toByte() && bytes[2] == 0x67.toByte() && bytes[3] == 0x53.toByte()) {
+            return FileCategory.DOCUMENT
+        }
+        // FLAC: fLaC (66 4C 61 43)
+        if (bytes[0] == 0x66.toByte() && bytes[1] == 0x4C.toByte() && bytes[2] == 0x61.toByte() && bytes[3] == 0x43.toByte()) {
+            return FileCategory.DOCUMENT
+        }
+
+        return null
+    }
+
+    private fun detectFileCategory(file: File): FileCategory {
+        val path = file.absolutePath.lowercase()
+        val name = file.name.lowercase()
+
+        // 1. Folder path based classification (highest confidence from TDLib directory structure)
+        if (path.contains("/photos/") || path.contains("/thumbnails/") || path.contains("/thumbs/") ||
+            path.contains("/profile_photos/") || path.contains("/wallpapers/") ||
+            path.contains("/autobackup_compressed/")
+        ) {
+            return FileCategory.PHOTO
+        }
+
+        if (path.contains("/videos/") || path.contains("/video_notes/") ||
+            path.contains("/video_stories/") || path.contains("/live_photos/")
+        ) {
+            return FileCategory.VIDEO
+        }
+
+        if (path.contains("/documents/") || path.contains("/voice/") || path.contains("/music/") ||
+            path.contains("/audios/")
+        ) {
+            return FileCategory.DOCUMENT
+        }
+
+        // 2. Extension based classification
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") ||
+            name.endsWith(".webp") || name.endsWith(".heic") || name.endsWith(".heif") ||
+            name.endsWith(".bmp") || name.endsWith(".gif") || name.endsWith(".svg") ||
+            name.endsWith(".ico") || name.endsWith(".jfif") || name.endsWith(".tif") ||
+            name.endsWith(".tiff") || name.endsWith(".raw") || name.endsWith(".dng") ||
+            name.startsWith("thumb_") || name.startsWith("photo_") || name.startsWith("img_") ||
+            name.startsWith("opt_") || name.startsWith("avatar_")
+        ) {
+            return FileCategory.PHOTO
+        }
+
+        if (name.endsWith(".mp4") || name.endsWith(".mkv") || name.endsWith(".webm") ||
+            name.endsWith(".mov") || name.endsWith(".avi") || name.endsWith(".ts") ||
+            name.endsWith(".3gp") || name.endsWith(".wmv") || name.endsWith(".m4v") ||
+            name.endsWith(".flv") || name.endsWith(".m2ts") || name.startsWith("vid_") ||
+            name.startsWith("video_")
+        ) {
+            return FileCategory.VIDEO
+        }
+
+        if (name.endsWith(".pdf") || name.endsWith(".doc") || name.endsWith(".docx") ||
+            name.endsWith(".xls") || name.endsWith(".xlsx") || name.endsWith(".ppt") ||
+            name.endsWith(".pptx") || name.endsWith(".txt") || name.endsWith(".rtf") ||
+            name.endsWith(".csv") || name.endsWith(".zip") || name.endsWith(".rar") ||
+            name.endsWith(".7z") || name.endsWith(".tar") || name.endsWith(".gz") ||
+            name.endsWith(".bz2") || name.endsWith(".xz") || name.endsWith(".apk") ||
+            name.endsWith(".xapk") || name.endsWith(".apkm") || name.endsWith(".mp3") ||
+            name.endsWith(".wav") || name.endsWith(".ogg") || name.endsWith(".flac") ||
+            name.endsWith(".aac") || name.endsWith(".m4a") || name.endsWith(".wma") ||
+            name.endsWith(".amr") || name.endsWith(".opus") || name.endsWith(".plugin") ||
+            name.endsWith(".iso") || name.endsWith(".exe") || name.endsWith(".dmg")
+        ) {
+            return FileCategory.DOCUMENT
+        }
+
+        // 3. Magic Header Sniffing for extensionless or temp files (e.g. in tdlib_files/temp/ or uploads/)
+        if (file.length() >= 4) {
+            val header = readHeaderBytes(file)
+            if (header != null && header.isNotEmpty()) {
+                val magicCat = detectCategoryFromHeader(header)
+                if (magicCat != null) return magicCat
+            }
+        }
+
+        return FileCategory.OTHER
+    }
+
     suspend fun calculateCacheStats(context: Context): CacheStats = withContext(Dispatchers.IO) {
         var videoBytes = 0L
         var documentBytes = 0L
@@ -56,45 +213,14 @@ object CacheManager {
             val length = file.length()
             if (length <= 0L) return
 
-            val path = file.absolutePath.lowercase()
-            val name = file.name.lowercase()
+            // Never include permanent TDLib auth/chat database in clearable cache calculations
+            if (file.absolutePath.contains("tdlib_db")) return
 
-            when {
-                // Videos
-                path.contains("/videos/") || path.contains("/video_notes/") ||
-                        name.endsWith(".mp4") || name.endsWith(".mkv") || name.endsWith(".webm") ||
-                        name.endsWith(".mov") || name.endsWith(".avi") || name.endsWith(".ts") ||
-                        name.endsWith(".3gp") || name.endsWith(".wmv") || name.endsWith(".m4v") ||
-                        name.endsWith(".flv") || name.endsWith(".m2ts") -> {
-                    videoBytes += length
-                }
-
-                // Photos & Thumbnails
-                path.contains("/photos/") || path.contains("/thumbnails/") || path.contains("/thumbs/") ||
-                        path.contains("/profile_photos/") ||
-                        name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") ||
-                        name.endsWith(".webp") || name.endsWith(".heic") || name.endsWith(".bmp") ||
-                        name.endsWith(".gif") -> {
-                    photoBytes += length
-                }
-
-                // Documents & Audio & Archives
-                path.contains("/documents/") || path.contains("/voice/") || path.contains("/music/") ||
-                        name.endsWith(".pdf") || name.endsWith(".doc") || name.endsWith(".docx") ||
-                        name.endsWith(".xls") || name.endsWith(".xlsx") || name.endsWith(".ppt") ||
-                        name.endsWith(".pptx") || name.endsWith(".txt") || name.endsWith(".zip") ||
-                        name.endsWith(".rar") || name.endsWith(".7z") || name.endsWith(".tar") ||
-                        name.endsWith(".gz") || name.endsWith(".apk") || name.endsWith(".mp3") ||
-                        name.endsWith(".wav") || name.endsWith(".ogg") || name.endsWith(".flac") ||
-                        name.endsWith(".aac") || name.endsWith(".m4a") || name.endsWith(".plugin") ||
-                        name.endsWith(".iso") || name.endsWith(".exe") || (name.endsWith(".bin") && !path.contains("tdlib_db")) -> {
-                    documentBytes += length
-                }
-
-                // App Database, Cache, and Other internal files
-                else -> {
-                    otherBytes += length
-                }
+            when (detectFileCategory(file)) {
+                FileCategory.VIDEO -> videoBytes += length
+                FileCategory.DOCUMENT -> documentBytes += length
+                FileCategory.PHOTO -> photoBytes += length
+                FileCategory.OTHER -> otherBytes += length
             }
         }
 
@@ -126,11 +252,14 @@ object CacheManager {
         // Clean any leftover uploads and backup temp files before measuring
         purgeStaleTempUploads(File(context.cacheDir, "uploads"))
         purgeStaleTempUploads(File(context.cacheDir, "autobackup_temp"))
+        purgeStaleTempUploads(File(context.cacheDir, "autobackup_compressed"))
 
-        // Scan all app storage locations on device (each physical file is scanned exactly once)
+        // Scan all clearable app cache locations on device (excluding permanent database)
         scanDirectory(context.cacheDir)
         scanDirectory(context.externalCacheDir)
-        scanDirectory(context.filesDir)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            scanDirectory(context.codeCacheDir)
+        }
 
         val totalCache = videoBytes + documentBytes + photoBytes + otherBytes
 
@@ -243,9 +372,9 @@ object CacheManager {
             for (file in files) {
                 if (file.isDirectory) {
                     val dirName = file.name.lowercase()
-                    if ((clearVideos && (dirName == "videos" || dirName == "video_notes")) ||
-                        (clearPhotos && (dirName == "photos" || dirName == "thumbnails" || dirName == "thumbs" || dirName == "profile_photos")) ||
-                        (clearDocuments && (dirName == "documents" || dirName == "voice" || dirName == "music")) ||
+                    if ((clearVideos && (dirName == "videos" || dirName == "video_notes" || dirName == "video_stories")) ||
+                        (clearPhotos && (dirName == "photos" || dirName == "thumbnails" || dirName == "thumbs" || dirName == "profile_photos" || dirName == "wallpapers" || dirName == "autobackup_compressed")) ||
+                        (clearDocuments && (dirName == "documents" || dirName == "voice" || dirName == "music" || dirName == "audios")) ||
                         (clearOther && (dirName == "animations" || dirName == "stickers" || dirName == "temp" || dirName == "uploads" || dirName == "autobackup_temp"))
                     ) {
                         deleteDirContents(file)
@@ -253,17 +382,15 @@ object CacheManager {
                         cleanMatchingFiles(file)
                     }
                 } else {
-                    val path = file.absolutePath.lowercase()
-                    val name = file.name.lowercase()
-                    val isVideo = name.endsWith(".mp4") || name.endsWith(".mkv") || name.endsWith(".webm") || name.endsWith(".mov") || name.endsWith(".avi")
-                    val isPhoto = name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") || name.endsWith(".webp")
-                    val isDoc = name.endsWith(".pdf") || name.endsWith(".zip") || name.endsWith(".rar") || name.endsWith(".doc") || name.endsWith(".mp3")
-                    
-                    if ((clearVideos && isVideo) ||
-                        (clearPhotos && isPhoto) ||
-                        (clearDocuments && isDoc) ||
-                        (clearOther && !isVideo && !isPhoto && !isDoc && !path.contains("tdlib_db"))
-                    ) {
+                    if (file.absolutePath.contains("tdlib_db")) return
+                    val category = detectFileCategory(file)
+                    val shouldDelete = when (category) {
+                        FileCategory.VIDEO -> clearVideos
+                        FileCategory.DOCUMENT -> clearDocuments
+                        FileCategory.PHOTO -> clearPhotos
+                        FileCategory.OTHER -> clearOther
+                    }
+                    if (shouldDelete) {
                         try { file.delete() } catch (_: Throwable) {}
                     }
                 }
@@ -272,6 +399,9 @@ object CacheManager {
 
         cleanMatchingFiles(context.cacheDir)
         cleanMatchingFiles(context.externalCacheDir)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            cleanMatchingFiles(context.codeCacheDir)
+        }
 
         // Recalculate stats
         calculateCacheStats(context)
