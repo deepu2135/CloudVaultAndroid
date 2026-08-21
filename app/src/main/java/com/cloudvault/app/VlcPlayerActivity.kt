@@ -2,6 +2,7 @@ package com.cloudvault.app
 
 import android.app.PictureInPictureParams
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.media.AudioManager
 import android.net.Uri
@@ -68,6 +69,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private lateinit var ivPlayPauseIcon: ImageView
     private lateinit var btnVlcForward: ImageView
     private lateinit var btnVlcPip: ImageView
+    private lateinit var btnVlcRotate: ImageView
     private lateinit var btnVlcMore: ImageView
 
     private var libVLC: LibVLC? = null
@@ -84,6 +86,14 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     private var currentAspectIndex = 0
     private val aspectModes = arrayOf("Best Fit", "Zoom to Fill", "Stretch (Full)", "16:9", "4:3")
+
+    private var currentOrientationIndex = 0
+    private val orientationModes = arrayOf(
+        Pair("Landscape 🖥️", ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE),
+        Pair("Portrait 📱", ActivityInfo.SCREEN_ORIENTATION_PORTRAIT),
+        Pair("Reverse Landscape 🔄", ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE),
+        Pair("Auto Rotate 🌐", ActivityInfo.SCREEN_ORIENTATION_SENSOR)
+    )
 
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControlsRunnable = Runnable {
@@ -177,6 +187,7 @@ class VlcPlayerActivity : AppCompatActivity() {
         ivPlayPauseIcon = findViewById(R.id.ivPlayPauseIcon)
         btnVlcForward = findViewById(R.id.btnVlcForward)
         btnVlcPip = findViewById(R.id.btnVlcPip)
+        btnVlcRotate = findViewById(R.id.btnVlcRotate)
         btnVlcMore = findViewById(R.id.btnVlcMore)
     }
 
@@ -225,6 +236,11 @@ class VlcPlayerActivity : AppCompatActivity() {
 
         btnVlcPip.setOnClickListener {
             enterPipMode()
+        }
+
+        btnVlcRotate.setOnClickListener {
+            cycleScreenRotation()
+            scheduleControlsAutoHide()
         }
 
         btnVlcMore.setOnClickListener {
@@ -688,6 +704,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private fun showMoreOptionsDialog() {
         val options = arrayOf(
             "⏱️ Playback Speed (${speedLabels[currentSpeedIndex]})",
+            "🔄 Screen Rotation (${orientationModes[currentOrientationIndex].first})",
             "💬 Subtitles / Audio Tracks",
             "📐 Aspect Ratio (${aspectModes[currentAspectIndex]})",
             "⏩ Jump to Time",
@@ -701,13 +718,36 @@ class VlcPlayerActivity : AppCompatActivity() {
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> showSpeedDialog()
-                    1 -> showTrackSelectionDialog("Subtitles & Audio Tracks")
-                    2 -> cycleAspectRatio()
-                    3 -> showJumpToTimeDialog()
-                    4 -> showSleepTimerDialog()
-                    5 -> showAudioBoostDialog()
-                    6 -> enterPipMode()
+                    1 -> showRotationDialog()
+                    2 -> showTrackSelectionDialog("Subtitles & Audio Tracks")
+                    3 -> cycleAspectRatio()
+                    4 -> showJumpToTimeDialog()
+                    5 -> showSleepTimerDialog()
+                    6 -> showAudioBoostDialog()
+                    7 -> enterPipMode()
                 }
+            }
+            .show()
+    }
+
+    private fun cycleScreenRotation() {
+        currentOrientationIndex = (currentOrientationIndex + 1) % orientationModes.size
+        val (label, orientation) = orientationModes[currentOrientationIndex]
+        requestedOrientation = orientation
+        showGestureHud("🔄", label, -1)
+        Toast.makeText(this, "Orientation: $label", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showRotationDialog() {
+        val labels = orientationModes.map { it.first }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Screen Orientation / Rotation")
+            .setItems(labels) { _, which ->
+                currentOrientationIndex = which
+                val (label, orientation) = orientationModes[which]
+                requestedOrientation = orientation
+                showGestureHud("🔄", label, -1)
+                Toast.makeText(this, "Orientation: $label", Toast.LENGTH_SHORT).show()
             }
             .show()
     }
