@@ -1170,13 +1170,24 @@ object TelegramStreamingProxy {
     }
 
     fun clearStreamCache(fileId: Int) {
-        if (fileId <= 0 || DownloadManager.isFileIdActive(fileId)) return
-        activeFileJobs.remove("file_$fileId")?.cancel()
-        latestActiveStreamReqId.remove(fileId)
-        activeStreamRequests.remove(fileId)
-        activeDownloadWindows.remove(fileId)
+        if (fileId <= 0) return
+        val targetId = resolveFileId(fileId)
+        val fileIdsToClear = setOf(fileId, targetId).filter { it > 0 && !DownloadManager.isFileIdActive(it) }
+
+        fileIdsToClear.forEach { fId ->
+            activeFileJobs.remove("file_$fId")?.cancel()
+            latestActiveStreamReqId.remove(fId)
+            activeStreamRequests.remove(fId)
+            activeDownloadWindows.remove(fId)
+            lastDownloadRequestOffset.remove(fId)
+            lastDownloadRequestTime.remove(fId)
+        }
+
         scope.launch {
-            deleteFile(fileId)
+            fileIdsToClear.forEach { fId ->
+                deleteFile(fId)
+            }
+            TeleflixLogger.log(TAG, "Auto-cleared stream cache for fileId=$fileId (targetId=$targetId)")
         }
     }
 

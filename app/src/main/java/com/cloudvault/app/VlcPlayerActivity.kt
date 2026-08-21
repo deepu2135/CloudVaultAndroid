@@ -57,6 +57,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
     private var explicitDurationMs: Long = 0L
+    private var currentFileId: Int = 0
 
     private var isUserTracking = false
     private var isLocked = false
@@ -90,6 +91,7 @@ class VlcPlayerActivity : AppCompatActivity() {
         window.decorView.post { hideSystemUI() }
 
         val fileId = intent.getIntExtra("FILE_ID", 0)
+        currentFileId = fileId
         val title = intent.getStringExtra("TITLE") ?: "Video"
         val chatId = intent.getLongExtra("CHAT_ID", 0L)
         val messageId = intent.getLongExtra("MESSAGE_ID", 0L)
@@ -539,5 +541,10 @@ class VlcPlayerActivity : AppCompatActivity() {
         }
         mediaPlayer = null
         libVLC = null
+
+        // Auto-clear cache for streamed audio & video after exiting the player
+        if (currentFileId != 0) {
+            TelegramStreamingProxy.clearStreamCache(currentFileId)
+        }
     }
 }
