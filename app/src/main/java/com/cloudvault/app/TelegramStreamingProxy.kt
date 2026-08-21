@@ -26,7 +26,8 @@ object TelegramStreamingProxy {
     fun setPrefetchMb(mb: Long) {
         prefetchSizeMb = mb.coerceIn(4L, 512L)
     }
-    private const val DOWNLOAD_TIMEOUT_MS = 60_000L
+
+    private const val DOWNLOAD_TIMEOUT_MS = 30_000L
     private const val DOWNLOAD_PRIORITY = 32              // max TDLib priority
     private const val POLL_INTERVAL_MS = 100L
 
@@ -35,6 +36,7 @@ object TelegramStreamingProxy {
     private var serverSocket: ServerSocket? = null
     @Volatile private var running = false
     private val activeStreamRequests = java.util.concurrent.ConcurrentHashMap<Int, MutableSet<String>>()
+    private val activeSeekProbes = java.util.concurrent.ConcurrentHashMap<Int, Int>()
     private val latestActiveStreamReqId = java.util.concurrent.ConcurrentHashMap<Int, String>()
     private val activeFileJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
     private val activeDownloadWindows = java.util.concurrent.ConcurrentHashMap<Int, Pair<Long, Long>>()
@@ -50,7 +52,85 @@ object TelegramStreamingProxy {
     private fun getFileMutex(fileId: Int): Mutex = fileMutexes.getOrPut(fileId) { Mutex() }
     private val fileToMessageMap = java.util.concurrent.ConcurrentHashMap<Int, Pair<Long, Long>>()
     private val fileIdTranslationMap = java.util.concurrent.ConcurrentHashMap<Int, Int>()
+    private val zipCompressionCache = java.util.concurrent.ConcurrentHashMap<Int, Int>()
     @Volatile private var lastStreamedFileId: Int? = null
+
+    fun getCachedZipCompression(fileId: Int): Int? = zipCompressionCache[fileId]
+
+    fun setCachedZipCompression(fileId: Int, method: Int) {
+        zipCompressionCache[fileId] = method
+    }
+
+    suspend fun probeZipCompression(fileIds: List<Int>, sizes: List<Long>): Int? {
+        val firstFileId = fileIds.firstOrNull() ?: return null
+        val cached = zipCompressionCache[firstFileId]
+        if (cached != null) return cached
+
+        return withContext(Dispatchers.IO) {
+            try {
+                withTimeoutOrNull(3000L) {
+                    val header = readBufferFromMerged(fileIds, sizes, 0L, 40)
+                    if (header != null && header.size >= 4) {
+                        val hex = header.take(4).joinToString(" ") { "%02X".format(it) }
+                        var method: Int? = null
+
+                        // 1. Standard ZIP Local File Header
+                        if (header.size >= 30 &&
+                            header[0] == 0x50.toByte() && header[1] == 0x4B.toByte() &&
+                            header[2] == 0x03.toByte() && header[3] == 0x04.toByte()
+                        ) {
+                            method = (header[8].toInt() and 0xFF) or ((header[9].toInt() and 0xFF) shl 8)
+                        }
+                        // 2. Split ZIP Span Marker (PK 07 08) followed by Local Header (PK 03 04)
+                        else if (header.size >= 34 &&
+                            header[0] == 0x50.toByte() && header[1] == 0x4B.toByte() &&
+                            header[2] == 0x07.toByte() && header[3] == 0x08.toByte() &&
+                            header[4] == 0x50.toByte() && header[5] == 0x4B.toByte() &&
+                            header[6] == 0x03.toByte() && header[7] == 0x04.toByte()
+                        ) {
+                            method = (header[12].toInt() and 0xFF) or ((header[13].toInt() and 0xFF) shl 8)
+                        }
+                        // 3. Known Valid Raw Video / Audio Container Headers
+                        else {
+                            val isEbmlMkv = header.size >= 4 && header[0] == 0x1A.toByte() && header[1] == 0x45.toByte() && header[2] == 0xDF.toByte() && header[3] == 0xA3.toByte()
+                            val isMp4 = header.size >= 8 && (
+                                (header[4] == 'f'.code.toByte() && header[5] == 't'.code.toByte() && header[6] == 'y'.code.toByte() && header[7] == 'p'.code.toByte()) ||
+                                (header[4] == 'm'.code.toByte() && header[5] == 'o'.code.toByte() && header[6] == 'o'.code.toByte() && header[7] == 'v'.code.toByte()) ||
+                                (header[4] == 'm'.code.toByte() && header[5] == 'd'.code.toByte() && header[6] == 'a'.code.toByte() && header[7] == 't'.code.toByte())
+                            )
+                            val isTs = header[0] == 0x47.toByte()
+                            val isAvi = header.size >= 12 && header[0] == 'R'.code.toByte() && header[1] == 'I'.code.toByte() && header[2] == 'F'.code.toByte() && header[3] == 'F'.code.toByte()
+                            val isAudio = (header.size >= 4 && header[0] == 'f'.code.toByte() && header[1] == 'L'.code.toByte() && header[2] == 'a'.code.toByte() && header[3] == 'C'.code.toByte()) ||
+                                          (header.size >= 4 && header[0] == 'O'.code.toByte() && header[1] == 'g'.code.toByte() && header[2] == 'g'.code.toByte() && header[3] == 'S'.code.toByte()) ||
+                                          (header.size >= 3 && header[0] == 'I'.code.toByte() && header[1] == 'D'.code.toByte() && header[2] == '3'.code.toByte()) ||
+                                          (header.size >= 2 && header[0] == 0xFF.toByte() && (header[1].toInt() and 0xE0) == 0xE0)
+
+                            if (isEbmlMkv || isMp4 || isTs || isAvi || isAudio) {
+                                method = 0 // Valid playable raw media stream
+                            } else {
+                                method = 999 // Non-video / Compressed Archive data (e.g. 7z, RAR, DEFLATE without standard header)
+                            }
+                        }
+
+                        zipCompressionCache[firstFileId] = method
+                        val typeStr = when (method) {
+                            0 -> "STREAMABLE (Valid Media Container / Store ZIP)"
+                            999 -> "NON-STREAMABLE / COMPRESSED DATA (magic=[$hex])"
+                            else -> "COMPRESSED (method $method)"
+                        }
+                        TeleflixLogger.log(TAG, "probeZipCompression fileId=$firstFileId: magic=[$hex] -> $typeStr")
+                        method
+                    } else {
+                        TeleflixLogger.log(TAG, "probeZipCompression fileId=$firstFileId: buffer read failed or timed out")
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                TeleflixLogger.log(TAG, "probeZipCompression error: ${e.message}", isError = true)
+                null
+            }
+        }
+    }
 
     fun registerFileMessage(fileId: Int, chatId: Long, messageId: Long) {
         if (fileId != 0 && chatId != 0L && messageId != 0L) {
@@ -87,9 +167,6 @@ object TelegramStreamingProxy {
                 is TdApi.MessageVideo -> content.video.video.id
                 is TdApi.MessageDocument -> content.document.document.id
                 is TdApi.MessageAudio -> content.audio.audio.id
-                is TdApi.MessageVoiceNote -> content.voiceNote.voice.id
-                is TdApi.MessageAnimation -> content.animation.animation.id
-                is TdApi.MessageVideoNote -> content.videoNote.video.id
                 else -> null
             }
             if (freshId != null && freshId != 0) {
@@ -102,9 +179,7 @@ object TelegramStreamingProxy {
                 freshId
             } else target
         } catch (e: Exception) {
-            if (e !is kotlinx.coroutines.CancellationException) {
-                TeleflixLogger.log(TAG, "Failed refreshFileId for fileId $fileId (chatId=$chatId, msgId=$messageId): ${e.message}")
-            }
+            TeleflixLogger.log(TAG, "Failed refreshFileId for fileId $fileId (chatId=$chatId, msgId=$messageId): ${e.message}")
             null
         }
     }
@@ -145,15 +220,15 @@ object TelegramStreamingProxy {
         }
     }
 
-    private suspend fun triggerTdlibDownload(fileId: Int, offset: Long, limit: Long = 0L, force: Boolean = false, priority: Int = DOWNLOAD_PRIORITY) {
+    private suspend fun triggerTdlibDownload(fileId: Int, offset: Long, limit: Long, force: Boolean = false) {
         val now = System.currentTimeMillis()
         val lastOffset = lastDownloadRequestOffset[fileId]
         val lastTime = lastDownloadRequestTime[fileId] ?: 0L
 
-        val isOffsetJump = lastOffset != null && Math.abs(offset - lastOffset) > 500_000L
+        val isOffsetJump = lastOffset != null && (offset < lastOffset || (offset - lastOffset) > maxOf(1_000_000L, limit))
 
-        // Rate limit: do NOT re-issue DownloadFile for the exact same offset within 2500ms unless forced or seeking
-        if (!force && !isOffsetJump && lastOffset == offset && (now - lastTime) < 2500L) {
+        // Strict rate limit: never issue DownloadFile for the exact same offset more than once per 2,000ms unless forced
+        if (!force && !isOffsetJump && lastOffset == offset && (now - lastTime) < 2000L) {
             return
         }
 
@@ -162,17 +237,22 @@ object TelegramStreamingProxy {
 
         withContext(NonCancellable) {
             try {
+                // Cancel stuck TDLib download task on major offset jumps
+                if (isOffsetJump && !DownloadManager.isFileIdActive(fileId)) {
+                    runCatching { TelegramClient.sendRequest(TdApi.CancelDownloadFile(fileId, false)) }
+                }
+
                 val res = TelegramClient.sendRequest(TdApi.DownloadFile().also { req ->
                     req.fileId = fileId
-                    req.priority = priority
+                    req.priority = DOWNLOAD_PRIORITY
                     req.offset = offset
-                    req.limit = limit
+                    req.limit = if (limit > 0L) limit else 0L
                     req.synchronous = false
                 })
                 if (res is TdApi.Error) {
                     TeleflixLogger.log(TAG, "[TDLib Error] DownloadFile fileId=$fileId offset=$offset limit=$limit: code=${res.code} message=${res.message}", isError = true)
                 } else {
-                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset limit=$limit force=$force jump=$isOffsetJump priority=$priority")
+                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset limit=$limit force=$force jump=$isOffsetJump")
                 }
             } catch (e: Exception) {
                 TeleflixLogger.log(TAG, "[TDLib Exception] DownloadFile fileId=$fileId: ${e.message}", isError = true)
@@ -208,6 +288,7 @@ object TelegramStreamingProxy {
         running = false
         activeFileJobs.values.forEach { runCatching { it.cancel() } }
         activeFileJobs.clear()
+        lastStreamedFileId?.let { scope.launch { deleteFile(it) } }
         lastStreamedFileId = null
         try {
             serverSocket?.close()
@@ -221,178 +302,218 @@ object TelegramStreamingProxy {
             socket.tcpNoDelay = true
             try { socket.sendBufferSize = 2097152 } catch (_: Exception) {}
             try { socket.receiveBufferSize = 2097152 } catch (_: Exception) {}
-            socket.soTimeout = 60000
+            socket.soTimeout = 30000
             val inputStream = socket.getInputStream()
-            val output = socket.getOutputStream()
             val reader = inputStream.bufferedReader()
+            val reqLine = reader.readLine() ?: return
+            val parts = reqLine.split(" ")
+            if (parts.size < 2) return
+            val method = parts[0].uppercase()
+            val path = parts[1] // /file/{fileId} or /thumbnail/{fileId}
+            val isHead = (method == "HEAD")
 
-            while (running && !socket.isClosed) {
-                val reqLine = try {
-                    reader.readLine()
-                } catch (e: Exception) {
-                    null
-                } ?: break
+            if (method == "OPTIONS") {
+                val output = socket.getOutputStream()
+                val response = "HTTP/1.1 200 OK\r\n" +
+                        "Allow: GET, HEAD, OPTIONS\r\n" +
+                        "Access-Control-Allow-Origin: *\r\n" +
+                        "Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n" +
+                        "Access-Control-Allow-Headers: Range, Content-Type\r\n" +
+                        "Accept-Ranges: bytes\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n\r\n"
+                output.write(response.toByteArray())
+                output.flush()
+                socket.close()
+                return
+            }
 
-                if (reqLine.isBlank()) continue
-                val parts = reqLine.split(" ")
-                if (parts.size < 2) break
-                val method = parts[0].uppercase()
-                val path = parts[1] // /file/{fileId} or /thumbnail/{fileId}
-                val isHead = (method == "HEAD")
+            val queryParams = path.substringAfter("?", "")
+            val receivedToken = queryParams.split("&").find { it.startsWith("token=") }?.substringAfter("=")
+            if (receivedToken != authToken) {
+                val output = socket.getOutputStream()
+                output.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\nAccess Denied: Missing or Invalid Proxy Token".toByteArray())
+                output.flush()
+                socket.close()
+                return
+            }
 
-                if (method == "OPTIONS") {
-                    val response = "HTTP/1.1 200 OK\r\n" +
-                            "Allow: GET, HEAD, OPTIONS\r\n" +
-                            "Access-Control-Allow-Origin: *\r\n" +
-                            "Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n" +
-                            "Access-Control-Allow-Headers: Range, Content-Type\r\n" +
-                            "Accept-Ranges: bytes\r\n" +
-                            "Content-Length: 0\r\n" +
-                            "Connection: keep-alive\r\n\r\n"
-                    output.write(response.toByteArray())
-                    output.flush()
-                    continue
+            var fileId: Int? = null
+            var isThumbnail = false
+            var urlSize = 0L
+            var fileName: String? = null
+            var mergedFileIds: List<Int>? = null
+            var mergedSizes: List<Long>? = null
+            var zipInnerName: String? = null
+
+            if (path.startsWith("/file/")) {
+                val segment = path.substringAfter("/file/").substringBefore("?")
+                fileId = segment.substringBefore("/").toIntOrNull()
+                val encodedName = segment.substringAfter("/", "").takeIf { it.isNotBlank() }
+                if (encodedName != null) {
+                    fileName = java.net.URLDecoder.decode(encodedName, "UTF-8")
                 }
-
-                val queryParams = path.substringAfter("?", "")
-                val receivedToken = queryParams.split("&").find { it.startsWith("token=") }?.substringAfter("=")
-                if (receivedToken != authToken) {
-                    output.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\nAccess Denied: Missing or Invalid Proxy Token".toByteArray())
-                    output.flush()
-                    break
-                }
-
-                var fileId: Int? = null
-                var isThumbnail = false
-                var urlSize = 0L
-                var fileName: String? = null
-                var mergedFileIds: List<Int>? = null
-                var mergedSizes: List<Long>? = null
-                var zipInnerName: String? = null
-
-                if (path.startsWith("/file/")) {
-                    val segment = path.substringAfter("/file/").substringBefore("?")
-                    fileId = segment.substringBefore("/").toIntOrNull()
-                    val encodedName = segment.substringAfter("/", "").takeIf { it.isNotBlank() }
-                    if (encodedName != null) {
-                        fileName = java.net.URLDecoder.decode(encodedName, "UTF-8")
-                    }
-                    val queryStr = path.substringAfter("?", "")
-                    if (queryStr.isNotBlank()) {
-                        urlSize = queryStr.split("&").find { it.startsWith("size=") }?.substringAfter("=")?.toLongOrNull() ?: 0L
-                    }
-                } else if (path.startsWith("/thumbnail/")) {
-                    val segment = path.substringAfter("/thumbnail/").substringBefore("?")
-                    val thumbParts = segment.split("/")
-                    if (thumbParts.size == 1) {
-                        fileId = thumbParts[0].toIntOrNull()
-                    } else if (thumbParts.size == 2) {
-                        val chatId = thumbParts[0].toLongOrNull()
-                        val messageId = thumbParts[1].toLongOrNull()
-                        if (chatId != null && messageId != null) {
-                            val key = Pair(chatId, messageId)
-                            val cachedId = messageThumbMap[key]
-                            if (cachedId != null) {
-                                fileId = cachedId
-                            } else {
-                                try {
-                                    val msg = TelegramClient.sendRequest(TdApi.GetMessage(chatId, messageId)) as? TdApi.Message
-                                    if (msg != null) {
-                                        when (val content = msg.content) {
-                                            is TdApi.MessageVideo -> fileId = content.video.thumbnail?.file?.id
-                                            is TdApi.MessageDocument -> fileId = content.document.thumbnail?.file?.id
-                                            is TdApi.MessageAudio -> fileId = content.audio.albumCoverThumbnail?.file?.id
-                                        }
-                                        if (fileId != null) {
-                                            messageThumbMap[key] = fileId
-                                        }
-                                    }
-                                } catch (_: Exception) {}
-                            }
-                        }
-                    }
-                    isThumbnail = true
-                } else if (path.startsWith("/zip/")) {
-                    val segment = path.substringAfter("/zip/").substringBefore("?")
-                    val slashParts = segment.split("/", limit = 2)
-                    fileId = slashParts[0].toIntOrNull()
-                    zipInnerName = if (slashParts.size > 1) java.net.URLDecoder.decode(slashParts[1], "UTF-8") else null
-                    val queryStr = path.substringAfter("?", "")
-                    urlSize = queryStr.split("&").find { it.startsWith("size=") }
-                        ?.substringAfter("=")?.toLongOrNull() ?: 0L
-                }
-
-                if (path.contains("merged=")) {
-                    val queryStr = path.substringAfter("?", "")
-                    val mergedParam = queryStr.split("&").find { it.startsWith("merged=") }?.substringAfter("=")
-                    if (mergedParam != null) {
-                        mergedFileIds = mergedParam.split(",").mapNotNull { it.toIntOrNull() }
-                    }
-                    val sizesParam = queryStr.split("&").find { it.startsWith("sizes=") }?.substringAfter("=")
-                    if (sizesParam != null) {
-                        mergedSizes = sizesParam.split(",").mapNotNull { it.toLongOrNull() }
-                    }
-                }
-                if (path.contains("zip_entry=")) {
-                    val queryStr = path.substringAfter("?", "")
-                    val zipParam = queryStr.split("&").find { it.startsWith("zip_entry=") }?.substringAfter("=")
-                    if (zipParam != null) {
-                        zipInnerName = java.net.URLDecoder.decode(zipParam, "UTF-8")
-                    }
-                }
-
                 val queryStr = path.substringAfter("?", "")
-                val queryPairs = queryStr.split("&").mapNotNull {
-                    val p = it.split("=", limit = 2)
-                    if (p.size == 2) p[0] to p[1] else null
-                }.toMap()
-
-                val reqChatId = queryPairs["chatId"]?.toLongOrNull() ?: 0L
-                val reqMessageId = queryPairs["messageId"]?.toLongOrNull() ?: 0L
-                val reqChats = queryPairs["chats"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
-                val reqMessages = queryPairs["messages"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
-
-                if (fileId != null && reqChatId != 0L && reqMessageId != 0L) {
-                    registerFileMessage(fileId, reqChatId, reqMessageId)
+                if (queryStr.isNotBlank()) {
+                    urlSize = queryStr.split("&").find { it.startsWith("size=") }?.substringAfter("=")?.toLongOrNull() ?: 0L
                 }
-                if (mergedFileIds != null) {
-                    mergedFileIds.forEachIndexed { i, fId ->
-                        val cId = reqChats.getOrNull(i) ?: reqChatId
-                        val mId = reqMessages.getOrNull(i)
-                        if (cId != 0L && mId != null && mId != 0L) {
-                            registerFileMessage(fId, cId, mId)
+
+            } else if (path.startsWith("/thumbnail/")) {
+                val segment = path.substringAfter("/thumbnail/").substringBefore("?")
+                val thumbParts = segment.split("/")
+                if (thumbParts.size == 1) {
+                    fileId = thumbParts[0].toIntOrNull()
+                } else if (thumbParts.size == 2) {
+                    val chatId = thumbParts[0].toLongOrNull()
+                    val messageId = thumbParts[1].toLongOrNull()
+                    if (chatId != null && messageId != null) {
+                        val key = Pair(chatId, messageId)
+                        val cachedId = messageThumbMap[key]
+                        if (cachedId != null) {
+                            fileId = cachedId
+                        } else {
+                            try {
+                                val msg = TelegramClient.sendRequest(TdApi.GetMessage(chatId, messageId)) as? TdApi.Message
+                                if (msg != null) {
+                                    when (val content = msg.content) {
+                                        is TdApi.MessageVideo -> fileId = content.video.thumbnail?.file?.id
+                                        is TdApi.MessageDocument -> fileId = content.document.thumbnail?.file?.id
+                                        is TdApi.MessageAudio -> fileId = content.audio.albumCoverThumbnail?.file?.id
+                                    }
+                                    if (fileId != null) {
+                                        messageThumbMap[key] = fileId
+                                    }
+                                }
+                            } catch (_: Exception) {}
                         }
                     }
                 }
-
-                if (fileId == null) {
-                    output.write("HTTP/1.1 400 Bad Request\r\n\r\n".toByteArray())
-                    output.flush()
-                    break
+                isThumbnail = true
+            } else if (path.startsWith("/merged/")) {
+                val segment = path.substringAfter("/merged/").substringBefore("?")
+                val slashParts = segment.split("/", limit = 2)
+                mergedFileIds = slashParts[0].split(",").mapNotNull { it.toIntOrNull() }
+                if (slashParts.size > 1) {
+                    fileName = java.net.URLDecoder.decode(slashParts[1], "UTF-8")
                 }
+                val queryStr = path.substringAfter("?", "")
+                mergedSizes = queryStr.split("&").find { it.startsWith("sizes=") }
+                    ?.substringAfter("=")?.split(",")?.mapNotNull { it.toLongOrNull() }
+                urlSize = mergedSizes?.sum() ?: 0L
+                fileId = mergedFileIds?.firstOrNull()
+            } else if (path.startsWith("/playlist/")) {
+                val segment = path.substringAfter("/playlist/").substringBefore("?")
+                val slashParts = segment.split("/", limit = 2)
+                val fIds = slashParts[0].split(",").mapNotNull { it.toIntOrNull() }
+                val queryStr = path.substringAfter("?", "")
+                val durations = queryStr.split("&").find { it.startsWith("durations=") }
+                    ?.substringAfter("=")?.split(",")?.mapNotNull { it.toIntOrNull() }
+                val sizes = queryStr.split("&").find { it.startsWith("sizes=") }
+                    ?.substringAfter("=")?.split(",")?.mapNotNull { it.toLongOrNull() }
 
-                var rangeHeader: String? = null
-                while (true) {
-                    val line = reader.readLine() ?: break
-                    if (line.isEmpty()) break
-                    if (line.startsWith("Range:", ignoreCase = true)) {
-                        rangeHeader = line.substringAfter(":").trim()
+                val maxDur = fIds.indices.maxOfOrNull { idx ->
+                    val dur = durations?.getOrNull(idx) ?: 0
+                    if (dur > 0) dur else {
+                        val sz = sizes?.getOrNull(idx) ?: 0L
+                        if (sz > 0L) (sz / 1_500_000L).toInt().coerceAtLeast(60) else 1800
+                    }
+                } ?: 3600
+                
+                val output = socket.getOutputStream()
+                val m3uBuilder = StringBuilder()
+                m3uBuilder.append("#EXTM3U\r\n")
+                m3uBuilder.append("#EXT-X-VERSION:3\r\n")
+                m3uBuilder.append("#EXT-X-PLAYLIST-TYPE:VOD\r\n")
+                m3uBuilder.append("#EXT-X-TARGETDURATION:$maxDur\r\n")
+                m3uBuilder.append("#EXT-X-MEDIA-SEQUENCE:0\r\n")
+                m3uBuilder.append("#EXT-X-ALLOW-CACHE:YES\r\n")
+                
+                fIds.forEachIndexed { idx, id ->
+                    val durSec = durations?.getOrNull(idx) ?: 0
+                    val validDur = if (durSec > 0) durSec else {
+                        val sz = sizes?.getOrNull(idx) ?: 0L
+                        if (sz > 0L) (sz / 1_500_000L).toInt().coerceAtLeast(60) else 1800
+                    }
+                    val partUrl = "http://127.0.0.1:$port/file/$id/part${idx + 1}.mkv?token=$authToken"
+                    m3uBuilder.append("#EXTINF:$validDur.0, Part ${idx + 1}\r\n")
+                    m3uBuilder.append("$partUrl\r\n")
+                }
+                m3uBuilder.append("#EXT-X-ENDLIST\r\n")
+
+                val body = m3uBuilder.toString().toByteArray(Charsets.UTF_8)
+                val headers = "HTTP/1.1 200 OK\r\n" +
+                        "Content-Type: application/vnd.apple.mpegurl\r\n" +
+                        "Content-Length: ${body.size}\r\n" +
+                        "Access-Control-Allow-Origin: *\r\n" +
+                        "Connection: close\r\n\r\n"
+
+                output.write(headers.toByteArray())
+                output.write(body)
+                output.flush()
+                return
+            } else if (path.startsWith("/zip/")) {
+                val segment = path.substringAfter("/zip/").substringBefore("?")
+                val slashParts = segment.split("/", limit = 2)
+                fileId = slashParts[0].toIntOrNull()
+                zipInnerName = if (slashParts.size > 1) java.net.URLDecoder.decode(slashParts[1], "UTF-8") else null
+                val queryStr = path.substringAfter("?", "")
+                urlSize = queryStr.split("&").find { it.startsWith("size=") }
+                    ?.substringAfter("=")?.toLongOrNull() ?: 0L
+
+            }
+
+            val queryStr = path.substringAfter("?", "")
+            val queryPairs = queryStr.split("&").mapNotNull {
+                val p = it.split("=", limit = 2)
+                if (p.size == 2) p[0] to p[1] else null
+            }.toMap()
+
+            val reqChatId = queryPairs["chatId"]?.toLongOrNull() ?: 0L
+            val reqMessageId = queryPairs["messageId"]?.toLongOrNull() ?: 0L
+            val reqChats = queryPairs["chats"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
+            val reqMessages = queryPairs["messages"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
+
+            if (fileId != null && reqChatId != 0L && reqMessageId != 0L) {
+                registerFileMessage(fileId, reqChatId, reqMessageId)
+            }
+            if (mergedFileIds != null) {
+                mergedFileIds.forEachIndexed { i, fId ->
+                    val cId = reqChats.getOrNull(i) ?: reqChatId
+                    val mId = reqMessages.getOrNull(i)
+                    if (cId != 0L && mId != null && mId != 0L) {
+                        registerFileMessage(fId, cId, mId)
                     }
                 }
+            }
 
-                TeleflixLogger.log(TAG, "HTTP $method $path | Range: ${rangeHeader ?: "full"}")
+            val output = socket.getOutputStream()
+            if (fileId == null) {
+                output.write("HTTP/1.1 400 Bad Request\r\n\r\n".toByteArray())
+                output.close()
+                return
+            }
 
-                if (isThumbnail) {
-                    serveThumbnail(fileId, output, isHead)
-                } else if (mergedFileIds != null && mergedSizes != null && mergedFileIds.size == mergedSizes.size) {
-                    streamMergedFile(mergedFileIds, mergedSizes, fileName ?: zipInnerName, rangeHeader, output, isHead)
-                } else if (zipInnerName != null) {
-                    streamZipEntry(fileId, zipInnerName, rangeHeader, output, urlSize, isHead)
-                } else if (fileName != null && TelegramRepository.isZipArchiveFilename(fileName)) {
-                    streamZipEntryFromMergedOrSingle(listOf(fileId), listOf(if (urlSize > 0L) urlSize else getFileInfo(fileId)?.second ?: 0L), fileName, rangeHeader, output, isHead)
-                } else {
-                    streamFile(fileId, fileName, rangeHeader, output, urlSize, isHead)
+            var rangeHeader: String? = null
+            while (true) {
+                val line = reader.readLine() ?: break
+                if (line.isEmpty()) break
+                if (line.startsWith("Range:", ignoreCase = true)) {
+                    rangeHeader = line.substringAfter(":").trim()
                 }
+            }
+
+            TeleflixLogger.log(TAG, "HTTP $method $path | Range: ${rangeHeader ?: "full"}")
+
+            if (isThumbnail) {
+                serveThumbnail(fileId, output, isHead)
+            } else if (mergedFileIds != null && mergedSizes != null && mergedFileIds!!.size == mergedSizes!!.size) {
+                streamMergedFile(mergedFileIds!!, mergedSizes!!, fileName ?: zipInnerName, rangeHeader, output, isHead)
+            } else if (zipInnerName != null) {
+                streamZipEntry(fileId, zipInnerName!!, rangeHeader, output, urlSize, isHead)
+            } else if (fileName != null && TelegramRepository.isZipArchiveFilename(fileName)) {
+                streamZipEntryFromMergedOrSingle(listOf(fileId), listOf(if (urlSize > 0L) urlSize else getFileInfo(fileId)?.second ?: 0L), fileName, rangeHeader, output, isHead)
+            } else {
+                streamFile(fileId, fileName, rangeHeader, output, urlSize, isHead)
             }
         } catch (e: java.util.concurrent.CancellationException) {
             TeleflixLogger.log(TAG, "Client stream cancelled")
@@ -424,28 +545,35 @@ object TelegramStreamingProxy {
         val currentJob = kotlin.coroutines.coroutineContext[Job]
 
         try {
+            val prev = lastStreamedFileId
+            if (prev != null && prev != fileId) {
+                TeleflixLogger.log(TAG, "New file requested ($fileId), cancelling active jobs for old file ($prev)")
+                activeFileJobs.remove("file_$prev")?.cancel()
+                if (!DownloadManager.isFileIdActive(prev)) {
+                    runCatching {
+                        TelegramClient.sendRequest(TdApi.CancelDownloadFile(prev, false))
+                    }
+                    if (!isCacheEnabled() && (activeStreamRequests[prev]?.isEmpty() != false)) {
+                        scope.launch { deleteFile(prev) }
+                    }
+                }
+            }
             lastStreamedFileId = fileId
-            lastDownloadRequestOffset.remove(fileId)
-            lastDownloadRequestTime.remove(fileId)
-            activeDownloadWindows.remove(fileId)
 
-            // Pre-warm TDLib message reference in the background without blocking the HTTP response
+            // Ensure TDLib message/file reference is pre-warmed if message mapping exists
             val targetFileId = resolveFileId(fileId)
             if (fileToMessageMap.containsKey(targetFileId) || fileToMessageMap.containsKey(fileId)) {
-                scope.launch { runCatching { refreshFileId(targetFileId) } }
+                refreshFileId(targetFileId)
             }
 
-            // Get file total size instantly from URL parameter if available, else query TDLib
-            val totalSize: Long = if (urlSize > 0L) {
-                urlSize
-            } else {
-                val fileInfo = getFileInfo(fileId)
-                fileInfo?.second?.takeIf { it > 0 } ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
-            }
+            // Get file info
+            val fileInfo = getFileInfo(fileId)
+            val exactSize = fileInfo?.second?.takeIf { it > 0 } ?: urlSize.takeIf { it > 0 }
+            val totalSize = exactSize ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
+            val localPath = fileInfo?.first
 
             if (totalSize <= 0L) {
                 output.write("HTTP/1.1 404 Not Found\r\n\r\n".toByteArray())
-                output.flush()
                 return
             }
 
@@ -472,10 +600,19 @@ object TelegramStreamingProxy {
             metrics = m
             activeStreamRequests.getOrPut(fileId) { java.util.concurrent.ConcurrentHashMap.newKeySet<String>() }.add(m.reqId)
 
-            val jobKey = "file_${fileId}_${m.reqId}"
-            currentJobRegisteredKey = jobKey
-            if (currentJob != null) {
-                activeFileJobs[jobKey] = currentJob
+            if (m.requestType == "seek_probe") {
+                activeSeekProbes.compute(fileId) { _, v -> (v ?: 0) + 1 }
+            } else {
+                latestActiveStreamReqId[fileId] = m.reqId
+                val jobKey = "file_$fileId"
+                currentJobRegisteredKey = jobKey
+                if (currentJob != null) {
+                    val oldJob = activeFileJobs.put(jobKey, currentJob)
+                    if (oldJob != null && oldJob != currentJob && oldJob.isActive) {
+                        TeleflixLogger.log(TAG, "Cancelling previous stream job for fileId=$fileId due to new request $jobKey")
+                        oldJob.cancel()
+                    }
+                }
             }
             m.logStart()
 
@@ -489,7 +626,8 @@ object TelegramStreamingProxy {
 
             val length = end - start + 1
 
-            val ext = fileName?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.isNotBlank() } ?: "mp4"
+            val ext = fileName?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.isNotBlank() }
+                ?: localPath?.substringAfterLast('.', "")?.lowercase() ?: ""
                 
             val mimeType = getMimeType(ext)
 
@@ -518,20 +656,22 @@ object TelegramStreamingProxy {
             }
 
             var activeDownloadEnd = -1L
-            val isNormalOrSeek = (m.requestType == "normal_stream" || m.requestType == "seek_stream")
 
             var offset = start
             while (offset <= end && running) {
+                // If a seek probe is actively reading container metadata (ends in <500ms), let it finish uninterrupted
+                if (m.requestType != "seek_probe" && (activeSeekProbes[fileId] ?: 0) > 0) {
+                    delay(80L)
+                    continue
+                }
+
                 val chunkSize = minOf(CHUNK_SIZE.toLong(), end - offset + 1).toInt()
                 val alignedOffset = offset - (offset % (1024 * 1024))
-                // Fast-start: request 4MB prefetch for initial chunks for instant playback, then continuous buffer
-                val currentPrefetch = if (m.chunksOk < 2) minOf(4L, prefetchSizeMb) else prefetchSizeMb
-                val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, currentPrefetch, chunkSize)
+                val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, prefetchSizeMb, chunkSize)
 
                 if (activeDownloadEnd < 0L || offset >= activeDownloadEnd - maxOf(CHUNK_SIZE.toLong(), safeLimit / 4)) {
                     val isFirstTrigger = activeDownloadEnd < 0L
-                    val p = if (m.requestType == "seek_probe") 32 else DOWNLOAD_PRIORITY
-                    triggerTdlibDownload(fileId, alignedOffset, safeLimit, force = isFirstTrigger, priority = p)
+                    triggerTdlibDownload(fileId, alignedOffset, safeLimit, force = isFirstTrigger)
                     activeDownloadEnd = if (safeLimit == 0L) totalSize else alignedOffset + safeLimit
                     activeDownloadWindows[fileId] = Pair(alignedOffset, activeDownloadEnd)
                 }
@@ -549,11 +689,6 @@ object TelegramStreamingProxy {
                     offset += bytes.size
                     m.totalBytesServed += bytes.size
                     m.chunksOk++
-
-                    // For large video files (>20MB), throttle socket bursts after fast-start (first 4MB) to prevent LibVLC demuxer queue overruns
-                    if (isNormalOrSeek && totalSize > 20_000_000L && m.chunksOk > 8) {
-                        delay(12L) // ~40 MB/s max socket throughput (8x real-time 1080p bitrate)
-                    }
                 } catch (e: Exception) {
                     m.exitReason = "client_disconnect"
                     break
@@ -561,6 +696,12 @@ object TelegramStreamingProxy {
             }
             m.logEnd()
         } finally {
+            if (metrics?.requestType == "seek_probe") {
+                activeSeekProbes.compute(fileId) { _, v ->
+                    val next = (v ?: 1) - 1
+                    if (next <= 0) null else next
+                }
+            }
             if (currentJob != null && currentJobRegisteredKey != null) {
                 activeFileJobs.remove(currentJobRegisteredKey, currentJob)
             }
@@ -685,8 +826,15 @@ object TelegramStreamingProxy {
         output: java.io.OutputStream,
         isHead: Boolean = false
     ) {
-        val isZip = fileName != null && TelegramRepository.isZipArchiveFilename(fileName)
-        if (isZip) {
+        val hasZipName = fileName != null && TelegramRepository.isZipArchiveFilename(fileName)
+        val hasZipHeader = run {
+            val header = readBufferFromMerged(fileIds, sizes, 0L, 4)
+            header != null && header.size >= 4 &&
+                header[0] == 0x50.toByte() && header[1] == 0x4B.toByte() &&
+                header[2] == 0x03.toByte() && header[3] == 0x04.toByte()
+        }
+
+        if (hasZipName || hasZipHeader) {
             streamZipEntryFromMergedOrSingle(fileIds, sizes, fileName, rangeHeader, output, isHead)
             return
         }
@@ -712,7 +860,7 @@ object TelegramStreamingProxy {
         val primaryFileId = fileIds.first()
         val (rangeStart, rangeEnd) = parseRange(rangeHeader)
         val start: Long
-        val end: Long
+        var end: Long
 
         if (rangeStart == null && rangeEnd != null) {
             start = maxOf(0L, effectiveSize - rangeEnd)
@@ -721,7 +869,7 @@ object TelegramStreamingProxy {
             start = rangeStart ?: 0L
             end = rangeEnd ?: (effectiveSize - 1L)
         }
-        val length = end - start + 1
+        end = minOf(end, effectiveSize - 1L)
 
         val m = StreamMetrics(
             fileId = primaryFileId,
@@ -736,39 +884,36 @@ object TelegramStreamingProxy {
             if (m.requestType != "seek_probe") {
                 fileIds.forEach { fId ->
                     latestActiveStreamReqId[fId] = m.reqId
-                    val jobKey = "file_$fId"
-                    currentJobRegisteredKeys.add(jobKey)
-                    if (currentJob != null) {
-                        val oldJob = activeFileJobs.put(jobKey, currentJob)
-                        if (oldJob != null && oldJob != currentJob && oldJob.isActive) {
-                            TeleflixLogger.log(TAG, "Cancelling previous stream job for fileId=$fId due to new request $jobKey")
-                            oldJob.cancel()
-                        }
-                    }
                 }
             }
             m.logStart()
 
-            val prefetchBytes = when {
-                prefetchSizeMb == -1L -> 0L
-                prefetchSizeMb <= 0L -> CHUNK_SIZE.toLong()
-                else -> maxOf(CHUNK_SIZE.toLong(), prefetchSizeMb * 1024L * 1024L)
-            }
-            for (fId in fileIds) {
-                runCatching {
-                    TelegramClient.sendRequest(TdApi.DownloadFile().also { req ->
-                        req.fileId = fId
-                        req.priority = DOWNLOAD_PRIORITY
-                        req.offset = 0
-                        req.limit = prefetchBytes
-                        req.synchronous = false
-                    })
-                }
+            if (start >= effectiveSize || start > end) {
+                m.exitReason = "range_not_satisfiable"
+                m.logEnd()
+                output.write("HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */$effectiveSize\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
+                output.flush()
+                return
             }
 
-            val cleanName = fileName?.removeSuffix(".zip") ?: "video.mkv"
-            val ext = cleanName.substringAfterLast('.', "mkv").lowercase()
-            val mimeType = getMimeType(ext)
+            val length = end - start + 1
+
+            var cleanName = (fileName ?: "video.mkv").trim()
+            if (cleanName.endsWith(".zip", ignoreCase = true)) {
+                cleanName = cleanName.substring(0, cleanName.length - 4).trim()
+            }
+            val existingExt = if (cleanName.contains('.')) cleanName.substringAfterLast('.').lowercase() else ""
+            val videoExtensions = setOf("mkv", "mp4", "avi", "mov", "webm", "flv", "wmv", "ts", "m2ts", "m4v")
+            val isAudioExt = existingExt in setOf("mp3", "flac", "aac", "ogg", "opus", "wav", "m4a")
+            val effectiveExt = when {
+                isAudioExt -> existingExt
+                existingExt in videoExtensions -> existingExt
+                else -> "mkv"
+            }
+            if (existingExt !in videoExtensions && !isAudioExt) {
+                cleanName = "$cleanName.mkv"
+            }
+            val mimeType = getMimeType(effectiveExt)
 
             val status = if (rangeHeader != null) "206 Partial Content" else "200 OK"
             val safeFileName = cleanName.replace("\"", "\\\"")
@@ -860,36 +1005,10 @@ object TelegramStreamingProxy {
             if (m.requestType != "seek_probe") {
                 fileIds.forEach { fId ->
                     latestActiveStreamReqId[fId] = m.reqId
-                    val jobKey = "file_$fId"
-                    currentJobRegisteredKeys.add(jobKey)
-                    if (currentJob != null) {
-                        val oldJob = activeFileJobs.put(jobKey, currentJob)
-                        if (oldJob != null && oldJob != currentJob && oldJob.isActive) {
-                            TeleflixLogger.log(TAG, "Cancelling previous stream job for fileId=$fId due to new request $jobKey")
-                            oldJob.cancel()
-                        }
-                    }
                 }
             }
             m.logStart()
 
-            val zipPrefetch = when {
-                prefetchSizeMb >= 102400L || prefetchSizeMb == -1L -> 0L
-                prefetchSizeMb <= 0L -> CHUNK_SIZE.toLong()
-                else -> maxOf(CHUNK_SIZE.toLong(), prefetchSizeMb * 1024L * 1024L)
-            }
-
-            for (fId in fileIds) {
-                runCatching {
-                    TelegramClient.sendRequest(TdApi.DownloadFile().also { req ->
-                        req.fileId = fId
-                        req.priority = DOWNLOAD_PRIORITY
-                        req.offset = 0
-                        req.limit = zipPrefetch
-                        req.synchronous = false
-                    })
-                }
-            }
 
             val eocdSearchSize = minOf(65557L, totalZipSize).toInt()
             val eocdOffset = totalZipSize - eocdSearchSize
@@ -922,9 +1041,19 @@ object TelegramStreamingProxy {
                     val nameLen = readLocalUInt16(startHeader, 26)
                     val extraLen = readLocalUInt16(startHeader, 28)
                     val dataOffset = 30L + nameLen + extraLen
-                    TeleflixLogger.log(TAG, "Found ZIP Local File Header at offset 0: dataOffset=$dataOffset, compressionMethod=$compressionMethod")
+                    val methodStr = if (compressionMethod == 0) "STORE (Uncompressed)" else "COMPRESSED (method $compressionMethod - DEFLATE/LZMA)"
+                    TeleflixLogger.log(TAG, "Found ZIP Local File Header at offset 0: dataOffset=$dataOffset, compressionMethod=$methodStr")
+                    val primaryFId = fileIds.firstOrNull() ?: 0
+                    if (primaryFId != 0) {
+                        zipCompressionCache[primaryFId] = compressionMethod
+                    }
                     if (compressionMethod == 0) {
                         streamMergedFileRaw(fileIds, sizes, requestedInnerName, rangeHeader, output, isHead, dataOffset)
+                        return
+                    } else {
+                        TeleflixLogger.log(TAG, "⚠️ ZIP file is COMPRESSED ($methodStr). Direct HTTP video range streaming is not possible for compressed archives. File must be downloaded and extracted.", isError = true)
+                        output.write("HTTP/1.1 422 Unprocessable Entity\r\nContent-Type: text/plain\r\n\r\nZIP file is compressed ($methodStr). Only STORED (uncompressed) files can be streamed. Please download all parts to extract and play.".toByteArray())
+                        output.flush()
                         return
                     }
                 }
@@ -948,15 +1077,26 @@ object TelegramStreamingProxy {
 
             var isZip64 = false
             if (cdOffset == 0xFFFFFFFFL || cdSize == 0xFFFFFFFFL || eocdPos >= 20) {
-                val locatorPos = eocdPos - 20
-                if (locatorPos >= 0 &&
-                    eocdData[locatorPos] == 0x50.toByte() &&
-                    eocdData[locatorPos + 1] == 0x4B.toByte() &&
-                    eocdData[locatorPos + 2] == 0x06.toByte() &&
-                    eocdData[locatorPos + 3] == 0x07.toByte()
-                ) {
+                var locatorPos = -1
+                for (i in (eocdPos - 20) downTo maxOf(0, eocdPos - 1024)) {
+                    if (i + 20 <= eocdData.size &&
+                        eocdData[i] == 0x50.toByte() &&
+                        eocdData[i + 1] == 0x4B.toByte() &&
+                        eocdData[i + 2] == 0x06.toByte() &&
+                        eocdData[i + 3] == 0x07.toByte()
+                    ) {
+                        locatorPos = i
+                        break
+                    }
+                }
+                if (locatorPos >= 0) {
                     val zip64EocdOffset = readUInt64(eocdData, locatorPos + 8)
-                    val zip64EocdData = readBufferFromMerged(fileIds, sizes, zip64EocdOffset, 56, m)
+                    val offsetInBuf = (zip64EocdOffset - eocdOffset).toInt()
+                    val zip64EocdData = if (offsetInBuf in 0..(eocdData.size - 56)) {
+                        eocdData.copyOfRange(offsetInBuf, offsetInBuf + 56)
+                    } else {
+                        readBufferFromMerged(fileIds, sizes, zip64EocdOffset, 56, m)
+                    }
                     if (zip64EocdData != null && zip64EocdData.size >= 56 &&
                         zip64EocdData[0] == 0x50.toByte() && zip64EocdData[1] == 0x4B.toByte() &&
                         zip64EocdData[2] == 0x06.toByte() && zip64EocdData[3] == 0x06.toByte()
@@ -966,11 +1106,68 @@ object TelegramStreamingProxy {
                         isZip64 = true
                     }
                 }
+
+                if (!isZip64) {
+                    for (i in (eocdPos - 56) downTo 0) {
+                        if (i + 56 <= eocdData.size &&
+                            eocdData[i] == 0x50.toByte() &&
+                            eocdData[i + 1] == 0x4B.toByte() &&
+                            eocdData[i + 2] == 0x06.toByte() &&
+                            eocdData[i + 3] == 0x06.toByte()
+                        ) {
+                            cdSize = readUInt64(eocdData, i + 40)
+                            cdOffset = readUInt64(eocdData, i + 48)
+                            isZip64 = true
+                            break
+                        }
+                    }
+                }
             }
 
-            val cdData = readBufferFromMerged(fileIds, sizes, cdOffset, cdSize.toInt(), m)
+            val cdData = if (cdOffset != 0xFFFFFFFFL && cdOffset > 0L && cdOffset < totalZipSize && cdSize > 0L && cdSize < 100_000_000L) {
+                readBufferFromMerged(fileIds, sizes, cdOffset, cdSize.toInt(), m)
+            } else null
+
+            suspend fun fallbackToLocalHeaderOrRaw() {
+                val startHeader = readBufferFromMerged(fileIds, sizes, 0L, 30, m)
+                if (startHeader != null && startHeader.size >= 30 &&
+                    startHeader[0] == 0x50.toByte() && startHeader[1] == 0x4B.toByte() &&
+                    startHeader[2] == 0x03.toByte() && startHeader[3] == 0x04.toByte()
+                ) {
+                    fun readLocalUInt16(data: ByteArray, off: Int): Int =
+                        (data[off].toInt() and 0xFF) or ((data[off + 1].toInt() and 0xFF) shl 8)
+                    val compressionMethod = readLocalUInt16(startHeader, 8)
+                    val nameLen = readLocalUInt16(startHeader, 26)
+                    val extraLen = readLocalUInt16(startHeader, 28)
+                    val dataOffset = 30L + nameLen + extraLen
+                    val methodStr = if (compressionMethod == 0) "STORE (Uncompressed)" else "COMPRESSED (method $compressionMethod - DEFLATE/LZMA)"
+                    TeleflixLogger.log(TAG, "ZIP local header parsed: compressionMethod=$methodStr, dataOffset=$dataOffset, nameLen=$nameLen, extraLen=$extraLen")
+                    val primaryFId = fileIds.firstOrNull() ?: 0
+                    if (primaryFId != 0) {
+                        zipCompressionCache[primaryFId] = compressionMethod
+                    }
+                    if (compressionMethod == 0) {
+                        val innerNameBytes = if (nameLen > 0) readBufferFromMerged(fileIds, sizes, 30L, nameLen, m) else null
+                        val innerName = if (innerNameBytes != null && innerNameBytes.isNotEmpty()) String(innerNameBytes, Charsets.UTF_8).trim() else null
+                        val effectiveName = if (!innerName.isNullOrBlank() && !innerName.endsWith(".zip", ignoreCase = true)) {
+                            innerName
+                        } else {
+                            requestedInnerName
+                        }
+                        streamMergedFileRaw(fileIds, sizes, effectiveName, rangeHeader, output, isHead, dataOffset)
+                        return
+                    } else {
+                        TeleflixLogger.log(TAG, "⚠️ ZIP file is COMPRESSED ($methodStr). Direct HTTP video range streaming is not possible for compressed archives. File must be downloaded and extracted.", isError = true)
+                        output.write("HTTP/1.1 422 Unprocessable Entity\r\nContent-Type: text/plain\r\n\r\nZIP file is compressed ($methodStr). Only STORED (uncompressed) files can be streamed. Please download all parts to extract and play.".toByteArray())
+                        output.flush()
+                        return
+                    }
+                }
+                streamMergedFileRaw(fileIds, sizes, requestedInnerName, rangeHeader, output, isHead)
+            }
+
             if (cdData == null || cdData.isEmpty()) {
-                output.write("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nFailed to read Central Directory".toByteArray())
+                fallbackToLocalHeaderOrRaw()
                 return
             }
 
@@ -1033,7 +1230,7 @@ object TelegramStreamingProxy {
             }
 
             if (entries.isEmpty()) {
-                output.write("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNo files found in ZIP archive".toByteArray())
+                fallbackToLocalHeaderOrRaw()
                 return
             }
 
@@ -1056,31 +1253,54 @@ object TelegramStreamingProxy {
             }
 
             if (target == null) {
-                output.write("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNo playable entry found in ZIP".toByteArray())
+                fallbackToLocalHeaderOrRaw()
                 return
             }
 
             if (target.compressionMethod != 0) {
-                output.write("HTTP/1.1 422 Unprocessable Entity\r\nContent-Type: text/plain\r\n\r\nFile '${target.name}' is compressed (method ${target.compressionMethod}). Only STORED (uncompressed) files can be streamed.".toByteArray())
+                val primaryFId = fileIds.firstOrNull() ?: 0
+                if (primaryFId != 0) {
+                    zipCompressionCache[primaryFId] = target.compressionMethod
+                }
+                val methodStr = if (target.compressionMethod == 8) "DEFLATE" else "method ${target.compressionMethod}"
+                TeleflixLogger.log(TAG, "⚠️ File '${target.name}' is compressed ($methodStr). Direct HTTP video range streaming is not possible for compressed archives. File must be downloaded and extracted.", isError = true)
+                output.write("HTTP/1.1 422 Unprocessable Entity\r\nContent-Type: text/plain\r\n\r\nFile '${target.name}' is compressed ($methodStr). Only STORED (uncompressed) files can be streamed. Please download all parts to extract and play.".toByteArray())
+                output.flush()
                 return
             }
 
-            val localHeader = readBufferFromMerged(fileIds, sizes, target.localHeaderOffset, 30, m)
+            var localHeaderOffset = target.localHeaderOffset
+            var localHeader = readBufferFromMerged(fileIds, sizes, localHeaderOffset, 30, m)
+            if (localHeader == null || localHeader.size < 30 ||
+                localHeader[0] != 0x50.toByte() || localHeader[1] != 0x4B.toByte() ||
+                localHeader[2] != 0x03.toByte() || localHeader[3] != 0x04.toByte()
+            ) {
+                val zeroHeader = readBufferFromMerged(fileIds, sizes, 0L, 30, m)
+                if (zeroHeader != null && zeroHeader.size >= 30 &&
+                    zeroHeader[0] == 0x50.toByte() && zeroHeader[1] == 0x4B.toByte() &&
+                    zeroHeader[2] == 0x03.toByte() && zeroHeader[3] == 0x04.toByte()
+                ) {
+                    localHeaderOffset = 0L
+                    localHeader = zeroHeader
+                }
+            }
+
             if (localHeader == null || localHeader.size < 30) {
-                output.write("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nFailed to read local file header".toByteArray())
+                fallbackToLocalHeaderOrRaw()
                 return
             }
+
             val localNameLen = readUInt16(localHeader, 26)
             val localExtraLen = readUInt16(localHeader, 28)
-            val dataOffset = target.localHeaderOffset + 30 + localNameLen + localExtraLen
+            val dataOffset = localHeaderOffset + 30 + localNameLen + localExtraLen
 
-            val innerFileSize = target.uncompressedSize
+            val innerFileSize = if (target.uncompressedSize > 0L) target.uncompressedSize else maxOf(0L, totalZipSize - dataOffset)
 
             Log.d(TAG, "ZIP streaming entry '${target.name}' size=$innerFileSize dataOffset=$dataOffset isZip64=$isZip64")
 
             val (rangeStart, rangeEnd) = parseRange(rangeHeader)
             val reqStart: Long
-            val reqEnd: Long
+            var reqEnd: Long
 
             if (rangeStart == null && rangeEnd != null) {
                 reqStart = maxOf(0L, innerFileSize - rangeEnd)
@@ -1089,13 +1309,34 @@ object TelegramStreamingProxy {
                 reqStart = rangeStart ?: 0L
                 reqEnd = rangeEnd ?: (innerFileSize - 1L)
             }
+            reqEnd = minOf(reqEnd, innerFileSize - 1L)
+
+            if (reqStart >= innerFileSize || reqStart > reqEnd) {
+                m.exitReason = "range_not_satisfiable"
+                m.logEnd()
+                output.write("HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */$innerFileSize\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
+                output.flush()
+                return
+            }
+
             val length = reqEnd - reqStart + 1
 
             val ext = target.name.substringAfterLast('.', "").lowercase()
-            val mimeType = getMimeType(ext)
+            val videoExtensions = setOf("mkv", "mp4", "avi", "mov", "webm", "flv", "wmv", "ts", "m2ts", "m4v")
+            val isAudioExt = ext in setOf("mp3", "flac", "aac", "ogg", "opus", "wav", "m4a")
+            val effectiveExt = when {
+                isAudioExt -> ext
+                ext in videoExtensions -> ext
+                else -> "mkv"
+            }
+            var cleanTargetName = target.name
+            if (!cleanTargetName.contains('.')) {
+                cleanTargetName = "$cleanTargetName.mkv"
+            }
+            val mimeType = getMimeType(effectiveExt)
 
             val status = if (rangeHeader != null) "206 Partial Content" else "200 OK"
-            val safeFileName = target.name.replace("\"", "\\\"")
+            val safeFileName = cleanTargetName.replace("\"", "\\\"")
             val headers = StringBuilder().apply {
                 append("HTTP/1.1 $status\r\n")
                 append("Accept-Ranges: bytes\r\n")
@@ -1105,7 +1346,8 @@ object TelegramStreamingProxy {
                 }
                 append("Content-Type: $mimeType\r\n")
                 append("Content-Disposition: inline; filename=\"$safeFileName\"\r\n")
-                append("Connection: close\r\n\r\n")
+                append("Connection: keep-alive\r\n")
+                append("Keep-Alive: timeout=60, max=1000\r\n\r\n")
             }.toString()
 
             output.write(headers.toByteArray())
@@ -1142,24 +1384,13 @@ object TelegramStreamingProxy {
     }
 
     fun clearStreamCache(fileId: Int) {
-        if (fileId <= 0) return
-        val targetId = resolveFileId(fileId)
-        val fileIdsToClear = setOf(fileId, targetId).filter { it > 0 && !DownloadManager.isFileIdActive(it) }
-
-        fileIdsToClear.forEach { fId ->
-            activeFileJobs.remove("file_$fId")?.cancel()
-            latestActiveStreamReqId.remove(fId)
-            activeStreamRequests.remove(fId)
-            activeDownloadWindows.remove(fId)
-            lastDownloadRequestOffset.remove(fId)
-            lastDownloadRequestTime.remove(fId)
-        }
-
+        if (fileId <= 0 || DownloadManager.isFileIdActive(fileId)) return
+        activeFileJobs.remove("file_$fileId")?.cancel()
+        latestActiveStreamReqId.remove(fileId)
+        activeStreamRequests.remove(fileId)
+        activeDownloadWindows.remove(fileId)
         scope.launch {
-            fileIdsToClear.forEach { fId ->
-                deleteFile(fId)
-            }
-            TeleflixLogger.log(TAG, "Auto-cleared stream cache for fileId=$fileId (targetId=$targetId)")
+            deleteFile(fileId)
         }
     }
 
@@ -1240,7 +1471,17 @@ object TelegramStreamingProxy {
         }
         val ids = fileIds.joinToString(",")
         val szs = sizes.joinToString(",")
-        val encodedName = java.net.URLEncoder.encode(fileName, "UTF-8").replace("+", "%20")
+        var cleanName = fileName.trim()
+        if (cleanName.endsWith(".zip", ignoreCase = true)) {
+            cleanName = cleanName.substring(0, cleanName.length - 4).trim()
+        }
+        val existingExt = if (cleanName.contains('.')) cleanName.substringAfterLast('.').lowercase() else ""
+        val videoExtensions = setOf("mkv", "mp4", "avi", "mov", "webm", "flv", "wmv", "ts", "m2ts", "m4v")
+        val isAudioExt = existingExt in setOf("mp3", "flac", "aac", "ogg", "opus", "wav", "m4a")
+        if (existingExt !in videoExtensions && !isAudioExt) {
+            cleanName = "$cleanName.mkv"
+        }
+        val encodedName = java.net.URLEncoder.encode(cleanName, "UTF-8").replace("+", "%20")
         var url = "http://127.0.0.1:$port/merged/$ids/$encodedName?sizes=$szs"
         if (chatIds.isNotEmpty() && messageIds.isNotEmpty() && chatIds.any { it != 0L }) {
             url += "&chats=${chatIds.joinToString(",")}&messages=${messageIds.joinToString(",")}"
@@ -1374,8 +1615,6 @@ object TelegramStreamingProxy {
                 if (diskFile.exists() && diskFile.length() in 1..(5 * 1024 * 1024L)) {
                     downloadedFile = diskFile
                     break
-                } else if (!diskFile.exists() && attempts == 0) {
-                    runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(fileId)) }
                 }
             }
             delay(50L)
@@ -1413,18 +1652,39 @@ object TelegramStreamingProxy {
         metrics: StreamMetrics? = null
     ): ByteArray? {
         var activeFileId = resolveFileId(fileId)
+        if (metrics != null && metrics.requestType != "seek_probe") {
+            val latestReqId = latestActiveStreamReqId[activeFileId]
+            if (latestReqId != null && latestReqId != metrics.reqId) {
+                TeleflixLogger.log(TAG, "downloadChunk: reqId=${metrics.reqId} for fileId=$activeFileId superseded by $latestReqId")
+                metrics.exitReason = "superseded"
+                return null
+            }
+        }
         val chunkStartMs = System.currentTimeMillis()
-        val timeoutMs = DOWNLOAD_TIMEOUT_MS
+        val timeoutMs = if (metrics?.requestType == "seek_probe") 10_000L else DOWNLOAD_TIMEOUT_MS
         var isFileNotFound = false
         val dataBytes = withTimeoutOrNull(timeoutMs) {
             var attempts = 0
             var consecutiveGetFileErrors = 0
             while (attempts < 2000 && running) {
                 activeFileId = resolveFileId(activeFileId)
+                if (metrics != null && metrics.requestType != "seek_probe") {
+                    val latestReqId = latestActiveStreamReqId[activeFileId]
+                    if (latestReqId != null && latestReqId != metrics.reqId) {
+                        TeleflixLogger.log(TAG, "downloadChunk loop: reqId=${metrics.reqId} for fileId=$activeFileId superseded by $latestReqId")
+                        metrics.exitReason = "superseded"
+                        return@withTimeoutOrNull null
+                    }
+                }
                 val readRes = try {
-                    TelegramClient.sendRequest(
-                        TdApi.ReadFilePart(activeFileId, offset, limit.toLong())
-                    )
+                    val lockStart = System.currentTimeMillis()
+                    getFileMutex(activeFileId).withLock {
+                        val waitMs = System.currentTimeMillis() - lockStart
+                        metrics?.totalQueueWaitMs = (metrics?.totalQueueWaitMs ?: 0L) + waitMs
+                        TelegramClient.sendRequest(
+                            TdApi.ReadFilePart(activeFileId, offset, limit.toLong())
+                        )
+                    }
                 } catch (e: Exception) {
                     null
                 }
@@ -1433,10 +1693,12 @@ object TelegramStreamingProxy {
                     val tdlibMs = System.currentTimeMillis() - chunkStartMs
                     metrics?.chunksOk = (metrics?.chunksOk ?: 0) + 1
                     val count = metrics?.chunksOk ?: 1
-                    if (tdlibMs > 500L || count % 10 == 0 || count == 1) {
+                    if (tdlibMs > 500L || count % 5 == 0 || count == 1) {
                         TeleflixLogger.log(TAG, "[TDLib] chunk #$count fileId=$activeFileId offset=$offset size=${readRes.data.size} tdlibMs=$tdlibMs status=ok")
                     }
                     return@withTimeoutOrNull readRes.data
+                } else if (readRes is TdApi.Error && (attempts == 0 || attempts % 100 == 0)) {
+                    TeleflixLogger.log(TAG, "[TDLib ReadFilePart Error] fileId=$activeFileId offset=$offset: code=${readRes.code} msg=${readRes.message}", isError = true)
                 }
                 
                 val file = try {
@@ -1470,62 +1732,66 @@ object TelegramStreamingProxy {
                     return@withTimeoutOrNull null
                 }
 
-                if (file != null) {
-                    val localPath = file.local?.path
-                    if (!localPath.isNullOrBlank()) {
-                        val localFile = java.io.File(localPath)
-                        if (localFile.exists() && localFile.length() > offset) {
-                            try {
-                                java.io.RandomAccessFile(localFile, "r").use { raf ->
-                                    raf.seek(offset)
-                                    val available = localFile.length() - offset
-                                    val readLen = minOf(limit.toLong(), available).toInt()
-                                    if (readLen > 0) {
-                                        val buf = ByteArray(readLen)
-                                        val actualRead = raf.read(buf)
-                                        if (actualRead > 0) {
-                                            val tdlibMs = System.currentTimeMillis() - chunkStartMs
-                                            metrics?.chunksOk = (metrics?.chunksOk ?: 0) + 1
-                                            val count = metrics?.chunksOk ?: 1
-                                            if (tdlibMs > 500L || count % 10 == 0 || count == 1) {
-                                                TeleflixLogger.log(TAG, "[Disk] chunk #$count fileId=$activeFileId offset=$offset size=$actualRead tdlibMs=$tdlibMs status=ok")
-                                            }
-                                            return@withTimeoutOrNull if (actualRead == readLen) buf else buf.copyOf(actualRead)
-                                        }
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                TeleflixLogger.log(TAG, "Direct disk read error for fileId=$activeFileId: ${e.message}")
-                            }
-                        }
+                if (consecutiveGetFileErrors >= 200 && attempts >= 200) {
+                    TeleflixLogger.log(TAG, "fileId=$activeFileId invalid or not found in TDLib after ${attempts + 1} attempts, failing fast", isError = true)
+                    isFileNotFound = true
+                    if (metrics != null) {
+                        metrics.exitReason = "file_not_found"
                     }
-
-                    if (file.local?.isDownloadingCompleted == true && (localPath.isNullOrBlank() || !java.io.File(localPath).exists())) {
-                        if (attempts == 0) {
-                            TeleflixLogger.log(TAG, "Local file for fileId=$activeFileId missing from disk, resetting local state via DeleteFile to stream from Telegram Cloud")
-                            runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(activeFileId)) }
-                        }
-                    }
-
-                    // If download is inactive and not complete, immediately kick off download without waiting 5 seconds
-                    if (file.local?.isDownloadingActive == false && file.local?.isDownloadingCompleted == false && file.local?.canBeDownloaded == true) {
-                        if (attempts % 20 == 0) {
-                            TeleflixLogger.log(TAG, "File fileId=$activeFileId download inactive (attempts=$attempts), triggering DownloadFile...")
-                            triggerTdlibDownload(activeFileId, offset, limit.toLong(), force = true)
-                        }
-                    }
+                    return@withTimeoutOrNull null
                 }
 
-                // If stall detected after 40 attempts (2 seconds of no data), refresh message & re-elevate TDLib priority
-                val isStalled = attempts >= 40 && attempts % 40 == 0
-                if (isStalled) {
-                    metrics?.chunksRetried = (metrics?.chunksRetried ?: 0) + 1
-                    TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Refreshing message location and elevating TDLib priority...")
-                    val refreshed = refreshFileId(activeFileId, force = true)
+                if (file?.local?.isDownloadingCompleted == true) {
+                    val finalData = try {
+                        TelegramClient.sendRequest(TdApi.ReadFilePart(activeFileId, offset, limit.toLong())) as? TdApi.Data
+                    } catch (e: Exception) { null }
+                    return@withTimeoutOrNull finalData?.data
+                }
+
+                // Check if download is active
+                val isDownloading = file?.local?.isDownloadingActive == true
+
+                // Pre-warm / refresh message if TDLib is not actively downloading
+                if ((attempts == 0 || !isDownloading) && fileMsgRef != null) {
+                    val refreshed = refreshFileId(activeFileId)
                     if (refreshed != null && refreshed != 0) {
                         activeFileId = refreshed
                     }
-                    triggerTdlibDownload(activeFileId, offset, limit.toLong(), force = true)
+                }
+
+                // Re-trigger DownloadFile on attempt 0, when not actively downloading, or on periodic check
+                if (attempts == 0 || !isDownloading || attempts % 40 == 0) {
+                    metrics?.chunksRetried = (metrics?.chunksRetried ?: 0) + 1
+                    val fileInfo = getFileInfo(activeFileId)
+                    val totalSize = fileInfo?.second?.takeIf { it > 0 } ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
+                    val alignedOffset = offset - (offset % (1024 * 1024))
+                    val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, prefetchSizeMb, limit)
+
+                    // A real stall is when ReadFilePart gets no data for >5 seconds (attempts >= 100 with 50ms polling = ~5s)
+                    val isStalled = attempts >= 100 && attempts % 100 == 0
+                    if (isStalled) {
+                        TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Resetting TDLib stream & refreshing message location...")
+                        val refreshed = refreshFileId(activeFileId, force = true)
+                        if (refreshed != null && refreshed != 0) {
+                            activeFileId = refreshed
+                        }
+                        if (!DownloadManager.isFileIdActive(activeFileId)) {
+                            runCatching { TelegramClient.sendRequest(TdApi.CancelDownloadFile(activeFileId, false)) }
+                            if (activeFileId != fileId) {
+                                runCatching { TelegramClient.sendRequest(TdApi.CancelDownloadFile(fileId, false)) }
+                            }
+                        }
+                        lastDownloadRequestOffset.remove(activeFileId)
+                        lastDownloadRequestTime.remove(activeFileId)
+                        lastDownloadRequestOffset.remove(fileId)
+                        lastDownloadRequestTime.remove(fileId)
+                    }
+
+                    val forceRequest = (attempts == 0 || isStalled || !isDownloading)
+                    triggerTdlibDownload(activeFileId, alignedOffset, safeLimit, force = forceRequest)
+
+                    val winEnd = if (safeLimit == 0L) Long.MAX_VALUE else alignedOffset + safeLimit
+                    activeDownloadWindows[activeFileId] = Pair(alignedOffset, winEnd)
                 }
                 
                 delay(50L)
