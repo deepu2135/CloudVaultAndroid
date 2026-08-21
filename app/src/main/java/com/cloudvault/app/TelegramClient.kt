@@ -112,6 +112,10 @@ object TelegramClient {
                     is TdApi.AuthorizationStateReady -> {
                         _authState.value = TelegramAuthState.Ready
                         TdlibManager.setSessionActive(context, true)
+                        // Maximize network and upload throughput in TDLib
+                        client?.send(TdApi.SetNetworkType(TdApi.NetworkTypeOther())) {}
+                        client?.send(TdApi.SetOption("use_pfs", TdApi.OptionValueBoolean(true))) {}
+                        client?.send(TdApi.SetOption("disable_network_statistics", TdApi.OptionValueBoolean(true))) {}
                         // Auto-load vault items automatically upon connection
                         scope.launch {
                             TelegramRepository.loadVaultItems(force = true)
