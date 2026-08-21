@@ -217,220 +217,178 @@ object TelegramStreamingProxy {
             socket.tcpNoDelay = true
             try { socket.sendBufferSize = 2097152 } catch (_: Exception) {}
             try { socket.receiveBufferSize = 2097152 } catch (_: Exception) {}
-            socket.soTimeout = 30000
+            socket.soTimeout = 60000
             val inputStream = socket.getInputStream()
+            val output = socket.getOutputStream()
             val reader = inputStream.bufferedReader()
-            val reqLine = reader.readLine() ?: return
-            val parts = reqLine.split(" ")
-            if (parts.size < 2) return
-            val method = parts[0].uppercase()
-            val path = parts[1] // /file/{fileId} or /thumbnail/{fileId}
-            val isHead = (method == "HEAD")
 
-            if (method == "OPTIONS") {
-                val output = socket.getOutputStream()
-                val response = "HTTP/1.1 200 OK\r\n" +
-                        "Allow: GET, HEAD, OPTIONS\r\n" +
-                        "Access-Control-Allow-Origin: *\r\n" +
-                        "Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n" +
-                        "Access-Control-Allow-Headers: Range, Content-Type\r\n" +
-                        "Accept-Ranges: bytes\r\n" +
-                        "Content-Length: 0\r\n" +
-                        "Connection: close\r\n\r\n"
-                output.write(response.toByteArray())
-                output.flush()
-                socket.close()
-                return
-            }
+            while (running && !socket.isClosed) {
+                val reqLine = try {
+                    reader.readLine()
+                } catch (e: Exception) {
+                    null
+                } ?: break
 
-            val queryParams = path.substringAfter("?", "")
-            val receivedToken = queryParams.split("&").find { it.startsWith("token=") }?.substringAfter("=")
-            if (receivedToken != authToken) {
-                val output = socket.getOutputStream()
-                output.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\nAccess Denied: Missing or Invalid Proxy Token".toByteArray())
-                output.flush()
-                socket.close()
-                return
-            }
+                if (reqLine.isBlank()) continue
+                val parts = reqLine.split(" ")
+                if (parts.size < 2) break
+                val method = parts[0].uppercase()
+                val path = parts[1] // /file/{fileId} or /thumbnail/{fileId}
+                val isHead = (method == "HEAD")
 
-            var fileId: Int? = null
-            var isThumbnail = false
-            var urlSize = 0L
-            var fileName: String? = null
-            var mergedFileIds: List<Int>? = null
-            var mergedSizes: List<Long>? = null
-            var zipInnerName: String? = null
-
-            if (path.startsWith("/file/")) {
-                val segment = path.substringAfter("/file/").substringBefore("?")
-                fileId = segment.substringBefore("/").toIntOrNull()
-                val encodedName = segment.substringAfter("/", "").takeIf { it.isNotBlank() }
-                if (encodedName != null) {
-                    fileName = java.net.URLDecoder.decode(encodedName, "UTF-8")
+                if (method == "OPTIONS") {
+                    val response = "HTTP/1.1 200 OK\r\n" +
+                            "Allow: GET, HEAD, OPTIONS\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
+                            "Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n" +
+                            "Access-Control-Allow-Headers: Range, Content-Type\r\n" +
+                            "Accept-Ranges: bytes\r\n" +
+                            "Content-Length: 0\r\n" +
+                            "Connection: keep-alive\r\n\r\n"
+                    output.write(response.toByteArray())
+                    output.flush()
+                    continue
                 }
+
+                val queryParams = path.substringAfter("?", "")
+                val receivedToken = queryParams.split("&").find { it.startsWith("token=") }?.substringAfter("=")
+                if (receivedToken != authToken) {
+                    output.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\nAccess Denied: Missing or Invalid Proxy Token".toByteArray())
+                    output.flush()
+                    break
+                }
+
+                var fileId: Int? = null
+                var isThumbnail = false
+                var urlSize = 0L
+                var fileName: String? = null
+                var mergedFileIds: List<Int>? = null
+                var mergedSizes: List<Long>? = null
+                var zipInnerName: String? = null
+
+                if (path.startsWith("/file/")) {
+                    val segment = path.substringAfter("/file/").substringBefore("?")
+                    fileId = segment.substringBefore("/").toIntOrNull()
+                    val encodedName = segment.substringAfter("/", "").takeIf { it.isNotBlank() }
+                    if (encodedName != null) {
+                        fileName = java.net.URLDecoder.decode(encodedName, "UTF-8")
+                    }
+                    val queryStr = path.substringAfter("?", "")
+                    if (queryStr.isNotBlank()) {
+                        urlSize = queryStr.split("&").find { it.startsWith("size=") }?.substringAfter("=")?.toLongOrNull() ?: 0L
+                    }
+                } else if (path.startsWith("/thumbnail/")) {
+                    val segment = path.substringAfter("/thumbnail/").substringBefore("?")
+                    val thumbParts = segment.split("/")
+                    if (thumbParts.size == 1) {
+                        fileId = thumbParts[0].toIntOrNull()
+                    } else if (thumbParts.size == 2) {
+                        val chatId = thumbParts[0].toLongOrNull()
+                        val messageId = thumbParts[1].toLongOrNull()
+                        if (chatId != null && messageId != null) {
+                            val key = Pair(chatId, messageId)
+                            val cachedId = messageThumbMap[key]
+                            if (cachedId != null) {
+                                fileId = cachedId
+                            } else {
+                                try {
+                                    val msg = TelegramClient.sendRequest(TdApi.GetMessage(chatId, messageId)) as? TdApi.Message
+                                    if (msg != null) {
+                                        when (val content = msg.content) {
+                                            is TdApi.MessageVideo -> fileId = content.video.thumbnail?.file?.id
+                                            is TdApi.MessageDocument -> fileId = content.document.thumbnail?.file?.id
+                                            is TdApi.MessageAudio -> fileId = content.audio.albumCoverThumbnail?.file?.id
+                                        }
+                                        if (fileId != null) {
+                                            messageThumbMap[key] = fileId
+                                        }
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                    isThumbnail = true
+                } else if (path.startsWith("/zip/")) {
+                    val segment = path.substringAfter("/zip/").substringBefore("?")
+                    val slashParts = segment.split("/", limit = 2)
+                    fileId = slashParts[0].toIntOrNull()
+                    zipInnerName = if (slashParts.size > 1) java.net.URLDecoder.decode(slashParts[1], "UTF-8") else null
+                    val queryStr = path.substringAfter("?", "")
+                    urlSize = queryStr.split("&").find { it.startsWith("size=") }
+                        ?.substringAfter("=")?.toLongOrNull() ?: 0L
+                }
+
+                if (path.contains("merged=")) {
+                    val queryStr = path.substringAfter("?", "")
+                    val mergedParam = queryStr.split("&").find { it.startsWith("merged=") }?.substringAfter("=")
+                    if (mergedParam != null) {
+                        mergedFileIds = mergedParam.split(",").mapNotNull { it.toIntOrNull() }
+                    }
+                    val sizesParam = queryStr.split("&").find { it.startsWith("sizes=") }?.substringAfter("=")
+                    if (sizesParam != null) {
+                        mergedSizes = sizesParam.split(",").mapNotNull { it.toLongOrNull() }
+                    }
+                }
+                if (path.contains("zip_entry=")) {
+                    val queryStr = path.substringAfter("?", "")
+                    val zipParam = queryStr.split("&").find { it.startsWith("zip_entry=") }?.substringAfter("=")
+                    if (zipParam != null) {
+                        zipInnerName = java.net.URLDecoder.decode(zipParam, "UTF-8")
+                    }
+                }
+
                 val queryStr = path.substringAfter("?", "")
-                if (queryStr.isNotBlank()) {
-                    urlSize = queryStr.split("&").find { it.startsWith("size=") }?.substringAfter("=")?.toLongOrNull() ?: 0L
-                }
+                val queryPairs = queryStr.split("&").mapNotNull {
+                    val p = it.split("=", limit = 2)
+                    if (p.size == 2) p[0] to p[1] else null
+                }.toMap()
 
-                // Single file or direct multi-part
-            } else if (path.startsWith("/thumbnail/")) {
-                val segment = path.substringAfter("/thumbnail/").substringBefore("?")
-                val thumbParts = segment.split("/")
-                if (thumbParts.size == 1) {
-                    fileId = thumbParts[0].toIntOrNull()
-                } else if (thumbParts.size == 2) {
-                    val chatId = thumbParts[0].toLongOrNull()
-                    val messageId = thumbParts[1].toLongOrNull()
-                    if (chatId != null && messageId != null) {
-                        val key = Pair(chatId, messageId)
-                        val cachedId = messageThumbMap[key]
-                        if (cachedId != null) {
-                            fileId = cachedId
-                        } else {
-                            try {
-                                val msg = TelegramClient.sendRequest(TdApi.GetMessage(chatId, messageId)) as? TdApi.Message
-                                if (msg != null) {
-                                    when (val content = msg.content) {
-                                        is TdApi.MessageVideo -> fileId = content.video.thumbnail?.file?.id
-                                        is TdApi.MessageDocument -> fileId = content.document.thumbnail?.file?.id
-                                        is TdApi.MessageAudio -> fileId = content.audio.albumCoverThumbnail?.file?.id
-                                    }
-                                    if (fileId != null) {
-                                        messageThumbMap[key] = fileId
-                                    }
-                                }
-                            } catch (_: Exception) {}
+                val reqChatId = queryPairs["chatId"]?.toLongOrNull() ?: 0L
+                val reqMessageId = queryPairs["messageId"]?.toLongOrNull() ?: 0L
+                val reqChats = queryPairs["chats"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
+                val reqMessages = queryPairs["messages"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
+
+                if (fileId != null && reqChatId != 0L && reqMessageId != 0L) {
+                    registerFileMessage(fileId, reqChatId, reqMessageId)
+                }
+                if (mergedFileIds != null) {
+                    mergedFileIds.forEachIndexed { i, fId ->
+                        val cId = reqChats.getOrNull(i) ?: reqChatId
+                        val mId = reqMessages.getOrNull(i)
+                        if (cId != 0L && mId != null && mId != 0L) {
+                            registerFileMessage(fId, cId, mId)
                         }
                     }
                 }
-                isThumbnail = true
-            } else if (path.startsWith("/merged/")) {
-                val segment = path.substringAfter("/merged/").substringBefore("?")
-                val slashParts = segment.split("/", limit = 2)
-                mergedFileIds = slashParts[0].split(",").mapNotNull { it.toIntOrNull() }
-                if (slashParts.size > 1) {
-                    fileName = java.net.URLDecoder.decode(slashParts[1], "UTF-8")
+
+                if (fileId == null) {
+                    output.write("HTTP/1.1 400 Bad Request\r\n\r\n".toByteArray())
+                    output.flush()
+                    break
                 }
-                val queryStr = path.substringAfter("?", "")
-                mergedSizes = queryStr.split("&").find { it.startsWith("sizes=") }
-                    ?.substringAfter("=")?.split(",")?.mapNotNull { it.toLongOrNull() }
-                urlSize = mergedSizes?.sum() ?: 0L
-                fileId = mergedFileIds?.firstOrNull()
-            } else if (path.startsWith("/playlist/")) {
-                val segment = path.substringAfter("/playlist/").substringBefore("?")
-                val slashParts = segment.split("/", limit = 2)
-                val fIds = slashParts[0].split(",").mapNotNull { it.toIntOrNull() }
-                val queryStr = path.substringAfter("?", "")
-                val durations = queryStr.split("&").find { it.startsWith("durations=") }
-                    ?.substringAfter("=")?.split(",")?.mapNotNull { it.toIntOrNull() }
-                val sizes = queryStr.split("&").find { it.startsWith("sizes=") }
-                    ?.substringAfter("=")?.split(",")?.mapNotNull { it.toLongOrNull() }
 
-                val maxDur = fIds.indices.maxOfOrNull { idx ->
-                    val dur = durations?.getOrNull(idx) ?: 0
-                    if (dur > 0) dur else {
-                        val sz = sizes?.getOrNull(idx) ?: 0L
-                        if (sz > 0L) (sz / 1_500_000L).toInt().coerceAtLeast(60) else 1800
-                    }
-                } ?: 3600
-                
-                val output = socket.getOutputStream()
-                val m3uBuilder = StringBuilder()
-                m3uBuilder.append("#EXTM3U\r\n")
-                m3uBuilder.append("#EXT-X-VERSION:3\r\n")
-                m3uBuilder.append("#EXT-X-PLAYLIST-TYPE:VOD\r\n")
-                m3uBuilder.append("#EXT-X-TARGETDURATION:$maxDur\r\n")
-                m3uBuilder.append("#EXT-X-MEDIA-SEQUENCE:0\r\n")
-                m3uBuilder.append("#EXT-X-ALLOW-CACHE:YES\r\n")
-                
-                fIds.forEachIndexed { idx, id ->
-                    val durSec = durations?.getOrNull(idx) ?: 0
-                    val validDur = if (durSec > 0) durSec else {
-                        val sz = sizes?.getOrNull(idx) ?: 0L
-                        if (sz > 0L) (sz / 1_500_000L).toInt().coerceAtLeast(60) else 1800
-                    }
-                    val partUrl = "http://127.0.0.1:$port/file/$id/part${idx + 1}.mkv?token=$authToken"
-                    m3uBuilder.append("#EXTINF:$validDur.0, Part ${idx + 1}\r\n")
-                    m3uBuilder.append("$partUrl\r\n")
-                }
-                m3uBuilder.append("#EXT-X-ENDLIST\r\n")
-
-                val body = m3uBuilder.toString().toByteArray(Charsets.UTF_8)
-                val headers = "HTTP/1.1 200 OK\r\n" +
-                        "Content-Type: application/vnd.apple.mpegurl\r\n" +
-                        "Content-Length: ${body.size}\r\n" +
-                        "Access-Control-Allow-Origin: *\r\n" +
-                        "Connection: close\r\n\r\n"
-
-                output.write(headers.toByteArray())
-                output.write(body)
-                output.flush()
-                return
-            } else if (path.startsWith("/zip/")) {
-                val segment = path.substringAfter("/zip/").substringBefore("?")
-                val slashParts = segment.split("/", limit = 2)
-                fileId = slashParts[0].toIntOrNull()
-                zipInnerName = if (slashParts.size > 1) java.net.URLDecoder.decode(slashParts[1], "UTF-8") else null
-                val queryStr = path.substringAfter("?", "")
-                urlSize = queryStr.split("&").find { it.startsWith("size=") }
-                    ?.substringAfter("=")?.toLongOrNull() ?: 0L
-
-                // direct zip stream
-            }
-
-            val queryStr = path.substringAfter("?", "")
-            val queryPairs = queryStr.split("&").mapNotNull {
-                val p = it.split("=", limit = 2)
-                if (p.size == 2) p[0] to p[1] else null
-            }.toMap()
-
-            val reqChatId = queryPairs["chatId"]?.toLongOrNull() ?: 0L
-            val reqMessageId = queryPairs["messageId"]?.toLongOrNull() ?: 0L
-            val reqChats = queryPairs["chats"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
-            val reqMessages = queryPairs["messages"]?.split(",")?.mapNotNull { it.toLongOrNull() } ?: emptyList()
-
-            if (fileId != null && reqChatId != 0L && reqMessageId != 0L) {
-                registerFileMessage(fileId, reqChatId, reqMessageId)
-            }
-            if (mergedFileIds != null) {
-                mergedFileIds.forEachIndexed { i, fId ->
-                    val cId = reqChats.getOrNull(i) ?: reqChatId
-                    val mId = reqMessages.getOrNull(i)
-                    if (cId != 0L && mId != null && mId != 0L) {
-                        registerFileMessage(fId, cId, mId)
+                var rangeHeader: String? = null
+                while (true) {
+                    val line = reader.readLine() ?: break
+                    if (line.isEmpty()) break
+                    if (line.startsWith("Range:", ignoreCase = true)) {
+                        rangeHeader = line.substringAfter(":").trim()
                     }
                 }
-            }
 
-            val output = socket.getOutputStream()
-            if (fileId == null) {
-                output.write("HTTP/1.1 400 Bad Request\r\n\r\n".toByteArray())
-                output.close()
-                return
-            }
+                TeleflixLogger.log(TAG, "HTTP $method $path | Range: ${rangeHeader ?: "full"}")
 
-            var rangeHeader: String? = null
-            while (true) {
-                val line = reader.readLine() ?: break
-                if (line.isEmpty()) break
-                if (line.startsWith("Range:", ignoreCase = true)) {
-                    rangeHeader = line.substringAfter(":").trim()
+                if (isThumbnail) {
+                    serveThumbnail(fileId, output, isHead)
+                } else if (mergedFileIds != null && mergedSizes != null && mergedFileIds.size == mergedSizes.size) {
+                    streamMergedFile(mergedFileIds, mergedSizes, fileName ?: zipInnerName, rangeHeader, output, isHead)
+                } else if (zipInnerName != null) {
+                    streamZipEntry(fileId, zipInnerName, rangeHeader, output, urlSize, isHead)
+                } else if (fileName != null && TelegramRepository.isZipArchiveFilename(fileName)) {
+                    streamZipEntryFromMergedOrSingle(listOf(fileId), listOf(if (urlSize > 0L) urlSize else getFileInfo(fileId)?.second ?: 0L), fileName, rangeHeader, output, isHead)
+                } else {
+                    streamFile(fileId, fileName, rangeHeader, output, urlSize, isHead)
                 }
-            }
-
-            TeleflixLogger.log(TAG, "HTTP $method $path | Range: ${rangeHeader ?: "full"}")
-
-            if (isThumbnail) {
-                serveThumbnail(fileId, output, isHead)
-            } else if (mergedFileIds != null && mergedSizes != null && mergedFileIds!!.size == mergedSizes!!.size) {
-                streamMergedFile(mergedFileIds!!, mergedSizes!!, fileName ?: zipInnerName, rangeHeader, output, isHead)
-            } else if (zipInnerName != null) {
-                streamZipEntry(fileId, zipInnerName!!, rangeHeader, output, urlSize, isHead)
-            } else if (fileName != null && TelegramRepository.isZipArchiveFilename(fileName)) {
-                streamZipEntryFromMergedOrSingle(listOf(fileId), listOf(if (urlSize > 0L) urlSize else getFileInfo(fileId)?.second ?: 0L), fileName, rangeHeader, output, isHead)
-            } else {
-                streamFile(fileId, fileName, rangeHeader, output, urlSize, isHead)
             }
         } catch (e: java.util.concurrent.CancellationException) {
             TeleflixLogger.log(TAG, "Client stream cancelled")
