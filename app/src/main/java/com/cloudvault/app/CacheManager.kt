@@ -83,6 +83,11 @@ object CacheManager {
         if (bytes[0] == 0x42.toByte() && bytes[1] == 0x4D.toByte()) {
             return FileCategory.PHOTO
         }
+        // TIFF: 49 49 2A 00 ('II*\0') or 4D 4D 00 2A ('MM\0*')
+        if ((bytes[0] == 0x49.toByte() && bytes[1] == 0x49.toByte() && bytes[2] == 0x2A.toByte() && bytes[3] == 0x00.toByte()) ||
+            (bytes[0] == 0x4D.toByte() && bytes[1] == 0x4D.toByte() && bytes[2] == 0x00.toByte() && bytes[3] == 0x2A.toByte())) {
+            return FileCategory.PHOTO
+        }
         // WebP / AVI / WAV: RIFF ...
         if (bytes.size >= 12 && bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() && bytes[2] == 0x46.toByte() && bytes[3] == 0x46.toByte()) {
             val isWebp = bytes[8] == 0x57.toByte() && bytes[9] == 0x45.toByte() && bytes[10] == 0x42.toByte() && bytes[11] == 0x50.toByte()
@@ -96,14 +101,27 @@ object CacheManager {
         if (bytes[0] == 0x1A.toByte() && bytes[1] == 0x45.toByte() && bytes[2] == 0xDF.toByte() && bytes[3] == 0xA3.toByte()) {
             return FileCategory.VIDEO
         }
-        // MP4 / MOV / HEIF: bytes 4..7 == 'ftyp'
+        // MP4 / MOV / HEIF / AVIF: bytes 4..7 == 'ftyp'
         if (bytes.size >= 8 && bytes[4] == 0x66.toByte() && bytes[5] == 0x74.toByte() && bytes[6] == 0x79.toByte() && bytes[7] == 0x70.toByte()) {
             if (bytes.size >= 12) {
                 val brand = String(bytes, 8, 4, java.nio.charset.StandardCharsets.US_ASCII).lowercase()
-                if (brand.startsWith("heic") || brand.startsWith("mif1") || brand.startsWith("msf1") || brand.startsWith("hevc")) {
+                if (brand.startsWith("heic") || brand.startsWith("heix") || brand.startsWith("heim") ||
+                    brand.startsWith("heis") || brand.startsWith("hevc") || brand.startsWith("hevx") ||
+                    brand.startsWith("mif1") || brand.startsWith("msf1") || brand.startsWith("avif") ||
+                    brand.startsWith("avis") || brand.startsWith("miaf") || brand.startsWith("pict")
+                ) {
                     return FileCategory.PHOTO
                 }
+                if (brand.startsWith("m4a") || brand.startsWith("m4b") || brand.startsWith("m4p") ||
+                    brand.startsWith("f4a") || brand.startsWith("alac")
+                ) {
+                    return FileCategory.DOCUMENT
+                }
             }
+            return FileCategory.VIDEO
+        }
+        // FLV: 46 4C 56 ('FLV')
+        if (bytes[0] == 0x46.toByte() && bytes[1] == 0x4C.toByte() && bytes[2] == 0x56.toByte()) {
             return FileCategory.VIDEO
         }
         // PDF: %PDF (25 50 44 46)
@@ -134,7 +152,28 @@ object CacheManager {
         val path = file.absolutePath.lowercase()
         val name = file.name.lowercase()
 
-        // 1. Folder path based classification (highest confidence from TDLib directory structure)
+        // 1. File Extension classification (highest accuracy for named files)
+        val ext = name.substringAfterLast('.', "")
+        if (ext.isNotEmpty()) {
+            when (ext) {
+                "jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "bmp", "gif", "svg",
+                "ico", "jfif", "tif", "tiff", "raw", "dng", "cr2", "nef", "arw", "psd" -> {
+                    return FileCategory.PHOTO
+                }
+                "mp4", "mkv", "webm", "mov", "avi", "ts", "3gp", "wmv", "m4v", "flv",
+                "m2ts", "vob", "mpg", "mpeg", "ogv", "divx", "f4v" -> {
+                    return FileCategory.VIDEO
+                }
+                "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "csv",
+                "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "apk", "xapk", "apkm",
+                "mp3", "wav", "ogg", "flac", "aac", "m4a", "wma", "amr", "opus", "iso",
+                "exe", "dmg", "plugin" -> {
+                    return FileCategory.DOCUMENT
+                }
+            }
+        }
+
+        // 2. Folder path based classification (from TDLib directory structure)
         if (path.contains("/photos/") || path.contains("/thumbnails/") || path.contains("/thumbs/") ||
             path.contains("/profile_photos/") || path.contains("/wallpapers/") ||
             path.contains("/autobackup_compressed/")
@@ -154,42 +193,6 @@ object CacheManager {
             return FileCategory.DOCUMENT
         }
 
-        // 2. Extension based classification
-        if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png") ||
-            name.endsWith(".webp") || name.endsWith(".heic") || name.endsWith(".heif") ||
-            name.endsWith(".bmp") || name.endsWith(".gif") || name.endsWith(".svg") ||
-            name.endsWith(".ico") || name.endsWith(".jfif") || name.endsWith(".tif") ||
-            name.endsWith(".tiff") || name.endsWith(".raw") || name.endsWith(".dng") ||
-            name.startsWith("thumb_") || name.startsWith("photo_") || name.startsWith("img_") ||
-            name.startsWith("opt_") || name.startsWith("avatar_")
-        ) {
-            return FileCategory.PHOTO
-        }
-
-        if (name.endsWith(".mp4") || name.endsWith(".mkv") || name.endsWith(".webm") ||
-            name.endsWith(".mov") || name.endsWith(".avi") || name.endsWith(".ts") ||
-            name.endsWith(".3gp") || name.endsWith(".wmv") || name.endsWith(".m4v") ||
-            name.endsWith(".flv") || name.endsWith(".m2ts") || name.startsWith("vid_") ||
-            name.startsWith("video_")
-        ) {
-            return FileCategory.VIDEO
-        }
-
-        if (name.endsWith(".pdf") || name.endsWith(".doc") || name.endsWith(".docx") ||
-            name.endsWith(".xls") || name.endsWith(".xlsx") || name.endsWith(".ppt") ||
-            name.endsWith(".pptx") || name.endsWith(".txt") || name.endsWith(".rtf") ||
-            name.endsWith(".csv") || name.endsWith(".zip") || name.endsWith(".rar") ||
-            name.endsWith(".7z") || name.endsWith(".tar") || name.endsWith(".gz") ||
-            name.endsWith(".bz2") || name.endsWith(".xz") || name.endsWith(".apk") ||
-            name.endsWith(".xapk") || name.endsWith(".apkm") || name.endsWith(".mp3") ||
-            name.endsWith(".wav") || name.endsWith(".ogg") || name.endsWith(".flac") ||
-            name.endsWith(".aac") || name.endsWith(".m4a") || name.endsWith(".wma") ||
-            name.endsWith(".amr") || name.endsWith(".opus") || name.endsWith(".plugin") ||
-            name.endsWith(".iso") || name.endsWith(".exe") || name.endsWith(".dmg")
-        ) {
-            return FileCategory.DOCUMENT
-        }
-
         // 3. Magic Header Sniffing for extensionless or temp files (e.g. in tdlib_files/temp/ or uploads/)
         if (file.length() >= 4) {
             val header = readHeaderBytes(file)
@@ -197,6 +200,14 @@ object CacheManager {
                 val magicCat = detectCategoryFromHeader(header)
                 if (magicCat != null) return magicCat
             }
+        }
+
+        // 4. Filename prefix heuristics for extensionless temp files
+        if (name.startsWith("thumb_") || name.startsWith("photo_") || name.startsWith("opt_") || name.startsWith("avatar_")) {
+            return FileCategory.PHOTO
+        }
+        if (name.startsWith("vid_") || name.startsWith("video_")) {
+            return FileCategory.VIDEO
         }
 
         return FileCategory.OTHER
@@ -375,7 +386,7 @@ object CacheManager {
                     if ((clearVideos && (dirName == "videos" || dirName == "video_notes" || dirName == "video_stories")) ||
                         (clearPhotos && (dirName == "photos" || dirName == "thumbnails" || dirName == "thumbs" || dirName == "profile_photos" || dirName == "wallpapers" || dirName == "autobackup_compressed")) ||
                         (clearDocuments && (dirName == "documents" || dirName == "voice" || dirName == "music" || dirName == "audios")) ||
-                        (clearOther && (dirName == "animations" || dirName == "stickers" || dirName == "temp" || dirName == "uploads" || dirName == "autobackup_temp"))
+                        (clearOther && (dirName == "animations" || dirName == "stickers" || dirName == "uploads" || dirName == "autobackup_temp"))
                     ) {
                         deleteDirContents(file)
                     } else {
