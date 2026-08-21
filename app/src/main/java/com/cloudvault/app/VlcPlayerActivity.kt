@@ -1,13 +1,22 @@
 package com.cloudvault.app
 
+import android.app.PictureInPictureParams
+import android.content.Context
+import android.graphics.Color
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Rational
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.SeekBar
@@ -23,6 +32,8 @@ import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class VlcPlayerActivity : AppCompatActivity() {
 
@@ -31,28 +42,33 @@ class VlcPlayerActivity : AppCompatActivity() {
     private lateinit var pbVlcBuffering: ProgressBar
     private lateinit var layoutControlsOverlay: FrameLayout
 
-    private lateinit var btnVlcBack: FrameLayout
+    private lateinit var layoutTopBar: FrameLayout
+    private lateinit var btnVlcBack: ImageView
     private lateinit var tvVlcTitle: TextView
-    private lateinit var btnVlcSubtitles: TextView
-    private lateinit var btnVlcSettings: TextView
+    private lateinit var tvVlcSubtitle: TextView
 
-    private lateinit var btnVlcRewind: FrameLayout
-    private lateinit var btnVlcPlayPause: FrameLayout
-    private lateinit var tvPlayPauseIcon: TextView
-    private lateinit var btnVlcForward: FrameLayout
+    private lateinit var btnVlcFloatingLock: FrameLayout
+    private lateinit var ivFloatingLockIcon: ImageView
 
+    private lateinit var layoutGestureHud: LinearLayout
+    private lateinit var tvGestureHudIcon: TextView
+    private lateinit var pbGestureHud: ProgressBar
+    private lateinit var tvGestureHudText: TextView
+
+    private lateinit var layoutBottomBar: LinearLayout
     private lateinit var tvVlcCurrentTime: TextView
     private lateinit var sbVlcProgress: SeekBar
     private lateinit var tvVlcTotalDuration: TextView
 
-    private lateinit var btnVlcLock: LinearLayout
-    private lateinit var tvLockIcon: TextView
-    private lateinit var btnVlcSpeed: LinearLayout
-    private lateinit var tvSpeedLabel: TextView
-    private lateinit var btnVlcPrev: TextView
-    private lateinit var btnVlcNext: TextView
-    private lateinit var btnVlcFullscreen: LinearLayout
-    private lateinit var tvFullscreenLabel: TextView
+    private lateinit var btnVlcSubtitles: ImageView
+    private lateinit var btnVlcAspect: ImageView
+    private lateinit var btnVlcLock: ImageView
+    private lateinit var btnVlcRewind: ImageView
+    private lateinit var btnVlcPlayPause: FrameLayout
+    private lateinit var ivPlayPauseIcon: ImageView
+    private lateinit var btnVlcForward: ImageView
+    private lateinit var btnVlcPip: ImageView
+    private lateinit var btnVlcMore: ImageView
 
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
@@ -61,16 +77,32 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     private var isUserTracking = false
     private var isLocked = false
+    private var showRemainingTime = true
     private var currentSpeedIndex = 1
     private val speedOptions = arrayOf(0.5f, 1.0f, 1.25f, 1.5f, 2.0f)
     private val speedLabels = arrayOf("0.5x", "1.0x", "1.25x", "1.5x", "2.0x")
+
+    private var currentAspectIndex = 0
+    private val aspectModes = arrayOf("Best Fit", "Zoom to Fill", "Stretch (Full)", "16:9", "4:3")
 
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideControlsRunnable = Runnable {
         if (!isLocked) {
             layoutControlsOverlay.visibility = View.GONE
+        } else {
+            btnVlcFloatingLock.visibility = View.GONE
         }
     }
+
+    private val hideHudRunnable = Runnable {
+        layoutGestureHud.visibility = View.GONE
+    }
+
+    private lateinit var audioManager: AudioManager
+    private var maxVolume: Int = 15
+    private var currentBrightness: Float = -1f
+
+    private lateinit var gestureDetector: GestureDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,6 +122,9 @@ class VlcPlayerActivity : AppCompatActivity() {
 
         window.decorView.post { hideSystemUI() }
 
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+
         val fileId = intent.getIntExtra("FILE_ID", 0)
         currentFileId = fileId
         val title = intent.getStringExtra("TITLE") ?: "Video"
@@ -102,39 +137,56 @@ class VlcPlayerActivity : AppCompatActivity() {
             TelegramStreamingProxy.registerFileMessage(fileId, chatId, messageId)
         }
 
+        bindViews()
+        setupListeners(fileId, title)
+        setupGestures()
+        setupSeekBar()
+        initVlcAndPlay(fileId, title)
+        scheduleControlsAutoHide()
+    }
+
+    private fun bindViews() {
         vlcRoot = findViewById(R.id.vlcRoot)
         vlcVideoLayout = findViewById(R.id.vlcVideoLayout)
         pbVlcBuffering = findViewById(R.id.pbVlcBuffering)
         layoutControlsOverlay = findViewById(R.id.layoutControlsOverlay)
 
+        layoutTopBar = findViewById(R.id.layoutTopBar)
         btnVlcBack = findViewById(R.id.btnVlcBack)
         tvVlcTitle = findViewById(R.id.tvVlcTitle)
-        btnVlcSubtitles = findViewById(R.id.btnVlcSubtitles)
-        btnVlcSettings = findViewById(R.id.btnVlcSettings)
+        tvVlcSubtitle = findViewById(R.id.tvVlcSubtitle)
 
-        btnVlcRewind = findViewById(R.id.btnVlcRewind)
-        btnVlcPlayPause = findViewById(R.id.btnVlcPlayPause)
-        tvPlayPauseIcon = findViewById(R.id.tvPlayPauseIcon)
-        btnVlcForward = findViewById(R.id.btnVlcForward)
+        btnVlcFloatingLock = findViewById(R.id.btnVlcFloatingLock)
+        ivFloatingLockIcon = findViewById(R.id.ivFloatingLockIcon)
 
+        layoutGestureHud = findViewById(R.id.layoutGestureHud)
+        tvGestureHudIcon = findViewById(R.id.tvGestureHudIcon)
+        pbGestureHud = findViewById(R.id.pbGestureHud)
+        tvGestureHudText = findViewById(R.id.tvGestureHudText)
+
+        layoutBottomBar = findViewById(R.id.layoutBottomBar)
         tvVlcCurrentTime = findViewById(R.id.tvVlcCurrentTime)
         sbVlcProgress = findViewById(R.id.sbVlcProgress)
         tvVlcTotalDuration = findViewById(R.id.tvVlcTotalDuration)
 
-        if (explicitDurationMs > 0L) {
-            tvVlcTotalDuration.text = formatTime(explicitDurationMs)
-        }
-
+        btnVlcSubtitles = findViewById(R.id.btnVlcSubtitles)
+        btnVlcAspect = findViewById(R.id.btnVlcAspect)
         btnVlcLock = findViewById(R.id.btnVlcLock)
-        tvLockIcon = findViewById(R.id.tvLockIcon)
-        btnVlcSpeed = findViewById(R.id.btnVlcSpeed)
-        tvSpeedLabel = findViewById(R.id.tvSpeedLabel)
-        btnVlcPrev = findViewById(R.id.btnVlcPrev)
-        btnVlcNext = findViewById(R.id.btnVlcNext)
-        btnVlcFullscreen = findViewById(R.id.btnVlcFullscreen)
-        tvFullscreenLabel = findViewById(R.id.tvFullscreenLabel)
+        btnVlcRewind = findViewById(R.id.btnVlcRewind)
+        btnVlcPlayPause = findViewById(R.id.btnVlcPlayPause)
+        ivPlayPauseIcon = findViewById(R.id.ivPlayPauseIcon)
+        btnVlcForward = findViewById(R.id.btnVlcForward)
+        btnVlcPip = findViewById(R.id.btnVlcPip)
+        btnVlcMore = findViewById(R.id.btnVlcMore)
+    }
 
+    private fun setupListeners(fileId: Int, title: String) {
         tvVlcTitle.text = title
+        tvVlcSubtitle.text = "CLOUD VAULT STREAM • VLC ENGINE"
+
+        if (explicitDurationMs > 0L) {
+            updateTimeViews(0L, explicitDurationMs)
+        }
 
         btnVlcBack.setOnClickListener { finish() }
 
@@ -158,13 +210,8 @@ class VlcPlayerActivity : AppCompatActivity() {
             scheduleControlsAutoHide()
         }
 
-        btnVlcSettings.setOnClickListener {
-            showSpeedDialog()
-            scheduleControlsAutoHide()
-        }
-
-        btnVlcSpeed.setOnClickListener {
-            cycleSpeed()
+        btnVlcAspect.setOnClickListener {
+            cycleAspectRatio()
             scheduleControlsAutoHide()
         }
 
@@ -172,48 +219,212 @@ class VlcPlayerActivity : AppCompatActivity() {
             toggleLock()
         }
 
-        btnVlcPrev.setOnClickListener {
-            seekRelative(-30000L)
+        btnVlcFloatingLock.setOnClickListener {
+            toggleLock()
+        }
+
+        btnVlcPip.setOnClickListener {
+            enterPipMode()
+        }
+
+        btnVlcMore.setOnClickListener {
+            showMoreOptionsDialog()
             scheduleControlsAutoHide()
         }
 
-        btnVlcNext.setOnClickListener {
-            seekRelative(30000L)
+        tvVlcTotalDuration.setOnClickListener {
+            showRemainingTime = !showRemainingTime
+            val time = mediaPlayer?.time ?: 0L
+            val duration = getEffectiveDuration()
+            updateTimeViews(time, duration)
             scheduleControlsAutoHide()
         }
+    }
 
-        btnVlcFullscreen.setOnClickListener {
-            cycleAspectRatio()
+    private fun enterPipMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                layoutControlsOverlay.visibility = View.GONE
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9))
+                    .build()
+                enterPictureInPictureMode(params)
+            } catch (e: Throwable) {
+                Toast.makeText(this, "PIP not supported: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "Picture-in-Picture requires Android 8.0+", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        if (isInPictureInPictureMode) {
+            layoutControlsOverlay.visibility = View.GONE
+        } else {
+            layoutControlsOverlay.visibility = View.VISIBLE
             scheduleControlsAutoHide()
         }
+    }
 
-        vlcRoot.setOnClickListener {
-            if (isLocked) {
-                // Show only unlock button briefly
-                layoutControlsOverlay.visibility = View.VISIBLE
-                scheduleControlsAutoHide()
-            } else {
-                if (layoutControlsOverlay.visibility == View.VISIBLE) {
-                    layoutControlsOverlay.visibility = View.GONE
+    private fun setupGestures() {
+        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (isLocked) {
+                    if (btnVlcFloatingLock.visibility == View.VISIBLE) {
+                        btnVlcFloatingLock.visibility = View.GONE
+                    } else {
+                        btnVlcFloatingLock.visibility = View.VISIBLE
+                        scheduleControlsAutoHide()
+                    }
                 } else {
-                    layoutControlsOverlay.visibility = View.VISIBLE
-                    scheduleControlsAutoHide()
+                    if (layoutControlsOverlay.visibility == View.VISIBLE) {
+                        layoutControlsOverlay.visibility = View.GONE
+                    } else {
+                        layoutControlsOverlay.visibility = View.VISIBLE
+                        scheduleControlsAutoHide()
+                    }
                 }
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                if (isLocked) return false
+                val screenWidth = vlcRoot.width.toFloat()
+                if (e.x < screenWidth / 2f) {
+                    seekRelative(-10000L)
+                    showGestureHud("⏱️", "-10s", 0)
+                } else {
+                    seekRelative(10000L)
+                    showGestureHud("⏱️", "+10s", 0)
+                }
+                scheduleControlsAutoHide()
+                return true
+            }
+        })
+
+        var initialX = 0f
+        var initialY = 0f
+        var isDraggingVertical = false
+        var isDraggingHorizontal = false
+        var initialVolume = 0
+        var initialSeekTime = 0L
+
+        vlcRoot.setOnTouchListener { _, event ->
+            if (gestureDetector.onTouchEvent(event)) {
+                return@setOnTouchListener true
+            }
+
+            if (isLocked) {
+                return@setOnTouchListener false
+            }
+
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = event.x
+                    initialY = event.y
+                    isDraggingVertical = false
+                    isDraggingHorizontal = false
+                    initialVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    initialSeekTime = mediaPlayer?.time ?: 0L
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.x - initialX
+                    val deltaY = event.y - initialY
+                    val screenWidth = vlcRoot.width.toFloat()
+                    val screenHeight = vlcRoot.height.toFloat()
+
+                    if (!isDraggingVertical && !isDraggingHorizontal) {
+                        if (abs(deltaY) > 40f && abs(deltaY) > abs(deltaX)) {
+                            isDraggingVertical = true
+                        } else if (abs(deltaX) > 40f && abs(deltaX) > abs(deltaY)) {
+                            isDraggingHorizontal = true
+                        }
+                    }
+
+                    if (isDraggingVertical) {
+                        val fraction = -deltaY / screenHeight
+                        if (initialX < screenWidth / 2f) {
+                            // Left side: Brightness
+                            val lp = window.attributes
+                            val current = if (lp.screenBrightness < 0f) 0.5f else lp.screenBrightness
+                            val newBrightness = (current + fraction * 0.1f).coerceIn(0.01f, 1.0f)
+                            lp.screenBrightness = newBrightness
+                            window.attributes = lp
+                            val pct = (newBrightness * 100).roundToInt()
+                            showGestureHud("☀️", "$pct%", pct)
+                        } else {
+                            // Right side: Volume
+                            val volumeDelta = (fraction * maxVolume * 0.8f).roundToInt()
+                            val newVolume = (initialVolume + volumeDelta).coerceIn(0, maxVolume)
+                            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+                            val pct = ((newVolume.toFloat() / maxVolume.toFloat()) * 100).roundToInt()
+                            showGestureHud("🔊", "$pct%", pct)
+                        }
+                    } else if (isDraggingHorizontal) {
+                        // Horizontal Scrub / Seek
+                        val duration = getEffectiveDuration()
+                        if (duration > 0L) {
+                            val seekFraction = deltaX / screenWidth
+                            val seekDeltaMs = (seekFraction * 90000L).toLong() // +/- 90 seconds max per drag
+                            val targetTime = (initialSeekTime + seekDeltaMs).coerceIn(0L, duration)
+                            val sign = if (seekDeltaMs >= 0) "+" else ""
+                            showGestureHud("⏱️", "$sign${formatTime(seekDeltaMs)} (${formatTime(targetTime)})", ((targetTime.toFloat() / duration.toFloat()) * 100).roundToInt())
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (isDraggingHorizontal) {
+                        val duration = getEffectiveDuration()
+                        val deltaX = event.x - initialX
+                        val screenWidth = vlcRoot.width.toFloat()
+                        if (duration > 0L) {
+                            val seekFraction = deltaX / screenWidth
+                            val seekDeltaMs = (seekFraction * 90000L).toLong()
+                            val targetTime = (initialSeekTime + seekDeltaMs).coerceIn(0L, duration)
+                            mediaPlayer?.time = targetTime
+                        }
+                    }
+                    hideHandler.removeCallbacks(hideHudRunnable)
+                    hideHandler.postDelayed(hideHudRunnable, 1200L)
+                    scheduleControlsAutoHide()
+                    true
+                }
+                else -> false
             }
         }
+    }
 
-        setupSeekBar()
-        initVlcAndPlay(fileId, title)
-        scheduleControlsAutoHide()
+    private fun showGestureHud(icon: String, text: String, progress: Int) {
+        tvGestureHudIcon.text = icon
+        tvGestureHudText.text = text
+        if (progress in 0..100) {
+            pbGestureHud.visibility = View.VISIBLE
+            pbGestureHud.progress = progress
+        } else {
+            pbGestureHud.visibility = View.GONE
+        }
+        layoutGestureHud.visibility = View.VISIBLE
+        hideHandler.removeCallbacks(hideHudRunnable)
+    }
+
+    private fun updateTimeViews(currentTimeMs: Long, totalDurationMs: Long) {
+        tvVlcCurrentTime.text = formatTime(currentTimeMs)
+        if (totalDurationMs > 0L) {
+            if (showRemainingTime) {
+                val remaining = (totalDurationMs - currentTimeMs).coerceAtLeast(0L)
+                tvVlcTotalDuration.text = "- ${formatTime(remaining)}"
+            } else {
+                tvVlcTotalDuration.text = formatTime(totalDurationMs)
+            }
+        }
     }
 
     private fun getEffectiveDuration(): Long {
         val vlcLength = mediaPlayer?.length ?: 0L
         if (explicitDurationMs > 0L) {
-            // When streaming over local HTTP, VLC's demuxer can sometimes estimate an inaccurate length
-            // (e.g. 3 hours = 10,855,000ms for a 1-minute video due to container timescale quirk).
-            // If VLC reports 0, or VLC reports a length > 2.5x or < 0.3x the verified video duration,
-            // prioritize explicitDurationMs.
             if (vlcLength <= 0L || vlcLength > explicitDurationMs * 2.5 || vlcLength < explicitDurationMs * 0.3) {
                 return explicitDurationMs
             }
@@ -229,7 +440,7 @@ class VlcPlayerActivity : AppCompatActivity() {
                     val duration = getEffectiveDuration()
                     if (duration > 0L) {
                         val newTime = (progress.toFloat() / 1000f * duration).toLong()
-                        tvVlcCurrentTime.text = formatTime(newTime)
+                        updateTimeViews(newTime, duration)
                     }
                 }
             }
@@ -283,9 +494,22 @@ class VlcPlayerActivity : AppCompatActivity() {
 
             TeleflixLogger.log("VlcPlayer", "Initializing VLC playback for '$videoTitle' (fileId=$fileId) url=$proxyUrl")
 
+            val isAudio = videoTitle.endsWith(".m4a", ignoreCase = true) ||
+                          videoTitle.endsWith(".mp3", ignoreCase = true) ||
+                          videoTitle.endsWith(".ogg", ignoreCase = true) ||
+                          videoTitle.endsWith(".flac", ignoreCase = true) ||
+                          videoTitle.endsWith(".wav", ignoreCase = true) ||
+                          videoTitle.endsWith(".aac", ignoreCase = true) ||
+                          videoTitle.endsWith(".opus", ignoreCase = true)
+
             val media = Media(vlc, Uri.parse(proxyUrl)).apply {
-                setHWDecoderEnabled(true, false)
-                addOption(":network-caching=1500")
+                if (!isAudio) {
+                    setHWDecoderEnabled(true, false)
+                }
+                addOption(":network-caching=2000")
+                addOption(":file-caching=2000")
+                addOption(":live-caching=2000")
+                addOption(":sout-mux-caching=2000")
             }
 
             player.setEventListener { event ->
@@ -295,24 +519,21 @@ class VlcPlayerActivity : AppCompatActivity() {
                         MediaPlayer.Event.Buffering -> {
                             if (event.buffering < 100f) {
                                 pbVlcBuffering.visibility = View.VISIBLE
-                                if (event.buffering.toInt() % 25 == 0) {
-                                    TeleflixLogger.log("VlcPlayer", "Buffering video stream: ${event.buffering.toInt()}%")
-                                }
                             } else {
                                 pbVlcBuffering.visibility = View.GONE
                             }
                         }
                         MediaPlayer.Event.Playing -> {
                             pbVlcBuffering.visibility = View.GONE
-                            tvPlayPauseIcon.text = "⏸"
+                            ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_pause)
                             TeleflixLogger.log("VlcPlayer", "Playback state: PLAYING")
                         }
                         MediaPlayer.Event.Paused -> {
-                            tvPlayPauseIcon.text = "▶"
+                            ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_play)
                             TeleflixLogger.log("VlcPlayer", "Playback state: PAUSED")
                         }
                         MediaPlayer.Event.EndReached -> {
-                            tvPlayPauseIcon.text = "▶"
+                            ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_play)
                             pbVlcBuffering.visibility = View.GONE
                             TeleflixLogger.log("VlcPlayer", "Playback state: END REACHED")
                         }
@@ -324,8 +545,7 @@ class VlcPlayerActivity : AppCompatActivity() {
                                     val clampedTime = time.coerceIn(0L, length)
                                     val progress = ((clampedTime.toFloat() / length.toFloat()) * 1000).toInt().coerceIn(0, 1000)
                                     sbVlcProgress.progress = progress
-                                    tvVlcCurrentTime.text = formatTime(clampedTime)
-                                    tvVlcTotalDuration.text = formatTime(length)
+                                    updateTimeViews(clampedTime, length)
                                 } else if (time > 0L) {
                                     tvVlcCurrentTime.text = formatTime(time)
                                 }
@@ -355,10 +575,10 @@ class VlcPlayerActivity : AppCompatActivity() {
         mediaPlayer?.let { player ->
             if (player.isPlaying) {
                 player.pause()
-                tvPlayPauseIcon.text = "▶"
+                ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_play)
             } else {
                 player.play()
-                tvPlayPauseIcon.text = "⏸"
+                ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_pause)
             }
         }
     }
@@ -374,29 +594,66 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     private fun toggleLock() {
         isLocked = !isLocked
-        tvLockIcon.text = if (isLocked) "🔓" else "🔒"
-        Toast.makeText(this, if (isLocked) "Screen locked" else "Screen unlocked", Toast.LENGTH_SHORT).show()
+        if (isLocked) {
+            ivFloatingLockIcon.setImageResource(R.drawable.ic_vlc_lock)
+            btnVlcLock.setImageResource(R.drawable.ic_vlc_lock)
+            layoutTopBar.visibility = View.GONE
+            layoutBottomBar.visibility = View.GONE
+            btnVlcFloatingLock.visibility = View.VISIBLE
+            Toast.makeText(this, "Screen locked 🔒", Toast.LENGTH_SHORT).show()
+        } else {
+            ivFloatingLockIcon.setImageResource(R.drawable.ic_vlc_unlock)
+            btnVlcLock.setImageResource(R.drawable.ic_vlc_unlock)
+            layoutTopBar.visibility = View.VISIBLE
+            layoutBottomBar.visibility = View.VISIBLE
+            btnVlcFloatingLock.visibility = View.VISIBLE
+            Toast.makeText(this, "Screen unlocked 🔓", Toast.LENGTH_SHORT).show()
+        }
         scheduleControlsAutoHide()
     }
 
-    private fun cycleSpeed() {
-        currentSpeedIndex = (currentSpeedIndex + 1) % speedOptions.size
-        val speed = speedOptions[currentSpeedIndex]
-        mediaPlayer?.rate = speed
-        tvSpeedLabel.text = speedLabels[currentSpeedIndex]
-        Toast.makeText(this, "Speed: ${speedLabels[currentSpeedIndex]}", Toast.LENGTH_SHORT).show()
-    }
+    private fun cycleAspectRatio() {
+        val player = mediaPlayer ?: return
+        currentAspectIndex = (currentAspectIndex + 1) % aspectModes.size
+        val mode = aspectModes[currentAspectIndex]
 
-    private fun showSpeedDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Playback Speed")
-            .setItems(speedLabels) { _, which ->
-                currentSpeedIndex = which
-                val speed = speedOptions[which]
-                mediaPlayer?.rate = speed
-                tvSpeedLabel.text = speedLabels[which]
+        val rootW = if (vlcRoot.width > 0) vlcRoot.width else resources.displayMetrics.widthPixels
+        val rootH = if (vlcRoot.height > 0) vlcRoot.height else resources.displayMetrics.heightPixels
+
+        when (currentAspectIndex) {
+            0 -> {
+                // Best Fit (letterboxed, original proportions)
+                player.aspectRatio = null
+                player.scale = 0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
             }
-            .show()
+            1 -> {
+                // Zoom to Fill (crops without stretch)
+                player.aspectRatio = null
+                player.scale = 0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_FIT_SCREEN
+            }
+            2 -> {
+                // Stretch Fullscreen
+                player.scale = 0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
+                player.aspectRatio = "$rootW:$rootH"
+            }
+            3 -> {
+                // 16:9
+                player.scale = 0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_FIT_SCREEN
+                player.aspectRatio = "16:9"
+            }
+            4 -> {
+                // 4:3
+                player.scale = 0f
+                player.videoScale = MediaPlayer.ScaleType.SURFACE_FIT_SCREEN
+                player.aspectRatio = "4:3"
+            }
+        }
+        vlcVideoLayout.requestLayout()
+        Toast.makeText(this, "Aspect: $mode", Toast.LENGTH_SHORT).show()
     }
 
     private fun showTrackSelectionDialog(title: String) {
@@ -428,40 +685,128 @@ class VlcPlayerActivity : AppCompatActivity() {
             .show()
     }
 
-    private var currentAspectIndex = 0
-    private val aspectModes = arrayOf("Best Fit", "Zoom to Fill", "Stretch (Full)")
+    private fun showMoreOptionsDialog() {
+        val options = arrayOf(
+            "⏱️ Playback Speed (${speedLabels[currentSpeedIndex]})",
+            "💬 Subtitles / Audio Tracks",
+            "📐 Aspect Ratio (${aspectModes[currentAspectIndex]})",
+            "⏩ Jump to Time",
+            "⏲️ Sleep Timer",
+            "🔊 Audio Boost (Up to 200%)",
+            "🖼️ Picture-in-Picture"
+        )
 
-    private fun cycleAspectRatio() {
-        val player = mediaPlayer ?: return
-        currentAspectIndex = (currentAspectIndex + 1) % aspectModes.size
-        val mode = aspectModes[currentAspectIndex]
+        AlertDialog.Builder(this)
+            .setTitle("VLC Options")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showSpeedDialog()
+                    1 -> showTrackSelectionDialog("Subtitles & Audio Tracks")
+                    2 -> cycleAspectRatio()
+                    3 -> showJumpToTimeDialog()
+                    4 -> showSleepTimerDialog()
+                    5 -> showAudioBoostDialog()
+                    6 -> enterPipMode()
+                }
+            }
+            .show()
+    }
 
-        val rootW = if (vlcRoot.width > 0) vlcRoot.width else resources.displayMetrics.widthPixels
-        val rootH = if (vlcRoot.height > 0) vlcRoot.height else resources.displayMetrics.heightPixels
+    private fun showSpeedDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Playback Speed")
+            .setItems(speedLabels) { _, which ->
+                currentSpeedIndex = which
+                val speed = speedOptions[which]
+                mediaPlayer?.rate = speed
+                Toast.makeText(this, "Speed set to ${speedLabels[which]}", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
 
-        when (currentAspectIndex) {
-            0 -> {
-                // 1. Best Fit (Entire video visible, original aspect ratio with letterboxing)
-                player.aspectRatio = null
-                player.scale = 0f
-                player.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
-            }
-            1 -> {
-                // 2. Zoom to Fill (Crops top/bottom or sides without distortion to remove black bars)
-                player.aspectRatio = null
-                player.scale = 0f
-                player.videoScale = MediaPlayer.ScaleType.SURFACE_FIT_SCREEN
-            }
-            2 -> {
-                // 3. Stretch (Full screen edge-to-edge stretch)
-                player.scale = 0f
-                player.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
-                player.aspectRatio = "$rootW:$rootH"
-            }
+    private fun showJumpToTimeDialog() {
+        val input = EditText(this).apply {
+            hint = "e.g. 12:30 or 75"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
         }
-        vlcVideoLayout.requestLayout()
-        tvFullscreenLabel.text = mode
-        Toast.makeText(this, "Screen: $mode", Toast.LENGTH_SHORT).show()
+        AlertDialog.Builder(this)
+            .setTitle("Jump to Time")
+            .setMessage("Enter time (MM:SS or minutes):")
+            .setView(input)
+            .setPositiveButton("Jump") { _, _ ->
+                val text = input.text.toString().trim()
+                val targetMs = parseTimeToMs(text)
+                if (targetMs >= 0L) {
+                    val dur = getEffectiveDuration()
+                    mediaPlayer?.time = targetMs.coerceIn(0L, if (dur > 0L) dur else Long.MAX_VALUE)
+                } else {
+                    Toast.makeText(this, "Invalid time format", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun parseTimeToMs(text: String): Long {
+        if (text.isBlank()) return -1L
+        return try {
+            if (text.contains(":")) {
+                val parts = text.split(":")
+                if (parts.size == 2) {
+                    val m = parts[0].toLong()
+                    val s = parts[1].toLong()
+                    (m * 60 + s) * 1000L
+                } else if (parts.size == 3) {
+                    val h = parts[0].toLong()
+                    val m = parts[1].toLong()
+                    val s = parts[2].toLong()
+                    (h * 3600 + m * 60 + s) * 1000L
+                } else -1L
+            } else {
+                val num = text.toLong()
+                num * 60 * 1000L
+            }
+        } catch (_: Throwable) {
+            -1L
+        }
+    }
+
+    private fun showSleepTimerDialog() {
+        val options = arrayOf("15 Minutes", "30 Minutes", "45 Minutes", "60 Minutes", "Cancel Timer")
+        AlertDialog.Builder(this)
+            .setTitle("Sleep Timer")
+            .setItems(options) { _, which ->
+                if (which < 4) {
+                    val minutes = arrayOf(15, 30, 45, 60)[which]
+                    hideHandler.postDelayed({
+                        try {
+                            mediaPlayer?.pause()
+                            finish()
+                        } catch (_: Throwable) {}
+                    }, minutes * 60 * 1000L)
+                    Toast.makeText(this, "Sleep timer set for $minutes min", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Sleep timer canceled", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .show()
+    }
+
+    private fun showAudioBoostDialog() {
+        val levels = arrayOf("100% (Normal)", "125%", "150%", "175%", "200% (Max Boost)")
+        val volInts = arrayOf(100, 125, 150, 175, 200)
+        AlertDialog.Builder(this)
+            .setTitle("Audio Boost")
+            .setItems(levels) { _, which ->
+                try {
+                    mediaPlayer?.volume = volInts[which]
+                    Toast.makeText(this, "Audio Volume: ${levels[which]}", Toast.LENGTH_SHORT).show()
+                } catch (e: Throwable) {
+                    Toast.makeText(this, "Audio boost not supported: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .show()
     }
 
     private fun scheduleControlsAutoHide() {

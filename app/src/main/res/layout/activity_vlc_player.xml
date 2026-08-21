@@ -13,189 +13,154 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Buffering Spinner -->
+    <!-- Buffering Spinner (VLC Orange) -->
     <ProgressBar
         android:id="@+id/pbVlcBuffering"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
         android:layout_gravity="center"
-        android:indeterminateTint="#FF7700" />
+        android:indeterminateTint="#FF8800" />
+
+    <!-- Center HUD for Volume / Brightness / Seek Gestures -->
+    <LinearLayout
+        android:id="@+id/layoutGestureHud"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_vlc_pill"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvGestureHudIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔊"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp" />
+
+        <ProgressBar
+            android:id="@+id/pbGestureHud"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="120dp"
+            android:layout_height="6dp"
+            android:layout_marginStart="12dp"
+            android:max="100"
+            android:progress="50"
+            android:progressTint="#FF8800"
+            android:progressBackgroundTint="#4DFFFFFF" />
+
+        <TextView
+            android:id="@+id/tvGestureHudText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="50%"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <!-- Overlay Controller Container -->
     <FrameLayout
         android:id="@+id/layoutControlsOverlay"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#50000000">
+        android:layout_height="match_parent">
 
-        <!-- Top Bar: Back, Title, CC, Settings, VLC Indicator -->
-        <LinearLayout
+        <!-- Top Header: Back Arrow, Centered Title & Subtitle -->
+        <FrameLayout
+            android:id="@+id/layoutTopBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="top"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
+            android:background="#99000000"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
             android:paddingTop="16dp"
             android:paddingBottom="12dp">
 
-            <!-- Rounded Back Button -->
-            <FrameLayout
+            <!-- Back Button -->
+            <ImageView
                 android:id="@+id/btnVlcBack"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:background="@drawable/ic_launcher_background"
-                android:backgroundTint="#26FFFFFF">
+                android:layout_gravity="center_vertical|start"
+                android:padding="8dp"
+                android:src="@drawable/ic_vlc_back"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                app:tint="#FFFFFF" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="←"
-                    android:textColor="#FFFFFF"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-
-            <!-- Video Title -->
-            <TextView
-                android:id="@+id/tvVlcTitle"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="14dp"
-                android:layout_marginEnd="12dp"
-                android:text="Video_1782206965.mp4"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <!-- Subtitle CC Button -->
-            <TextView
-                android:id="@+id/btnVlcSubtitles"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
-                android:text="[CC]"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:padding="6dp" />
-
-            <!-- Settings Button -->
-            <TextView
-                android:id="@+id/btnVlcSettings"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="16dp"
-                android:text="⚙️"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:padding="6dp" />
-
-            <!-- VLC Badge -->
+            <!-- Centered 2-line Title & Subtitle -->
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:layout_marginStart="52dp"
+                android:layout_marginEnd="52dp"
+                android:layout_gravity="center"
+                android:orientation="vertical"
+                android:gravity="center">
 
                 <TextView
+                    android:id="@+id/tvVlcTitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🟠"
-                    android:textSize="10sp" />
+                    android:gravity="center"
+                    android:text="VIDEO TITLE"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
 
                 <TextView
+                    android:id="@+id/tvVlcSubtitle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="VLC"
-                    android:textColor="#FF8800"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="2dp"
+                    android:gravity="center"
+                    android:text="CLOUD VAULT STREAM"
+                    android:textColor="#CCCCCC"
+                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
             </LinearLayout>
 
-        </LinearLayout>
+        </FrameLayout>
 
-        <!-- Center Controls: Rewind 10s, Orange Play/Pause, Forward 10s -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+        <!-- Left Floating Lock Capsule Button -->
+        <FrameLayout
+            android:id="@+id/btnVlcFloatingLock"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center_vertical|start"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/bg_vlc_pill">
 
-            <!-- Rewind 10s -->
-            <FrameLayout
-                android:id="@+id/btnVlcRewind"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
-                android:background="@drawable/ic_launcher_background"
-                android:backgroundTint="#33FFFFFF">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="↶ 10"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-
-            <!-- Play/Pause Orange Circle -->
-            <FrameLayout
-                android:id="@+id/btnVlcPlayPause"
-                android:layout_width="68dp"
-                android:layout_height="68dp"
-                android:layout_marginStart="28dp"
-                android:layout_marginEnd="28dp"
-                android:background="@drawable/ic_launcher_background"
-                android:backgroundTint="#FF7700">
-
-                <TextView
-                    android:id="@+id/tvPlayPauseIcon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="⏸"
-                    android:textColor="#FFFFFF"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-
-            <!-- Forward 10s -->
-            <FrameLayout
-                android:id="@+id/btnVlcForward"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
-                android:background="@drawable/ic_launcher_background"
-                android:backgroundTint="#33FFFFFF">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:text="↷ 10"
-                    android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-
-        </LinearLayout>
+            <ImageView
+                android:id="@+id/ivFloatingLockIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_vlc_unlock"
+                app:tint="#FFFFFF" />
+        </FrameLayout>
 
         <!-- Bottom Controller Bar -->
         <LinearLayout
+            android:id="@+id/layoutBottomBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
+            android:background="#B3000000"
             android:orientation="vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
+            android:paddingTop="8dp"
             android:paddingBottom="16dp">
 
             <!-- Time Row with Orange Seekbar -->
@@ -210,12 +175,12 @@
                     android:id="@+id/tvVlcCurrentTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="00:07"
+                    android:text="0:00"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
-                <!-- Progress Seekbar -->
+                <!-- Progress Seekbar (VLC Orange) -->
                 <SeekBar
                     android:id="@+id/sbVlcProgress"
                     android:layout_width="0dp"
@@ -223,133 +188,138 @@
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     android:layout_marginEnd="8dp"
-                    android:progressTint="#FF7700"
-                    android:thumbTint="#FF7700" />
+                    android:maxHeight="4dp"
+                    android:minHeight="4dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:progressDrawable="@drawable/vlc_seekbar_progress"
+                    android:thumb="@drawable/vlc_seekbar_thumb"
+                    android:thumbOffset="0dp" />
 
-                <!-- Total Duration -->
+                <!-- Total / Remaining Duration -->
                 <TextView
                     android:id="@+id/tvVlcTotalDuration"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="3:00:55"
-                    android:textColor="#BBBBBB"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:text="- 0:00"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="4dp" />
 
             </LinearLayout>
 
-            <!-- Bottom Actions Row: Lock, Speed, Previous, Next, Fullscreen -->
+            <!-- Bottom Actions Row: Subtitle, Aspect, Lock, Rewind, Play/Pause, Forward, PIP, More -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_height="64dp"
+                android:layout_marginTop="4dp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
+                <!-- Subtitles / Audio Track Button -->
+                <ImageView
+                    android:id="@+id/btnVlcSubtitles"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_vlc_subtitles"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF" />
+
+                <!-- Aspect Ratio Cycle Button -->
+                <ImageView
+                    android:id="@+id/btnVlcAspect"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_vlc_aspect"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF" />
+
                 <!-- Lock Button -->
-                <LinearLayout
+                <ImageView
                     android:id="@+id/btnVlcLock"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="6dp">
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_vlc_unlock"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF" />
 
-                    <TextView
-                        android:id="@+id/tvLockIcon"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🔒"
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Lock"
-                        android:textColor="#AAAAAA"
-                        android:textSize="9sp" />
-                </LinearLayout>
-
-                <!-- Speed Selector -->
-                <LinearLayout
-                    android:id="@+id/btnVlcSpeed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="6dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="⏱️"
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:id="@+id/tvSpeedLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="1.0x"
-                        android:textColor="#AAAAAA"
-                        android:textSize="9sp" />
-                </LinearLayout>
-
+                <!-- Spacer -->
                 <View
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:layout_weight="1" />
 
-                <!-- Prev Button -->
-                <TextView
-                    android:id="@+id/btnVlcPrev"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="⏮"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp"
-                    android:padding="8dp" />
+                <!-- Rewind 10s Button -->
+                <ImageView
+                    android:id="@+id/btnVlcRewind"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:padding="6dp"
+                    android:src="@drawable/ic_vlc_rewind10"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF" />
 
-                <!-- Next Button -->
-                <TextView
-                    android:id="@+id/btnVlcNext"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="24dp"
-                    android:text="⏭"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp"
-                    android:padding="8dp" />
+                <!-- Prominent Play/Pause Circle Button -->
+                <FrameLayout
+                    android:id="@+id/btnVlcPlayPause"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginEnd="20dp"
+                    android:background="@drawable/bg_vlc_circle_button">
 
+                    <ImageView
+                        android:id="@+id/ivPlayPauseIcon"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_vlc_play"
+                        app:tint="#FFFFFF" />
+                </FrameLayout>
+
+                <!-- Forward 10s Button -->
+                <ImageView
+                    android:id="@+id/btnVlcForward"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:padding="6dp"
+                    android:src="@drawable/ic_vlc_forward10"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF" />
+
+                <!-- Spacer -->
                 <View
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:layout_weight="1" />
 
-                <!-- Fullscreen Toggle -->
-                <LinearLayout
-                    android:id="@+id/btnVlcFullscreen"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="6dp">
+                <!-- PIP Button -->
+                <ImageView
+                    android:id="@+id/btnVlcPip"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="8dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_vlc_pip"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="⛶"
-                        android:textColor="#FFFFFF"
-                        android:textSize="18sp" />
-
-                    <TextView
-                        android:id="@+id/tvFullscreenLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Fit Screen"
-                        android:textColor="#AAAAAA"
-                        android:textSize="9sp" />
-                </LinearLayout>
+                <!-- More Options Button (3 dots) -->
+                <ImageView
+                    android:id="@+id/btnVlcMore"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_vlc_more"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    app:tint="#FFFFFF" />
 
             </LinearLayout>
 

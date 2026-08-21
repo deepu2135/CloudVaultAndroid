@@ -83,6 +83,9 @@ object TelegramStreamingProxy {
                 is TdApi.MessageVideo -> content.video.video.id
                 is TdApi.MessageDocument -> content.document.document.id
                 is TdApi.MessageAudio -> content.audio.audio.id
+                is TdApi.MessageVoiceNote -> content.voiceNote.voice.id
+                is TdApi.MessageAnimation -> content.animation.animation.id
+                is TdApi.MessageVideoNote -> content.videoNote.video.id
                 else -> null
             }
             if (freshId != null && freshId != 0) {
@@ -145,8 +148,8 @@ object TelegramStreamingProxy {
 
         val isOffsetJump = lastOffset != null && Math.abs(offset - lastOffset) > 500_000L
 
-        // Strict rate limit: do NOT re-issue DownloadFile for the exact same offset within 8,000ms unless forced or seeking
-        if (!force && !isOffsetJump && lastOffset == offset && (now - lastTime) < 8000L) {
+        // Rate limit: do NOT re-issue DownloadFile for the exact same offset within 2500ms unless forced or seeking
+        if (!force && !isOffsetJump && lastOffset == offset && (now - lastTime) < 2500L) {
             return
         }
 
@@ -159,13 +162,13 @@ object TelegramStreamingProxy {
                     req.fileId = fileId
                     req.priority = DOWNLOAD_PRIORITY
                     req.offset = offset
-                    req.limit = 0L // 0 means continuous uninterrupted stream to end of file
+                    req.limit = limit
                     req.synchronous = false
                 })
                 if (res is TdApi.Error) {
-                    TeleflixLogger.log(TAG, "[TDLib Error] DownloadFile fileId=$fileId offset=$offset: code=${res.code} message=${res.message}", isError = true)
+                    TeleflixLogger.log(TAG, "[TDLib Error] DownloadFile fileId=$fileId offset=$offset limit=$limit: code=${res.code} message=${res.message}", isError = true)
                 } else {
-                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset force=$force jump=$isOffsetJump")
+                    TeleflixLogger.log(TAG, "[TDLib OK] DownloadFile fileId=$fileId offset=$offset limit=$limit force=$force jump=$isOffsetJump")
                 }
             } catch (e: Exception) {
                 TeleflixLogger.log(TAG, "[TDLib Exception] DownloadFile fileId=$fileId: ${e.message}", isError = true)
@@ -1498,25 +1501,54 @@ object TelegramStreamingProxy {
                     return@withTimeoutOrNull null
                 }
 
-                if (file?.local?.isDownloadingCompleted == true) {
-                    val localFileExists = !file.local.path.isNullOrBlank() && java.io.File(file.local.path).exists()
-                    if (localFileExists) {
-                        val finalData = try {
-                            TelegramClient.sendRequest(TdApi.ReadFilePart(activeFileId, offset, limit.toLong())) as? TdApi.Data
-                        } catch (e: Exception) { null }
-                        if (finalData?.data != null && finalData.data.isNotEmpty()) {
-                            return@withTimeoutOrNull finalData.data
+                if (file != null) {
+                    val localPath = file.local?.path
+                    if (!localPath.isNullOrBlank()) {
+                        val localFile = java.io.File(localPath)
+                        if (localFile.exists() && localFile.length() > offset) {
+                            try {
+                                java.io.RandomAccessFile(localFile, "r").use { raf ->
+                                    raf.seek(offset)
+                                    val available = localFile.length() - offset
+                                    val readLen = minOf(limit.toLong(), available).toInt()
+                                    if (readLen > 0) {
+                                        val buf = ByteArray(readLen)
+                                        val actualRead = raf.read(buf)
+                                        if (actualRead > 0) {
+                                            val tdlibMs = System.currentTimeMillis() - chunkStartMs
+                                            metrics?.chunksOk = (metrics?.chunksOk ?: 0) + 1
+                                            val count = metrics?.chunksOk ?: 1
+                                            if (tdlibMs > 500L || count % 10 == 0 || count == 1) {
+                                                TeleflixLogger.log(TAG, "[Disk] chunk #$count fileId=$activeFileId offset=$offset size=$actualRead tdlibMs=$tdlibMs status=ok")
+                                            }
+                                            return@withTimeoutOrNull if (actualRead == readLen) buf else buf.copyOf(actualRead)
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                TeleflixLogger.log(TAG, "Direct disk read error for fileId=$activeFileId: ${e.message}")
+                            }
                         }
-                    } else {
+                    }
+
+                    if (file.local?.isDownloadingCompleted == true && (localPath.isNullOrBlank() || !java.io.File(localPath).exists())) {
                         if (attempts == 0) {
                             TeleflixLogger.log(TAG, "Local file for fileId=$activeFileId missing from disk, resetting local state via DeleteFile to stream from Telegram Cloud")
                             runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(activeFileId)) }
                         }
                     }
+
+                    // If download is inactive and not complete, immediately kick off download without waiting 5 seconds
+                    if (file.local?.isDownloadingActive == false && file.local?.isDownloadingCompleted == false && file.local?.canBeDownloaded == true) {
+                        if (attempts % 20 == 0) {
+                            TeleflixLogger.log(TAG, "File fileId=$activeFileId download inactive (attempts=$attempts), triggering DownloadFile...")
+                            triggerTdlibDownload(activeFileId, offset, limit.toLong(), force = true)
+                        }
+                    }
                 }
 
-                // If stall detected after 100 attempts (5 full seconds of no data), refresh message & re-elevate TDLib priority
-                val isStalled = attempts >= 100 && attempts % 100 == 0
+                // If stall detected after 40 attempts (2 seconds of no data), refresh message & re-elevate TDLib priority
+                val isStalled = attempts >= 40 && attempts % 40 == 0
                 if (isStalled) {
                     metrics?.chunksRetried = (metrics?.chunksRetried ?: 0) + 1
                     TeleflixLogger.log(TAG, "downloadChunk stall check for fileId=$activeFileId offset=$offset at attempt $attempts. Refreshing message location and elevating TDLib priority...")
@@ -1524,7 +1556,7 @@ object TelegramStreamingProxy {
                     if (refreshed != null && refreshed != 0) {
                         activeFileId = refreshed
                     }
-                    triggerTdlibDownload(activeFileId, offset, force = true)
+                    triggerTdlibDownload(activeFileId, offset, limit.toLong(), force = true)
                 }
                 
                 delay(50L)
