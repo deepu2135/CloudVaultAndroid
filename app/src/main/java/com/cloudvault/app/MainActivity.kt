@@ -1126,6 +1126,7 @@ class MainActivity : AppCompatActivity() {
         val cardOptionAutoBackup: MaterialCardView = dialogView.findViewById(R.id.cardOptionAutoBackup)
         val tvSettingsAutoBackupSummary: TextView = dialogView.findViewById(R.id.tvSettingsAutoBackupSummary)
         val tvSettingsAutoBackupBadge: TextView = dialogView.findViewById(R.id.tvSettingsAutoBackupBadge)
+        val cardOptionApiConfig: MaterialCardView? = dialogView.findViewById(R.id.cardOptionApiConfig)
         val layoutToggleApiSettings: LinearLayout = dialogView.findViewById(R.id.layoutToggleApiSettings)
         val layoutApiFields: LinearLayout = dialogView.findViewById(R.id.layoutApiFields)
         val tvApiExpandIcon: TextView = dialogView.findViewById(R.id.tvApiExpandIcon)
@@ -1140,6 +1141,10 @@ class MainActivity : AppCompatActivity() {
 
         val cardOptionAppLogs: MaterialCardView? = dialogView.findViewById(R.id.cardOptionAppLogs)
         val tvSettingsLogsCountBadge: TextView? = dialogView.findViewById(R.id.tvSettingsLogsCountBadge)
+
+        // Hide API Configuration if already logged in
+        val isUserLoggedIn = TelegramClient.authState.value is TelegramAuthState.Ready
+        cardOptionApiConfig?.visibility = if (isUserLoggedIn) View.GONE else View.VISIBLE
 
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
