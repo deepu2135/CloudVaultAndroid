@@ -216,7 +216,7 @@ class MediaGridAdapter(
             is VaultDisplayItem.Header -> TYPE_HEADER
             is VaultDisplayItem.Media -> when (item.item.type) {
                 MediaType.PHOTO, MediaType.VIDEO -> TYPE_PHOTO
-                MediaType.DOCUMENT -> TYPE_FILE
+                MediaType.DOCUMENT, MediaType.AUDIO -> TYPE_FILE
             }
         }
     }
@@ -507,6 +507,7 @@ class MediaGridAdapter(
 
     inner class FileViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvFileName: TextView = itemView.findViewById(R.id.tvFileName)
+        private val tvFileIcon: TextView? = itemView.findViewById(R.id.tvFileIcon)
         private val tvFileBadge: TextView = itemView.findViewById(R.id.tvFileBadge)
         private val tvFileSize: TextView = itemView.findViewById(R.id.tvFileSize)
         private val tvFileDate: TextView = itemView.findViewById(R.id.tvFileDate)
@@ -528,8 +529,23 @@ class MediaGridAdapter(
             tvFileName.text = item.title
             tvFileSize.text = item.formattedSize
 
-            val ext = item.title.substringAfterLast('.', "").uppercase().ifBlank { "FILE" }
-            tvFileBadge.text = ext
+            val ext = item.title.substringAfterLast('.', "").uppercase().ifBlank { "" }
+            val isAudio = item.type == MediaType.AUDIO || item.mimeType.startsWith("audio/")
+
+            if (tvFileIcon != null) {
+                tvFileIcon.text = when {
+                    isAudio -> "🎵"
+                    item.title.endsWith(".pdf", ignoreCase = true) -> "📄"
+                    TelegramRepository.isZipArchiveFilename(item.title) -> "📦"
+                    else -> "📄"
+                }
+            }
+
+            tvFileBadge.text = when {
+                ext.isNotBlank() -> ext
+                isAudio -> "AUDIO"
+                else -> "FILE"
+            }
 
             val formattedDate = if (item.dateAdded > 0) {
                 dateFormat.format(Date(item.dateAdded * 1000L))

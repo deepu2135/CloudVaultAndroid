@@ -213,12 +213,13 @@
                 android:layout_height="wrap_content"
                 android:text="🖼 PHOTOS"
                 android:textColor="@color/accent_cyan_bright"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
 
             <View
                 android:id="@+id/tabPhotosIndicator"
-                android:layout_width=" match_parent"
+                android:layout_width="match_parent"
                 android:layout_height="2dp"
                 android:layout_marginTop="6dp"
                 android:background="@color/accent_cyan" />
@@ -240,11 +241,40 @@
                 android:layout_height="wrap_content"
                 android:text="🎞 VIDEOS"
                 android:textColor="@color/tab_inactive"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
 
             <View
                 android:id="@+id/tabVideosIndicator"
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:layout_marginTop="6dp"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabAudiosContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:id="@+id/tvTabAudiosLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎵 AUDIO"
+                android:textColor="@color/tab_inactive"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
+
+            <View
+                android:id="@+id/tabAudiosIndicator"
                 android:layout_width="match_parent"
                 android:layout_height="2dp"
                 android:layout_marginTop="6dp"
@@ -267,8 +297,9 @@
                 android:layout_height="wrap_content"
                 android:text="📄 FILES"
                 android:textColor="@color/tab_inactive"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
 
             <View
                 android:id="@+id/tabFilesIndicator"

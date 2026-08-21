@@ -185,6 +185,13 @@ object AutoBackupManager {
                                 completedCountAtomic.incrementAndGet()
                                 return@withPermit
                             }
+                            // Skip video if video backup setting is disabled
+                            if (!AutoBackupPreferences.isBackupVideosEnabled(context) && file.mediaType == MediaType.VIDEO) {
+                                inFlightSignatures.remove(file.signature)
+                                completedCountAtomic.incrementAndGet()
+                                return@withPermit
+                            }
+
                             // Double-check signature wasn't marked backed up while waiting for semaphore
                             if (AutoBackupPreferences.isBackedUp(context, file)) {
                                 inFlightSignatures.remove(file.signature)
@@ -300,6 +307,7 @@ object AutoBackupManager {
         try {
             queryMediaStore(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
             queryMediaStore(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+            queryMediaStore(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI)
             
             val docSelection = "${MediaStore.MediaColumns.MIME_TYPE} IN (?, ?, ?, ?, ?, ?)"
             val docArgs = arrayOf(
@@ -336,7 +344,7 @@ object AutoBackupManager {
         val cloudVaultNames = mutableSetOf<String>()
         val cloudVaultNamesWithoutExt = mutableSetOf<String>()
 
-        val allCloudItems = TelegramRepository.photos.value + TelegramRepository.videos.value + TelegramRepository.files.value
+        val allCloudItems = TelegramRepository.photos.value + TelegramRepository.videos.value + TelegramRepository.audios.value + TelegramRepository.files.value
         allCloudItems.forEach { item ->
             if (item.sizeBytes > 0) cloudVaultSizes.add(item.sizeBytes)
             val titleClean = item.title.lowercase().trim()
@@ -432,9 +440,13 @@ object AutoBackupManager {
             }
         }
 
+        val backupVideos = AutoBackupPreferences.isBackupVideosEnabled(context)
         try {
             queryMedia(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaType.PHOTO)
-            queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaType.VIDEO)
+            if (backupVideos) {
+                queryMedia(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaType.VIDEO)
+            }
+            queryMedia(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, MediaType.AUDIO)
             
             val docSelection = "${MediaStore.MediaColumns.MIME_TYPE} IN (?, ?, ?, ?, ?, ?)"
             val docArgs = arrayOf(
@@ -509,8 +521,12 @@ object AutoBackupManager {
         }
 
         try {
+            val backupVideos = AutoBackupPreferences.isBackupVideosEnabled(context)
             queryAll(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaType.PHOTO)
-            queryAll(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaType.VIDEO)
+            if (backupVideos) {
+                queryAll(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, MediaType.VIDEO)
+            }
+            queryAll(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, MediaType.AUDIO)
             val docSelection = "${MediaStore.MediaColumns.MIME_TYPE} IN (?, ?, ?, ?, ?, ?)"
             val docArgs = arrayOf(
                 "application/pdf",

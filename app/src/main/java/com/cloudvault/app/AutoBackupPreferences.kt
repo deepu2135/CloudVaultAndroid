@@ -8,6 +8,7 @@ object AutoBackupPreferences {
     private const val PREFS_NAME = "cloudvault_auto_backup_prefs"
     private const val KEY_ENABLED = "auto_backup_enabled"
     private const val KEY_WIFI_ONLY = "auto_backup_wifi_only"
+    private const val KEY_BACKUP_VIDEOS = "auto_backup_videos_enabled"
     private const val KEY_SELECTED_BUCKETS = "selected_bucket_ids"
     private const val KEY_BACKED_UP_SIGNATURES = "backed_up_signatures"
     private const val KEY_LAST_BACKUP_TIME = "last_backup_timestamp"
@@ -47,6 +48,14 @@ object AutoBackupPreferences {
 
     fun setWifiOnly(context: Context, wifiOnly: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_WIFI_ONLY, wifiOnly).apply()
+    }
+
+    fun isBackupVideosEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_BACKUP_VIDEOS, true)
+    }
+
+    fun setBackupVideosEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_BACKUP_VIDEOS, enabled).apply()
     }
 
     fun getSelectedBucketIds(context: Context): Set<String>? {

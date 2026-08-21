@@ -20,7 +20,7 @@ data class VaultMediaItem(
 )
 
 enum class MediaType {
-    PHOTO, VIDEO, DOCUMENT
+    PHOTO, VIDEO, AUDIO, DOCUMENT
 }
 
 object TdlibManager {

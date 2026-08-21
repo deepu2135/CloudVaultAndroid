@@ -89,6 +89,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTabVideosLabel: TextView
     private lateinit var tabVideosIndicator: View
 
+    private lateinit var tabAudiosContainer: LinearLayout
+    private lateinit var tvTabAudiosLabel: TextView
+    private lateinit var tabAudiosIndicator: View
+
     private lateinit var tabFilesContainer: LinearLayout
     private lateinit var tvTabFilesLabel: TextView
     private lateinit var tabFilesIndicator: View
@@ -117,14 +121,16 @@ class MainActivity : AppCompatActivity() {
     private fun handleSwipeLeft() {
         when (currentCategory) {
             MediaType.PHOTO -> switchCategory(MediaType.VIDEO)
-            MediaType.VIDEO -> switchCategory(MediaType.DOCUMENT)
+            MediaType.VIDEO -> switchCategory(MediaType.AUDIO)
+            MediaType.AUDIO -> switchCategory(MediaType.DOCUMENT)
             MediaType.DOCUMENT -> {}
         }
     }
 
     private fun handleSwipeRight() {
         when (currentCategory) {
-            MediaType.DOCUMENT -> switchCategory(MediaType.VIDEO)
+            MediaType.DOCUMENT -> switchCategory(MediaType.AUDIO)
+            MediaType.AUDIO -> switchCategory(MediaType.VIDEO)
             MediaType.VIDEO -> switchCategory(MediaType.PHOTO)
             MediaType.PHOTO -> {}
         }
@@ -147,6 +153,12 @@ class MainActivity : AppCompatActivity() {
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri>? ->
         if (!uris.isNullOrEmpty()) {
             handleBatchMediaUpload(uris, MediaType.VIDEO)
+        }
+    }
+
+    private val pickAudioLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris: List<Uri>? ->
+        if (!uris.isNullOrEmpty()) {
+            handleBatchMediaUpload(uris, MediaType.AUDIO)
         }
     }
 
@@ -278,6 +290,10 @@ class MainActivity : AppCompatActivity() {
         tvTabVideosLabel = findViewById(R.id.tvTabVideosLabel)
         tabVideosIndicator = findViewById(R.id.tabVideosIndicator)
 
+        tabAudiosContainer = findViewById(R.id.tabAudiosContainer)
+        tvTabAudiosLabel = findViewById(R.id.tvTabAudiosLabel)
+        tabAudiosIndicator = findViewById(R.id.tabAudiosIndicator)
+
         tabFilesContainer = findViewById(R.id.tabFilesContainer)
         tvTabFilesLabel = findViewById(R.id.tvTabFilesLabel)
         tabFilesIndicator = findViewById(R.id.tabFilesIndicator)
@@ -338,6 +354,7 @@ class MainActivity : AppCompatActivity() {
 
         tabPhotosContainer.setOnClickListener { switchCategory(MediaType.PHOTO) }
         tabVideosContainer.setOnClickListener { switchCategory(MediaType.VIDEO) }
+        tabAudiosContainer.setOnClickListener { switchCategory(MediaType.AUDIO) }
         tabFilesContainer.setOnClickListener { switchCategory(MediaType.DOCUMENT) }
 
         btnGridToggle.text = currentZoomLevel.label
@@ -536,6 +553,7 @@ class MainActivity : AppCompatActivity() {
         val rawItems = when (currentCategory) {
             MediaType.PHOTO -> TelegramRepository.photos.value
             MediaType.VIDEO -> TelegramRepository.videos.value
+            MediaType.AUDIO -> TelegramRepository.audios.value
             MediaType.DOCUMENT -> TelegramRepository.files.value
         }
         return when (currentSortOrder) {
@@ -607,12 +625,16 @@ class MainActivity : AppCompatActivity() {
         tvTabVideosLabel.setTextColor(if (category == MediaType.VIDEO) cyanBright else tabInactive)
         tabVideosIndicator.setBackgroundColor(if (category == MediaType.VIDEO) cyanColor else transparent)
 
+        tvTabAudiosLabel.setTextColor(if (category == MediaType.AUDIO) cyanBright else tabInactive)
+        tabAudiosIndicator.setBackgroundColor(if (category == MediaType.AUDIO) cyanColor else transparent)
+
         tvTabFilesLabel.setTextColor(if (category == MediaType.DOCUMENT) cyanBright else tabInactive)
         tabFilesIndicator.setBackgroundColor(if (category == MediaType.DOCUMENT) cyanColor else transparent)
 
         tvSectionTitle.text = when (category) {
             MediaType.PHOTO -> "Photos"
             MediaType.VIDEO -> "Videos"
+            MediaType.AUDIO -> "Audio & Music"
             MediaType.DOCUMENT -> "Files & Documents"
         }
 
@@ -623,6 +645,7 @@ class MainActivity : AppCompatActivity() {
         val rawItems = when (currentCategory) {
             MediaType.PHOTO -> TelegramRepository.photos.value
             MediaType.VIDEO -> TelegramRepository.videos.value
+            MediaType.AUDIO -> TelegramRepository.audios.value
             MediaType.DOCUMENT -> TelegramRepository.files.value
         }
 
@@ -675,6 +698,11 @@ class MainActivity : AppCompatActivity() {
                         tvEmptyTitle.text = "No Videos Found"
                         tvEmptySubtitle.text = "Videos in your Telegram Cloud will appear here ready to stream."
                     }
+                    MediaType.AUDIO -> {
+                        tvEmptyEmoji.text = "🎵"
+                        tvEmptyTitle.text = "No Audio Found"
+                        tvEmptySubtitle.text = "Audio files and music in your Telegram Vault will appear here."
+                    }
                     MediaType.DOCUMENT -> {
                         tvEmptyEmoji.text = "📄"
                         tvEmptyTitle.text = "No Files Found"
@@ -689,14 +717,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showUploadChoiceDialog() {
-        val options = arrayOf("📷 Upload Photo", "🎬 Upload Video", "📄 Upload File / Document")
+        val options = arrayOf("📷 Upload Photo", "🎬 Upload Video", "🎵 Upload Audio", "📄 Upload File / Document")
         AlertDialog.Builder(this)
             .setTitle("Upload to Cloud Vault")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> pickPhotoLauncher.launch("image/*")
                     1 -> pickVideoLauncher.launch("video/*")
-                    2 -> pickFileLauncher.launch("*/*")
+                    2 -> pickAudioLauncher.launch("audio/*")
+                    3 -> pickFileLauncher.launch("*/*")
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -813,6 +842,8 @@ class MainActivity : AppCompatActivity() {
         popup.menu.add(0, 3, 2, "☑ Select")
         if (item.type == MediaType.VIDEO) {
             popup.menu.add(0, 4, 3, "▶ Play Video")
+        } else if (item.type == MediaType.AUDIO) {
+            popup.menu.add(0, 4, 3, "▶ Play Audio")
         }
 
         popup.setOnMenuItemClickListener { menuItem ->
@@ -858,6 +889,7 @@ class MainActivity : AppCompatActivity() {
         when (item.type) {
             MediaType.PHOTO -> showPhotoViewerDialog(item)
             MediaType.VIDEO -> playVideoViaProxy(item)
+            MediaType.AUDIO -> playVideoViaProxy(item)
             MediaType.DOCUMENT -> showFileDownloadPrompt(item)
         }
     }
@@ -1067,6 +1099,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         lifecycleScope.launch {
+            TelegramRepository.audios.collectLatest {
+                updateDisplayedItems()
+            }
+        }
+        lifecycleScope.launch {
             TelegramRepository.files.collectLatest {
                 updateDisplayedItems()
             }
@@ -1075,6 +1112,7 @@ class MainActivity : AppCompatActivity() {
             TelegramRepository.isLoadingVault.collectLatest { loading ->
                 val hasAnyItems = TelegramRepository.photos.value.isNotEmpty() ||
                         TelegramRepository.videos.value.isNotEmpty() ||
+                        TelegramRepository.audios.value.isNotEmpty() ||
                         TelegramRepository.files.value.isNotEmpty()
                 pbLoading.visibility = if (loading && !hasAnyItems) View.VISIBLE else View.GONE
             }
@@ -1489,6 +1527,7 @@ class MainActivity : AppCompatActivity() {
 
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_autobackup_settings, null)
         val switchAutoBackup: SwitchMaterial = dialogView.findViewById(R.id.switchAutoBackup)
+        val switchBackupVideos: SwitchMaterial? = dialogView.findViewById(R.id.switchBackupVideos)
         val switchWifiOnly: SwitchMaterial = dialogView.findViewById(R.id.switchWifiOnly)
         val tvBackupStatus: TextView = dialogView.findViewById(R.id.tvBackupStatus)
         val btnSelectFolders: MaterialButton = dialogView.findViewById(R.id.btnSelectFolders)
@@ -1500,6 +1539,7 @@ class MainActivity : AppCompatActivity() {
 
         val isBackupOn = AutoBackupPreferences.isEnabled(this)
         switchAutoBackup.isChecked = isBackupOn
+        switchBackupVideos?.isChecked = AutoBackupPreferences.isBackupVideosEnabled(this)
         switchWifiOnly.isChecked = AutoBackupPreferences.isWifiOnly(this)
         tvBackupStatus.text = if (isBackupOn) {
             "Auto Backup is ON • Real-time observer & background sync active ☁️"
@@ -1515,6 +1555,11 @@ class MainActivity : AppCompatActivity() {
                 "Auto Backup is OFF • Tap switch to automatically sync photos & videos"
             }
             Toast.makeText(this, if (isChecked) "Auto Backup enabled!" else "Auto Backup disabled", Toast.LENGTH_SHORT).show()
+        }
+
+        switchBackupVideos?.setOnCheckedChangeListener { _, isChecked ->
+            AutoBackupPreferences.setBackupVideosEnabled(this, isChecked)
+            Toast.makeText(this, if (isChecked) "Video backup enabled" else "Video backup disabled (photos & files only)", Toast.LENGTH_SHORT).show()
         }
 
         switchWifiOnly.setOnCheckedChangeListener { _, isChecked ->

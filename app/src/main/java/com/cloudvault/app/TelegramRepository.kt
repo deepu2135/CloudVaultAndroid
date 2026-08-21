@@ -26,6 +26,9 @@ object TelegramRepository {
     private val _videos = MutableStateFlow<List<VaultMediaItem>>(emptyList())
     val videos: StateFlow<List<VaultMediaItem>> = _videos.asStateFlow()
 
+    private val _audios = MutableStateFlow<List<VaultMediaItem>>(emptyList())
+    val audios: StateFlow<List<VaultMediaItem>> = _audios.asStateFlow()
+
     private val _files = MutableStateFlow<List<VaultMediaItem>>(emptyList())
     val files: StateFlow<List<VaultMediaItem>> = _files.asStateFlow()
 
@@ -61,18 +64,22 @@ object TelegramRepository {
         }
         val photoList = _photos.value.toMutableList()
         val videoList = _videos.value.toMutableList()
+        val audioList = _audios.value.toMutableList()
         val fileList = _files.value.toMutableList()
-        val initialCounts = Triple(photoList.size, videoList.size, fileList.size)
+        val initialCounts = listOf(photoList.size, videoList.size, audioList.size, fileList.size)
 
-        parseAndClassifyMessage(msg, photoList, videoList, fileList)
+        parseAndClassifyMessage(msg, photoList, videoList, audioList, fileList)
 
-        if (photoList.size != initialCounts.first) {
+        if (photoList.size != initialCounts[0]) {
             _photos.value = photoList.distinctBy { it.id }.sortedByDescending { it.dateAdded }
         }
-        if (videoList.size != initialCounts.second) {
+        if (videoList.size != initialCounts[1]) {
             _videos.value = videoList.distinctBy { it.id }.sortedByDescending { it.dateAdded }
         }
-        if (fileList.size != initialCounts.third) {
+        if (audioList.size != initialCounts[2]) {
+            _audios.value = audioList.distinctBy { it.id }.sortedByDescending { it.dateAdded }
+        }
+        if (fileList.size != initialCounts[3]) {
             _files.value = fileList.distinctBy { it.id }.sortedByDescending { it.dateAdded }
         }
     }
@@ -91,7 +98,7 @@ object TelegramRepository {
                 return
             }
             val now = System.currentTimeMillis()
-            if (!force && now - lastVaultLoadTime < 3_000L && (_photos.value.isNotEmpty() || _videos.value.isNotEmpty() || _files.value.isNotEmpty())) {
+            if (!force && now - lastVaultLoadTime < 3_000L && (_photos.value.isNotEmpty() || _videos.value.isNotEmpty() || _audios.value.isNotEmpty() || _files.value.isNotEmpty())) {
                 return
             }
             lastVaultLoadTime = now
@@ -110,6 +117,7 @@ object TelegramRepository {
 
             val photoList = mutableListOf<VaultMediaItem>()
             val videoList = mutableListOf<VaultMediaItem>()
+            val audioList = mutableListOf<VaultMediaItem>()
             val fileList = mutableListOf<VaultMediaItem>()
             val seenMessageIds = mutableSetOf<Long>()
 
@@ -142,7 +150,7 @@ object TelegramRepository {
                 consecutiveEmptyBatches = 0
                 for (msg in history.messages) {
                     if (seenMessageIds.add(msg.id)) {
-                        parseAndClassifyMessage(msg, photoList, videoList, fileList)
+                        parseAndClassifyMessage(msg, photoList, videoList, audioList, fileList)
                     }
                 }
                 scannedCount += history.messages.size
@@ -157,6 +165,7 @@ object TelegramRepository {
                 if (scannedCount % 200 == 0 || scannedCount <= 100) {
                     _photos.value = photoList.sortedByDescending { it.dateAdded }
                     _videos.value = videoList.sortedByDescending { it.dateAdded }
+                    _audios.value = audioList.sortedByDescending { it.dateAdded }
                     _files.value = fileList.sortedByDescending { it.dateAdded }
                 }
             }
@@ -164,9 +173,10 @@ object TelegramRepository {
             // Final state flow update
             _photos.value = photoList.sortedByDescending { it.dateAdded }
             _videos.value = videoList.sortedByDescending { it.dateAdded }
+            _audios.value = audioList.sortedByDescending { it.dateAdded }
             _files.value = fileList.sortedByDescending { it.dateAdded }
 
-            TeleflixLogger.log(TAG, "Vault loaded: ${photoList.size} photos, ${videoList.size} videos, ${fileList.size} files (scanned $scannedCount messages from chat $targetChatId)")
+            TeleflixLogger.log(TAG, "Vault loaded: ${photoList.size} photos, ${videoList.size} videos, ${audioList.size} audios, ${fileList.size} files (scanned $scannedCount messages from chat $targetChatId)")
 
         } catch (e: Exception) {
             TeleflixLogger.log(TAG, "Failed to load vault items: ${e.message}", isError = true)
@@ -180,6 +190,7 @@ object TelegramRepository {
         msg: TdApi.Message,
         photoList: MutableList<VaultMediaItem>,
         videoList: MutableList<VaultMediaItem>,
+        audioList: MutableList<VaultMediaItem>,
         fileList: MutableList<VaultMediaItem>
     ) {
         if (msg.sendingState is TdApi.MessageSendingStateFailed) {
@@ -285,9 +296,28 @@ object TelegramRepository {
                         name.endsWith(".gif")
                 )
 
+                val isAudio = !isVideo && !isPhoto && (
+                        mime.startsWith("audio/") ||
+                        name.endsWith(".mp3") ||
+                        name.endsWith(".m4a") ||
+                        name.endsWith(".wav") ||
+                        name.endsWith(".flac") ||
+                        name.endsWith(".aac") ||
+                        name.endsWith(".ogg") ||
+                        name.endsWith(".oga") ||
+                        name.endsWith(".opus") ||
+                        name.endsWith(".wma") ||
+                        name.endsWith(".amr") ||
+                        name.endsWith(".alac") ||
+                        name.endsWith(".aiff") ||
+                        name.endsWith(".mid") ||
+                        name.endsWith(".midi")
+                )
+
                 val itemType = when {
                     isVideo -> MediaType.VIDEO
                     isPhoto -> MediaType.PHOTO
+                    isAudio -> MediaType.AUDIO
                     else -> MediaType.DOCUMENT
                 }
 
@@ -317,6 +347,7 @@ object TelegramRepository {
                 when (itemType) {
                     MediaType.VIDEO -> videoList.add(item)
                     MediaType.PHOTO -> photoList.add(item)
+                    MediaType.AUDIO -> audioList.add(item)
                     MediaType.DOCUMENT -> fileList.add(item)
                 }
             }
@@ -346,7 +377,7 @@ object TelegramRepository {
                 val audio = content.audio
                 val caption = content.caption?.text.orEmpty().trim()
                 val audioTitle = if (audio.fileName.isNotBlank()) audio.fileName else if (audio.title.isNotBlank()) audio.title else "Audio_${msg.date}.mp3"
-                fileList.add(
+                audioList.add(
                     VaultMediaItem(
                         id = "audio_${msg.id}",
                         title = audioTitle,
@@ -354,7 +385,7 @@ object TelegramRepository {
                         sizeBytes = audio.audio.size.toLong(),
                         formattedSize = formatSize(audio.audio.size.toLong()),
                         mimeType = audio.mimeType.ifBlank { "audio/mpeg" },
-                        type = MediaType.DOCUMENT,
+                        type = MediaType.AUDIO,
                         chatId = msg.chatId,
                         messageId = msg.id,
                         fileId = audio.audio.id,
@@ -367,7 +398,7 @@ object TelegramRepository {
             is TdApi.MessageVoiceNote -> {
                 val voice = content.voiceNote
                 val caption = content.caption?.text.orEmpty().trim()
-                fileList.add(
+                audioList.add(
                     VaultMediaItem(
                         id = "voice_${msg.id}",
                         title = if (caption.isNotBlank()) caption else "Voice_${msg.date}.ogg",
@@ -375,7 +406,7 @@ object TelegramRepository {
                         sizeBytes = voice.voice.size.toLong(),
                         formattedSize = formatSize(voice.voice.size.toLong()),
                         mimeType = voice.mimeType.ifBlank { "audio/ogg" },
-                        type = MediaType.DOCUMENT,
+                        type = MediaType.AUDIO,
                         chatId = msg.chatId,
                         messageId = msg.id,
                         fileId = voice.voice.id,
@@ -503,6 +534,27 @@ object TelegramRepository {
                 document = TdApi.InputDocument().apply { document = inputFile }
                 caption = formattedCaption
             }
+            MediaType.AUDIO -> TdApi.InputMessageAudio().apply {
+                val inputAudio = TdApi.InputAudio().apply {
+                    audio = inputFile
+                    try {
+                        val retriever = android.media.MediaMetadataRetriever()
+                        retriever.setDataSource(localPath)
+                        val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        val titleStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
+                        val artistStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)
+
+                        duration = (durationStr?.toLongOrNull() ?: 0L).let { (it / 1000).toInt() }
+                        title = titleStr?.ifBlank { targetFile.name } ?: targetFile.name
+                        performer = artistStr ?: ""
+                        retriever.release()
+                    } catch (e: Throwable) {
+                        title = targetFile.name
+                    }
+                }
+                audio = inputAudio
+                caption = formattedCaption
+            }
         }
 
         try {
@@ -531,6 +583,8 @@ object TelegramRepository {
                 is TdApi.MessagePhoto -> c.photo.sizes.maxByOrNull { it.photo.size }?.photo?.id
                     ?: (c.photo.sizes.lastOrNull()?.photo?.id ?: 0)
                 is TdApi.MessageVideo -> c.video.video.id
+                is TdApi.MessageAudio -> c.audio.audio.id
+                is TdApi.MessageVoiceNote -> c.voiceNote.voice.id
                 is TdApi.MessageDocument -> c.document.document.id
                 else -> 0
             }
@@ -649,6 +703,7 @@ object TelegramRepository {
             val deletedIds = items.map { it.id }.toSet()
             _photos.value = _photos.value.filterNot { deletedIds.contains(it.id) }
             _videos.value = _videos.value.filterNot { deletedIds.contains(it.id) }
+            _audios.value = _audios.value.filterNot { deletedIds.contains(it.id) }
             _files.value = _files.value.filterNot { deletedIds.contains(it.id) }
             true
         } catch (e: Throwable) {
