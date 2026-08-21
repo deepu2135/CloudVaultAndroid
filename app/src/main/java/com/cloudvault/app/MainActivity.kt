@@ -1139,6 +1139,10 @@ class MainActivity : AppCompatActivity() {
         val cardOptionCacheManager: MaterialCardView = dialogView.findViewById(R.id.cardOptionCacheManager)
         val tvSettingsCacheSizeBadge: TextView = dialogView.findViewById(R.id.tvSettingsCacheSizeBadge)
 
+        val layoutSettingsBufferSize: LinearLayout? = dialogView.findViewById(R.id.layoutSettingsBufferSize)
+        val tvSettingsBufferSizeBadge: TextView? = dialogView.findViewById(R.id.tvSettingsBufferSizeBadge)
+        val switchAutoResume: com.google.android.material.switchmaterial.SwitchMaterial? = dialogView.findViewById(R.id.switchAutoResume)
+
         val cardOptionAppLogs: MaterialCardView? = dialogView.findViewById(R.id.cardOptionAppLogs)
         val tvSettingsLogsCountBadge: TextView? = dialogView.findViewById(R.id.tvSettingsLogsCountBadge)
 
@@ -1176,9 +1180,16 @@ class MainActivity : AppCompatActivity() {
             tvSettingsLogsCountBadge?.text = "$count LOGS"
         }
 
+        fun updateVideoSettingsSummary() {
+            val sizeMb = PlayerPreferences.getBufferSizeMb(this)
+            tvSettingsBufferSizeBadge?.text = "$sizeMb MB"
+            switchAutoResume?.isChecked = PlayerPreferences.isAutoResumeEnabled(this)
+        }
+
         updateBackupSummary()
         updateCacheSummary()
         updateLogsSummary()
+        updateVideoSettingsSummary()
 
         cardOptionAutoBackup.setOnClickListener {
             showAutoBackupSettingsDialog {
@@ -1190,6 +1201,18 @@ class MainActivity : AppCompatActivity() {
             showCacheManagerDialog {
                 updateCacheSummary()
             }
+        }
+
+        layoutSettingsBufferSize?.setOnClickListener {
+            showBufferSizeSelectionDialog {
+                updateVideoSettingsSummary()
+            }
+        }
+
+        switchAutoResume?.setOnCheckedChangeListener { _, isChecked ->
+            PlayerPreferences.setAutoResumeEnabled(this, isChecked)
+            val msg = if (isChecked) "Auto-resume playback enabled" else "Auto-resume playback disabled"
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
 
         cardOptionAppLogs?.setOnClickListener {
@@ -1240,6 +1263,26 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun showBufferSizeSelectionDialog(onUpdated: () -> Unit) {
+        val currentSize = PlayerPreferences.getBufferSizeMb(this)
+        val options = PlayerPreferences.BUFFER_SIZE_OPTIONS
+        val labels = PlayerPreferences.BUFFER_SIZE_LABELS
+        val selectedIndex = options.indexOf(currentSize).coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle("Streaming Buffer Size")
+            .setSingleChoiceItems(labels, selectedIndex) { dialog, which ->
+                val chosenMb = options[which]
+                PlayerPreferences.setBufferSizeMb(this, chosenMb)
+                TelegramStreamingProxy.setPrefetchMb(chosenMb.toLong())
+                Toast.makeText(this, "Buffer size set to ${labels[which]}", Toast.LENGTH_SHORT).show()
+                onUpdated()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showAppLogsDialog() {

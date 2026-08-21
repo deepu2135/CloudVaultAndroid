@@ -22,6 +22,10 @@ object TelegramStreamingProxy {
     private const val TAG = "TelegramProxy"
     private const val CHUNK_SIZE = 512 * 1024         // 512 KB per socket chunk for maximum throughput & fast demuxing
     var prefetchSizeMb = 32L                             // Prefetch window sent to TDLib (dynamically configured)
+
+    fun setPrefetchMb(mb: Long) {
+        prefetchSizeMb = mb.coerceIn(4L, 512L)
+    }
     private const val DOWNLOAD_TIMEOUT_MS = 60_000L
     private const val DOWNLOAD_PRIORITY = 32              // max TDLib priority
     private const val POLL_INTERVAL_MS = 100L

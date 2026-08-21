@@ -76,6 +76,8 @@ class VlcPlayerActivity : AppCompatActivity() {
     private var mediaPlayer: MediaPlayer? = null
     private var explicitDurationMs: Long = 0L
     private var currentFileId: Int = 0
+    private var hasResumedPosition = false
+    private var lastPositionSaveTime = 0L
 
     private var isUserTracking = false
     private var isLocked = false
@@ -518,14 +520,19 @@ class VlcPlayerActivity : AppCompatActivity() {
                           videoTitle.endsWith(".aac", ignoreCase = true) ||
                           videoTitle.endsWith(".opus", ignoreCase = true)
 
+            hasResumedPosition = false
+            val bufferMb = PlayerPreferences.getBufferSizeMb(this)
+            TelegramStreamingProxy.setPrefetchMb(bufferMb.toLong())
+            val cachingMs = PlayerPreferences.getNetworkCachingMs(this)
+
             val media = Media(vlc, Uri.parse(proxyUrl)).apply {
                 if (!isAudio) {
                     setHWDecoderEnabled(true, false)
                 }
-                addOption(":network-caching=2000")
-                addOption(":file-caching=2000")
-                addOption(":live-caching=2000")
-                addOption(":sout-mux-caching=2000")
+                addOption(":network-caching=$cachingMs")
+                addOption(":file-caching=$cachingMs")
+                addOption(":live-caching=$cachingMs")
+                addOption(":sout-mux-caching=$cachingMs")
             }
 
             player.setEventListener { event ->
@@ -543,15 +550,30 @@ class VlcPlayerActivity : AppCompatActivity() {
                             pbVlcBuffering.visibility = View.GONE
                             ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_pause)
                             TeleflixLogger.log("VlcPlayer", "Playback state: PLAYING")
+
+                            if (!hasResumedPosition && currentFileId > 0) {
+                                hasResumedPosition = true
+                                val savedPos = PlayerPreferences.getSavedPlaybackPosition(this@VlcPlayerActivity, currentFileId)
+                                if (savedPos > 3000L) {
+                                    player.time = savedPos
+                                    val formatted = formatTime(savedPos)
+                                    showGestureHud("⏱️", "Resumed from $formatted", -1)
+                                    Toast.makeText(this@VlcPlayerActivity, "Resumed playback from $formatted", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         }
                         MediaPlayer.Event.Paused -> {
                             ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_play)
                             TeleflixLogger.log("VlcPlayer", "Playback state: PAUSED")
+                            saveCurrentPlaybackPosition()
                         }
                         MediaPlayer.Event.EndReached -> {
                             ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_play)
                             pbVlcBuffering.visibility = View.GONE
                             TeleflixLogger.log("VlcPlayer", "Playback state: END REACHED")
+                            if (currentFileId > 0) {
+                                PlayerPreferences.clearPlaybackPosition(this@VlcPlayerActivity, currentFileId)
+                            }
                         }
                         MediaPlayer.Event.TimeChanged -> {
                             if (!isUserTracking) {
@@ -564,6 +586,12 @@ class VlcPlayerActivity : AppCompatActivity() {
                                     updateTimeViews(clampedTime, length)
                                 } else if (time > 0L) {
                                     tvVlcCurrentTime.text = formatTime(time)
+                                }
+
+                                val now = System.currentTimeMillis()
+                                if (now - lastPositionSaveTime > 5000L && currentFileId > 0) {
+                                    lastPositionSaveTime = now
+                                    saveCurrentPlaybackPosition()
                                 }
                             }
                         }
@@ -895,8 +923,18 @@ class VlcPlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun saveCurrentPlaybackPosition() {
+        val player = mediaPlayer ?: return
+        val time = player.time
+        val duration = getEffectiveDuration()
+        if (time > 0L && currentFileId > 0) {
+            PlayerPreferences.savePlaybackPosition(this, currentFileId, time, duration)
+        }
+    }
+
     override fun onPause() {
         super.onPause()
+        saveCurrentPlaybackPosition()
         try {
             mediaPlayer?.pause()
         } catch (_: Throwable) {}
@@ -904,6 +942,7 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        saveCurrentPlaybackPosition()
         try {
             mediaPlayer?.pause()
         } catch (_: Throwable) {}
@@ -911,6 +950,7 @@ class VlcPlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        saveCurrentPlaybackPosition()
         hideHandler.removeCallbacksAndMessages(null)
         try {
             mediaPlayer?.stop()
