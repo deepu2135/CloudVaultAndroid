@@ -1139,9 +1139,8 @@ class MainActivity : AppCompatActivity() {
         val cardOptionCacheManager: MaterialCardView = dialogView.findViewById(R.id.cardOptionCacheManager)
         val tvSettingsCacheSizeBadge: TextView = dialogView.findViewById(R.id.tvSettingsCacheSizeBadge)
 
-        val layoutSettingsBufferSize: LinearLayout? = dialogView.findViewById(R.id.layoutSettingsBufferSize)
-        val tvSettingsBufferSizeBadge: TextView? = dialogView.findViewById(R.id.tvSettingsBufferSizeBadge)
-        val switchAutoResume: com.google.android.material.switchmaterial.SwitchMaterial? = dialogView.findViewById(R.id.switchAutoResume)
+        val cardOptionVideoSettings: MaterialCardView = dialogView.findViewById(R.id.cardOptionVideoSettings)
+        val tvSettingsVideoBadge: TextView = dialogView.findViewById(R.id.tvSettingsVideoBadge)
 
         val cardOptionAppLogs: MaterialCardView? = dialogView.findViewById(R.id.cardOptionAppLogs)
         val tvSettingsLogsCountBadge: TextView? = dialogView.findViewById(R.id.tvSettingsLogsCountBadge)
@@ -1180,16 +1179,15 @@ class MainActivity : AppCompatActivity() {
             tvSettingsLogsCountBadge?.text = "$count LOGS"
         }
 
-        fun updateVideoSettingsSummary() {
+        fun updateVideoSummary() {
             val sizeMb = PlayerPreferences.getBufferSizeMb(this)
-            tvSettingsBufferSizeBadge?.text = "$sizeMb MB"
-            switchAutoResume?.isChecked = PlayerPreferences.isAutoResumeEnabled(this)
+            tvSettingsVideoBadge.text = "$sizeMb MB"
         }
 
         updateBackupSummary()
         updateCacheSummary()
         updateLogsSummary()
-        updateVideoSettingsSummary()
+        updateVideoSummary()
 
         cardOptionAutoBackup.setOnClickListener {
             showAutoBackupSettingsDialog {
@@ -1203,16 +1201,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        layoutSettingsBufferSize?.setOnClickListener {
-            showBufferSizeSelectionDialog {
-                updateVideoSettingsSummary()
+        cardOptionVideoSettings.setOnClickListener {
+            showVideoSettingsDialog {
+                updateVideoSummary()
             }
-        }
-
-        switchAutoResume?.setOnCheckedChangeListener { _, isChecked ->
-            PlayerPreferences.setAutoResumeEnabled(this, isChecked)
-            val msg = if (isChecked) "Auto-resume playback enabled" else "Auto-resume playback disabled"
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
 
         cardOptionAppLogs?.setOnClickListener {
@@ -1263,6 +1255,59 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+    }
+
+    private fun showVideoSettingsDialog(onUpdated: () -> Unit) {
+        if (isFinishing || isDestroyed) return
+
+        try {
+            val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_video_settings, null)
+            val btnBack: TextView = dialogView.findViewById(R.id.btnBackFromVideoSettings)
+            val btnClose: TextView = dialogView.findViewById(R.id.btnCloseVideoSettings)
+            val layoutVideoBufferSize: LinearLayout = dialogView.findViewById(R.id.layoutVideoBufferSize)
+            val tvBufferSizeBadge: TextView = dialogView.findViewById(R.id.tvVideoSettingsBufferSizeBadge)
+            val switchVideoAutoResume: com.google.android.material.switchmaterial.SwitchMaterial = dialogView.findViewById(R.id.switchVideoAutoResume)
+
+            val dialog = AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create()
+
+            dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+            fun refreshViews() {
+                val sizeMb = PlayerPreferences.getBufferSizeMb(this)
+                tvBufferSizeBadge.text = "$sizeMb MB"
+                switchVideoAutoResume.isChecked = PlayerPreferences.isAutoResumeEnabled(this)
+            }
+
+            refreshViews()
+
+            switchVideoAutoResume.setOnCheckedChangeListener { _, isChecked ->
+                PlayerPreferences.setAutoResumeEnabled(this, isChecked)
+                val msg = if (isChecked) "Auto-resume playback enabled" else "Auto-resume playback disabled"
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                onUpdated()
+            }
+
+            layoutVideoBufferSize.setOnClickListener {
+                showBufferSizeSelectionDialog {
+                    refreshViews()
+                    onUpdated()
+                }
+            }
+
+            btnBack.setOnClickListener {
+                dialog.dismiss()
+            }
+
+            btnClose.setOnClickListener {
+                dialog.dismiss()
+            }
+
+            dialog.show()
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error showing video settings dialog", e)
+        }
     }
 
     private fun showBufferSizeSelectionDialog(onUpdated: () -> Unit) {

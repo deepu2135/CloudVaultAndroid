@@ -484,10 +484,13 @@ class VlcPlayerActivity : AppCompatActivity() {
     private fun initVlcAndPlay(fileId: Int, videoTitle: String) {
         try {
             val options = ArrayList<String>().apply {
-                add("--no-drop-late-frames")
-                add("--no-skip-frames")
                 add("--http-reconnect")
-                add("-vvv")
+                add("--network-caching=2000")
+                add("--avcodec-skiploopfilter=1")
+                add("--avcodec-hw=any")
+                add("--aout=opensles")
+                add("--audio-time-stretch")
+                add("-vv")
             }
 
             val vlc = LibVLC(this, options)
@@ -497,11 +500,11 @@ class VlcPlayerActivity : AppCompatActivity() {
             mediaPlayer = player
 
             try {
-                player.attachViews(vlcVideoLayout, null, true, true)
+                player.attachViews(vlcVideoLayout, null, true, false)
             } catch (e: Throwable) {
-                android.util.Log.w("VlcPlayer", "TextureView attach failed, fallback to SurfaceView", e)
+                android.util.Log.w("VlcPlayer", "SurfaceView attach failed, fallback to TextureView", e)
                 try {
-                    player.attachViews(vlcVideoLayout, null, true, false)
+                    player.attachViews(vlcVideoLayout, null, true, true)
                 } catch (e2: Throwable) {
                     android.util.Log.e("VlcPlayer", "attachViews fallback failed", e2)
                 }
@@ -532,7 +535,8 @@ class VlcPlayerActivity : AppCompatActivity() {
                 addOption(":network-caching=$cachingMs")
                 addOption(":file-caching=$cachingMs")
                 addOption(":live-caching=$cachingMs")
-                addOption(":sout-mux-caching=$cachingMs")
+                addOption(":clock-jitter=0")
+                addOption(":clock-synchro=0")
             }
 
             player.setEventListener { event ->
