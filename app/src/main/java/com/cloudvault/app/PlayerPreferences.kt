@@ -48,23 +48,40 @@ object PlayerPreferences {
         if (fileId <= 0) return
         val prefs = getPrefs(context)
         
-        // If near start or near end (>92% or within 5s), clear saved position
-        if (positionMs < 3000L || (durationMs > 10000L && positionMs >= durationMs - 5000L) || (durationMs > 0L && positionMs.toFloat() / durationMs.toFloat() >= 0.92f)) {
+        // Only save valid position if duration is known (> 15s) and position is meaningful (> 5s and < 90% of duration)
+        if (durationMs > 15_000L) {
+            if (positionMs < 5_000L || positionMs >= durationMs - 10_000L || (positionMs.toFloat() / durationMs.toFloat()) >= 0.90f) {
+                clearPlaybackPosition(context, fileId)
+                return
+            }
+            prefs.edit()
+                .putLong("pos_$fileId", positionMs)
+                .putLong("dur_$fileId", durationMs)
+                .putLong("time_$fileId", System.currentTimeMillis())
+                .apply()
+        } else {
+            // For files without known duration or very short clips, do not save arbitrary offsets
             clearPlaybackPosition(context, fileId)
-            return
         }
-
-        prefs.edit()
-            .putLong("pos_$fileId", positionMs)
-            .putLong("dur_$fileId", durationMs)
-            .putLong("time_$fileId", System.currentTimeMillis())
-            .apply()
     }
 
-    fun getSavedPlaybackPosition(context: Context, fileId: Int): Long {
+    fun getSavedPlaybackPosition(context: Context, fileId: Int, durationMs: Long = 0L): Long {
         if (fileId <= 0 || !isAutoResumeEnabled(context)) return 0L
         val prefs = getPrefs(context)
-        return prefs.getLong("pos_$fileId", 0L)
+        val pos = prefs.getLong("pos_$fileId", 0L)
+        val savedDur = prefs.getLong("dur_$fileId", 0L)
+        val effectiveDur = if (durationMs > 0L) durationMs else savedDur
+
+        if (pos < 5000L) {
+            return 0L
+        }
+        if (effectiveDur > 0L) {
+            if (pos >= effectiveDur - 10000L || (pos.toFloat() / effectiveDur.toFloat()) >= 0.90f) {
+                clearPlaybackPosition(context, fileId)
+                return 0L
+            }
+        }
+        return pos
     }
 
     fun clearPlaybackPosition(context: Context, fileId: Int) {

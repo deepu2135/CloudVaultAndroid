@@ -77,6 +77,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private var explicitDurationMs: Long = 0L
     private var currentFileId: Int = 0
     private var hasResumedPosition = false
+    private var pendingResumePos = 0L
     private var lastPositionSaveTime = 0L
 
     private var isUserTracking = false
@@ -486,10 +487,7 @@ class VlcPlayerActivity : AppCompatActivity() {
             val options = ArrayList<String>().apply {
                 add("--http-reconnect")
                 add("--network-caching=2000")
-                add("--avcodec-skiploopfilter=1")
-                add("--avcodec-hw=any")
-                add("--aout=opensles")
-                add("--audio-time-stretch")
+                add("--file-caching=2000")
                 add("-vv")
             }
 
@@ -524,19 +522,17 @@ class VlcPlayerActivity : AppCompatActivity() {
                           videoTitle.endsWith(".opus", ignoreCase = true)
 
             hasResumedPosition = false
+            pendingResumePos = PlayerPreferences.getSavedPlaybackPosition(this, fileId, explicitDurationMs)
             val bufferMb = PlayerPreferences.getBufferSizeMb(this)
             TelegramStreamingProxy.setPrefetchMb(bufferMb.toLong())
-            val cachingMs = PlayerPreferences.getNetworkCachingMs(this)
 
             val media = Media(vlc, Uri.parse(proxyUrl)).apply {
                 if (!isAudio) {
                     setHWDecoderEnabled(true, false)
                 }
-                addOption(":network-caching=$cachingMs")
-                addOption(":file-caching=$cachingMs")
-                addOption(":live-caching=$cachingMs")
-                addOption(":clock-jitter=0")
-                addOption(":clock-synchro=0")
+                addOption(":network-caching=2000")
+                addOption(":file-caching=2000")
+                addOption(":live-caching=2000")
             }
 
             player.setEventListener { event ->
@@ -554,17 +550,6 @@ class VlcPlayerActivity : AppCompatActivity() {
                             pbVlcBuffering.visibility = View.GONE
                             ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_pause)
                             TeleflixLogger.log("VlcPlayer", "Playback state: PLAYING")
-
-                            if (!hasResumedPosition && currentFileId > 0) {
-                                hasResumedPosition = true
-                                val savedPos = PlayerPreferences.getSavedPlaybackPosition(this@VlcPlayerActivity, currentFileId)
-                                if (savedPos > 3000L) {
-                                    player.time = savedPos
-                                    val formatted = formatTime(savedPos)
-                                    showGestureHud("⏱️", "Resumed from $formatted", -1)
-                                    Toast.makeText(this@VlcPlayerActivity, "Resumed playback from $formatted", Toast.LENGTH_SHORT).show()
-                                }
-                            }
                         }
                         MediaPlayer.Event.Paused -> {
                             ivPlayPauseIcon.setImageResource(R.drawable.ic_vlc_play)
@@ -590,6 +575,18 @@ class VlcPlayerActivity : AppCompatActivity() {
                                     updateTimeViews(clampedTime, length)
                                 } else if (time > 0L) {
                                     tvVlcCurrentTime.text = formatTime(time)
+                                }
+
+                                if (!hasResumedPosition && pendingResumePos > 5000L) {
+                                    if (length > 15000L && pendingResumePos < length - 10000L) {
+                                        hasResumedPosition = true
+                                        val target = pendingResumePos
+                                        pendingResumePos = 0L
+                                        player.time = target
+                                        val formatted = formatTime(target)
+                                        showGestureHud("⏱️", "Resumed from $formatted", -1)
+                                        Toast.makeText(this@VlcPlayerActivity, "Resumed playback from $formatted", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
 
                                 val now = System.currentTimeMillis()
@@ -931,7 +928,7 @@ class VlcPlayerActivity : AppCompatActivity() {
         val player = mediaPlayer ?: return
         val time = player.time
         val duration = getEffectiveDuration()
-        if (time > 0L && currentFileId > 0) {
+        if (time > 5000L && duration > 15000L && time < duration - 10000L && currentFileId > 0) {
             PlayerPreferences.savePlaybackPosition(this, currentFileId, time, duration)
         }
     }
