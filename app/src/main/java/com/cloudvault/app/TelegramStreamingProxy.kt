@@ -572,6 +572,18 @@ object TelegramStreamingProxy {
             val totalSize = exactSize ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
             val localPath = fileInfo?.first
 
+            if (!localPath.isNullOrBlank() && !java.io.File(localPath).exists()) {
+                TeleflixLogger.log(TAG, "streamFile: fileId=$fileId has stale local path '$localPath' which does not exist on disk. Resetting TDLib via DeleteFile...")
+                runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(fileId)) }
+                if (targetFileId != fileId) {
+                    runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(targetFileId)) }
+                }
+                lastDownloadRequestOffset.remove(fileId)
+                lastDownloadRequestTime.remove(fileId)
+                lastDownloadRequestOffset.remove(targetFileId)
+                lastDownloadRequestTime.remove(targetFileId)
+            }
+
             if (totalSize <= 0L) {
                 output.write("HTTP/1.1 404 Not Found\r\n\r\n".toByteArray())
                 return
@@ -1396,14 +1408,34 @@ object TelegramStreamingProxy {
 
     private suspend fun deleteFile(fileId: Int) {
         if (fileId <= 0 || DownloadManager.isFileIdActive(fileId)) return
+        val target = resolveFileId(fileId)
+        lastDownloadRequestOffset.remove(fileId)
+        lastDownloadRequestTime.remove(fileId)
+        lastDownloadRequestOffset.remove(target)
+        lastDownloadRequestTime.remove(target)
+        activeDownloadWindows.remove(fileId)
+        activeDownloadWindows.remove(target)
         runCatching {
             TelegramClient.sendRequest(TdApi.CancelDownloadFile().also { req ->
                 req.fileId = fileId
                 req.onlyIfPending = false
             })
         }
+        if (target != fileId) {
+            runCatching {
+                TelegramClient.sendRequest(TdApi.CancelDownloadFile().also { req ->
+                    req.fileId = target
+                    req.onlyIfPending = false
+                })
+            }
+        }
         runCatching {
             TelegramClient.sendRequest(TdApi.DeleteFile(fileId))
+        }
+        if (target != fileId) {
+            runCatching {
+                TelegramClient.sendRequest(TdApi.DeleteFile(target))
+            }
         }
     }
 
@@ -1615,6 +1647,17 @@ object TelegramStreamingProxy {
                 if (diskFile.exists() && diskFile.length() in 1..(5 * 1024 * 1024L)) {
                     downloadedFile = diskFile
                     break
+                } else if (!diskFile.exists()) {
+                    runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(fileId)) }
+                    runCatching {
+                        TelegramClient.sendRequest(TdApi.DownloadFile().also { req ->
+                            req.fileId = fileId
+                            req.priority = 8
+                            req.offset = 0
+                            req.limit = thumbLimit
+                            req.synchronous = false
+                        })
+                    }
                 }
             }
             delay(50L)
@@ -1741,11 +1784,53 @@ object TelegramStreamingProxy {
                     return@withTimeoutOrNull null
                 }
 
-                if (file?.local?.isDownloadingCompleted == true) {
-                    val finalData = try {
-                        TelegramClient.sendRequest(TdApi.ReadFilePart(activeFileId, offset, limit.toLong())) as? TdApi.Data
-                    } catch (e: Exception) { null }
-                    return@withTimeoutOrNull finalData?.data
+                val isCompleted = file?.local?.isDownloadingCompleted == true
+                val localPath = file?.local?.path
+                val diskFile = if (!localPath.isNullOrBlank()) java.io.File(localPath) else null
+
+                if (isCompleted && diskFile != null && diskFile.exists() && diskFile.isFile && diskFile.canRead()) {
+                    try {
+                        java.io.RandomAccessFile(diskFile, "r").use { raf ->
+                            val fileLen = raf.length()
+                            if (offset < fileLen) {
+                                raf.seek(offset)
+                                val toRead = minOf(limit.toLong(), fileLen - offset).toInt()
+                                val buffer = ByteArray(toRead)
+                                val bytesRead = raf.read(buffer, 0, toRead)
+                                if (bytesRead > 0) {
+                                    val diskMs = System.currentTimeMillis() - chunkStartMs
+                                    metrics?.chunksOk = (metrics?.chunksOk ?: 0) + 1
+                                    val count = metrics?.chunksOk ?: 1
+                                    if (diskMs > 500L || count % 5 == 0 || count == 1) {
+                                        TeleflixLogger.log(TAG, "[DiskRead] chunk #$count fileId=$activeFileId offset=$offset size=$bytesRead diskMs=$diskMs status=ok")
+                                    }
+                                    val result = if (bytesRead == toRead) buffer else buffer.copyOf(bytesRead)
+                                    return@withTimeoutOrNull result
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        TeleflixLogger.log(TAG, "Direct disk read failed for fileId=$activeFileId path=$localPath: ${e.message}", isError = true)
+                    }
+                } else if (isCompleted && (diskFile == null || !diskFile.exists())) {
+                    TeleflixLogger.log(TAG, "fileId=$activeFileId marked completed in TDLib but missing on disk ($localPath). Resetting TDLib via DeleteFile to force cloud re-download...", isError = true)
+                    runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(activeFileId)) }
+                    if (activeFileId != fileId) {
+                        runCatching { TelegramClient.sendRequest(TdApi.DeleteFile(fileId)) }
+                    }
+                    lastDownloadRequestOffset.remove(activeFileId)
+                    lastDownloadRequestTime.remove(activeFileId)
+                    lastDownloadRequestOffset.remove(fileId)
+                    lastDownloadRequestTime.remove(fileId)
+                    val refreshed = refreshFileId(activeFileId, force = true)
+                    if (refreshed != null && refreshed != 0) {
+                        activeFileId = refreshed
+                    }
+                    val fileInfo = getFileInfo(activeFileId)
+                    val totalSize = fileInfo?.second?.takeIf { it > 0 } ?: fileInfo?.third?.takeIf { it > 0 } ?: 0L
+                    val alignedOffset = offset - (offset % (1024 * 1024))
+                    val safeLimit = calculateSafeTdlibLimit(alignedOffset, totalSize, prefetchSizeMb, limit)
+                    triggerTdlibDownload(activeFileId, alignedOffset, safeLimit, force = true)
                 }
 
                 // Check if download is active
