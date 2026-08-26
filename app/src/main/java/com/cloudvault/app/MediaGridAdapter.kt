@@ -189,6 +189,8 @@ class MediaGridAdapter(
 
     fun getSelectedCount(): Int = selectedItemIds.size
 
+    fun getItemAt(position: Int): VaultDisplayItem? = items.getOrNull(position)
+
     fun submitList(newItems: List<VaultDisplayItem>) {
         val diffCallback = object : DiffUtil.Callback() {
             override fun getOldListSize() = items.size

@@ -104,6 +104,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnGridToggle: TextView
 
     private lateinit var rvMediaGrid: RecyclerView
+    private lateinit var fastScroller: FastScrollerView
     private lateinit var layoutEmptyState: LinearLayout
     private lateinit var tvEmptyEmoji: TextView
     private lateinit var tvEmptyTitle: TextView
@@ -309,6 +310,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         rvMediaGrid = findViewById(R.id.rvMediaGrid)
+        fastScroller = findViewById(R.id.fastScroller)
         layoutEmptyState = findViewById(R.id.layoutEmptyState)
         tvEmptyEmoji = findViewById(R.id.tvEmptyEmoji)
         tvEmptyTitle = findViewById(R.id.tvEmptyTitle)
@@ -440,6 +442,26 @@ class MainActivity : AppCompatActivity() {
         }
         rvMediaGrid.layoutManager = gridLayoutManager
         rvMediaGrid.adapter = mediaAdapter
+
+        fastScroller.attachRecyclerView(rvMediaGrid)
+        fastScroller.setPopupTextProvider { position ->
+            val item = mediaAdapter.getItemAt(position)
+            when (item) {
+                is VaultDisplayItem.Header -> item.dateTitle
+                is VaultDisplayItem.Media -> {
+                    if (item.item.dateAdded > 0L) {
+                        val date = Date(item.item.dateAdded * 1000L)
+                        when (currentCategory) {
+                            MediaType.PHOTO, MediaType.VIDEO -> formatDateHeader(item.item.dateAdded, currentZoomLevel)
+                            MediaType.AUDIO, MediaType.DOCUMENT -> SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(date)
+                        }
+                    } else {
+                        item.item.title.take(15)
+                    }
+                }
+                null -> null
+            }
+        }
 
         setupPinchToZoom()
     }
@@ -691,6 +713,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         mediaAdapter.submitList(displayItems)
+        fastScroller.post { fastScroller.updateThumbPositionFromList() }
 
         if (items.isEmpty()) {
             layoutEmptyState.visibility = View.VISIBLE
