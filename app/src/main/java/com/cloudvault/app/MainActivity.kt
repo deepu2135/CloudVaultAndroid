@@ -449,11 +449,13 @@ class MainActivity : AppCompatActivity() {
             private var accumulatedScale = 1.0f
 
             override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                if (currentCategory != MediaType.PHOTO && currentCategory != MediaType.VIDEO) return false
                 accumulatedScale = 1.0f
                 return true
             }
 
             override fun onScale(detector: ScaleGestureDetector): Boolean {
+                if (currentCategory != MediaType.PHOTO && currentCategory != MediaType.VIDEO) return false
                 accumulatedScale *= detector.scaleFactor
                 val now = System.currentTimeMillis()
                 if (now - lastScaleTime < 350) return true
@@ -479,12 +481,15 @@ class MainActivity : AppCompatActivity() {
 
         rvMediaGrid.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
             override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                if (currentCategory != MediaType.PHOTO && currentCategory != MediaType.VIDEO) return false
                 scaleDetector.onTouchEvent(e)
                 return e.pointerCount >= 2
             }
 
             override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {
-                scaleDetector.onTouchEvent(e)
+                if (currentCategory == MediaType.PHOTO || currentCategory == MediaType.VIDEO) {
+                    scaleDetector.onTouchEvent(e)
+                }
             }
         })
     }
@@ -637,6 +642,13 @@ class MainActivity : AppCompatActivity() {
             MediaType.VIDEO -> "Videos"
             MediaType.AUDIO -> "Audio & Music"
             MediaType.DOCUMENT -> "Files & Documents"
+        }
+
+        // Only show Day/Month/Year grid zoom toggle on Photos and Videos tabs
+        btnGridToggle.visibility = if (category == MediaType.PHOTO || category == MediaType.VIDEO) {
+            View.VISIBLE
+        } else {
+            View.GONE
         }
 
         updateDisplayedItems()
