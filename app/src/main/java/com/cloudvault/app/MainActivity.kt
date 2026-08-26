@@ -30,6 +30,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -1814,10 +1815,14 @@ class MainActivity : AppCompatActivity() {
         builder.setMessage("Enter your phone number with country code (e.g., +919876543210 or +14155552671):")
 
         val container = FrameLayout(this)
-        container.setPadding(50, 20, 50, 20)
+        container.setPadding(60, 24, 60, 16)
         val input = EditText(this)
         input.hint = "+1234567890"
         input.inputType = android.text.InputType.TYPE_CLASS_PHONE
+        input.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        input.setHintTextColor(ContextCompat.getColor(this, R.color.text_muted))
+        input.setBackgroundResource(R.drawable.bg_search)
+        input.setPadding(36, 32, 36, 32)
         container.addView(input)
         builder.setView(container)
 
@@ -1841,10 +1846,14 @@ class MainActivity : AppCompatActivity() {
         builder.setMessage("Enter the login code sent to your active Telegram app (chats list on your phone/desktop):\n\n(Note: Telegram sends the code in-app, not via SMS).")
 
         val container = FrameLayout(this)
-        container.setPadding(50, 20, 50, 20)
+        container.setPadding(60, 24, 60, 16)
         val input = EditText(this)
         input.hint = "12345"
         input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        input.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        input.setHintTextColor(ContextCompat.getColor(this, R.color.text_muted))
+        input.setBackgroundResource(R.drawable.bg_search)
+        input.setPadding(36, 32, 36, 32)
         container.addView(input)
         builder.setView(container)
 
@@ -1872,10 +1881,14 @@ class MainActivity : AppCompatActivity() {
         builder.setMessage("Your account has 2FA enabled. Enter your Cloud password:")
 
         val container = FrameLayout(this)
-        container.setPadding(50, 20, 50, 20)
+        container.setPadding(60, 24, 60, 16)
         val input = EditText(this)
         input.hint = "Password"
         input.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        input.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        input.setHintTextColor(ContextCompat.getColor(this, R.color.text_muted))
+        input.setBackgroundResource(R.drawable.bg_search)
+        input.setPadding(36, 32, 36, 32)
         container.addView(input)
         builder.setView(container)
 

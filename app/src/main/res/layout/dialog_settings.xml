@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#0A0F1D">
+    android:background="@color/bg_dark">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,7 +23,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Settings"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -33,7 +33,7 @@
                 android:layout_height="36dp"
                 android:gravity="center"
                 android:text="✕"
-                android:textColor="#94A3B8"
+                android:textColor="@color/text_secondary"
                 android:textSize="18sp"
                 android:background="?attr/selectableItemBackgroundBorderless" />
         </LinearLayout>
@@ -44,10 +44,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp"
             android:clickable="true"
             android:focusable="true">
@@ -76,7 +76,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Auto Backup &amp; Sync"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -86,7 +86,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="Back up device photos &amp; videos"
-                        android:textColor="#94A3B8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -95,21 +95,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="ON"
-                    android:textColor="@color/accent_cyan"
-                    android:textSize="12sp"
+                    android:textColor="@color/accent_cyan_bright"
+                    android:textSize="11sp"
                     android:textStyle="bold"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="3dp"
-                    android:paddingBottom="3dp"
-                    android:background="#16263D" />
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:background="@color/bg_surface_elevated" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:text="›"
-                    android:textColor="#64748B"
+                    android:textColor="@color/text_muted"
                     android:textSize="22sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -120,10 +120,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp"
             android:clickable="true"
             android:focusable="true">
@@ -152,7 +152,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Storage &amp; Cache Usage"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -162,7 +162,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="Manage cached videos, files &amp; photos"
-                        android:textColor="#94A3B8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -171,21 +171,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0 B"
-                    android:textColor="#60A5FA"
-                    android:textSize="12sp"
+                    android:textColor="@color/accent_blue_light"
+                    android:textSize="11sp"
                     android:textStyle="bold"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="3dp"
-                    android:paddingBottom="3dp"
-                    android:background="#16263D" />
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:background="@color/bg_surface_elevated" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:text="›"
-                    android:textColor="#64748B"
+                    android:textColor="@color/text_muted"
                     android:textSize="22sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -196,10 +196,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp"
             android:clickable="true"
             android:focusable="true">
@@ -228,7 +228,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Video Player &amp; Playback"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -238,7 +238,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="Buffer size, prefetch &amp; auto-resume"
-                        android:textColor="#94A3B8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -247,21 +247,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="32 MB"
-                    android:textColor="#F59E0B"
-                    android:textSize="12sp"
+                    android:textColor="@color/status_warning"
+                    android:textSize="11sp"
                     android:textStyle="bold"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="3dp"
-                    android:paddingBottom="3dp"
-                    android:background="#2E1C0C" />
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:background="@color/status_warning_bg" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:text="›"
-                    android:textColor="#64748B"
+                    android:textColor="@color/text_muted"
                     android:textSize="22sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -272,10 +272,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp"
             android:clickable="true"
             android:focusable="true">
@@ -304,7 +304,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="App Logs &amp; Diagnostics"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -314,7 +314,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="View live uploads, streaming &amp; system logs"
-                        android:textColor="#94A3B8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -323,21 +323,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="LOGS"
-                    android:textColor="#38BDF8"
-                    android:textSize="12sp"
+                    android:textColor="@color/accent_blue_light"
+                    android:textSize="11sp"
                     android:textStyle="bold"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="3dp"
-                    android:paddingBottom="3dp"
-                    android:background="#16263D" />
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:background="@color/bg_surface_elevated" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:text="›"
-                    android:textColor="#64748B"
+                    android:textColor="@color/text_muted"
                     android:textSize="22sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -348,10 +348,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -386,7 +386,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="API Configuration"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -395,7 +395,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Custom Telegram API credentials (Advanced)"
-                            android:textColor="#94A3B8"
+                            android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -404,7 +404,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="▼"
-                        android:textColor="#64748B"
+                        android:textColor="@color/text_muted"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -423,13 +423,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginBottom="12dp"
-                        android:background="#1E293B" />
+                        android:background="@color/divider_color" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="API ID"
-                        android:textColor="#94A3B8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
                     <EditText
@@ -437,12 +437,12 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:background="#1E293B"
+                        android:background="@color/bg_surface_elevated"
                         android:hint="••••••••"
                         android:inputType="numberPassword"
-                        android:padding="10dp"
-                        android:textColor="#FFFFFF"
-                        android:textColorHint="#64748B"
+                        android:padding="12dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_muted"
                         android:textSize="13sp" />
 
                     <TextView
@@ -450,7 +450,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
                         android:text="API Hash"
-                        android:textColor="#94A3B8"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
 
                     <EditText
@@ -458,23 +458,23 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:background="#1E293B"
+                        android:background="@color/bg_surface_elevated"
                         android:hint="••••••••••••••••••••••••••••••••"
                         android:inputType="textPassword"
-                        android:padding="10dp"
-                        android:textColor="#FFFFFF"
-                        android:textColorHint="#64748B"
+                        android:padding="12dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_muted"
                         android:textSize="13sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnSaveCredentials"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="14dp"
                         android:text="Save API Credentials"
-                        android:textColor="#FFFFFF"
-                        app:backgroundTint="#334155"
-                        app:cornerRadius="8dp" />
+                        android:textColor="@color/text_primary"
+                        app:backgroundTint="@color/bg_surface_highlight"
+                        app:cornerRadius="10dp" />
                 </LinearLayout>
 
             </LinearLayout>
@@ -484,14 +484,15 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSettingsLogout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="50dp"
             android:layout_marginTop="20dp"
             android:text="Log Out of CloudVault"
-            android:textColor="#EF4444"
-            app:backgroundTint="#1A0F1D"
-            app:strokeColor="#7F1D1D"
+            android:textColor="@color/status_error"
+            android:textStyle="bold"
+            app:backgroundTint="@color/status_error_bg"
+            app:strokeColor="@color/status_error"
             app:strokeWidth="1dp"
-            app:cornerRadius="10dp" />
+            app:cornerRadius="14dp" />
 
     </LinearLayout>
 </ScrollView>

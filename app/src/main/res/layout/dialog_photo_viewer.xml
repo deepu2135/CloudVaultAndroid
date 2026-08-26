@@ -26,7 +26,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="#B3000000"
+        android:background="#D9080E18"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="16dp"
@@ -40,14 +40,16 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="@drawable/ic_launcher_background"
-            android:backgroundTint="#26FFFFFF">
+            android:backgroundTint="@color/bg_surface_elevated"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="←"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold" />
         </FrameLayout>
@@ -65,8 +67,8 @@
                 android:id="@+id/tvViewerTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Photo_1784485762.jpg"
-                android:textColor="#FFFFFF"
+                android:text="Photo Preview"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:maxLines="1"
@@ -77,8 +79,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="154.7 KB"
-                android:textColor="#99A1AF"
+                android:text="0 B"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -89,14 +91,16 @@
             android:layout_height="38dp"
             android:layout_marginEnd="8dp"
             android:background="@drawable/ic_launcher_background"
-            android:backgroundTint="#33EF4444">
+            android:backgroundTint="@color/status_error_bg"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="🗑"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/status_error"
                 android:textSize="16sp" />
         </FrameLayout>
 
@@ -105,10 +109,12 @@
             android:id="@+id/btnDownloadPhoto"
             android:layout_width="wrap_content"
             android:layout_height="38dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:background="@drawable/ic_launcher_background"
-            android:backgroundTint="@color/accent_cyan">
+            android:backgroundTint="@color/accent_cyan"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:layout_width="wrap_content"

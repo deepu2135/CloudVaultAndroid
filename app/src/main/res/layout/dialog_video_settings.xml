@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#0A0F1D">
+    android:background="@color/bg_dark">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -24,7 +24,7 @@
                 android:layout_height="36dp"
                 android:gravity="center"
                 android:text="←"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:background="?attr/selectableItemBackgroundBorderless" />
@@ -35,7 +35,7 @@
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
                 android:text="Video Player &amp; Playback"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -45,7 +45,7 @@
                 android:layout_height="36dp"
                 android:gravity="center"
                 android:text="✕"
-                android:textColor="#94A3B8"
+                android:textColor="@color/text_secondary"
                 android:textSize="16sp"
                 android:background="?attr/selectableItemBackgroundBorderless" />
         </LinearLayout>
@@ -55,10 +55,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -90,7 +90,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Streaming Buffer Size"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -100,7 +100,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Prefetch cache window for smooth streaming"
-                            android:textColor="#94A3B8"
+                            android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -109,21 +109,21 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="32 MB"
-                        android:textColor="#F59E0B"
-                        android:textSize="12sp"
+                        android:textColor="@color/status_warning"
+                        android:textSize="11sp"
                         android:textStyle="bold"
-                        android:paddingStart="8dp"
-                        android:paddingEnd="8dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
                         android:paddingTop="4dp"
                         android:paddingBottom="4dp"
-                        android:background="#2E1C0C" />
+                        android:background="@color/status_warning_bg" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:text="›"
-                        android:textColor="#64748B"
+                        android:textColor="@color/text_muted"
                         android:textSize="20sp" />
                 </LinearLayout>
 
@@ -132,7 +132,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="12dp"
                     android:layout_marginBottom="12dp"
-                    android:background="#1E293B" />
+                    android:background="@color/divider_color" />
 
                 <!-- Auto Resume Toggle Row -->
                 <LinearLayout
@@ -153,7 +153,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Auto Resume Playback"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -162,7 +162,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:text="Remember &amp; resume last watched position"
-                            android:textColor="#94A3B8"
+                            android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -181,10 +181,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -197,7 +197,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="⚡ VLC Playback Engine"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
@@ -206,7 +206,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="• Hardware acceleration is automatically enabled for supported codecs\n• Stream cache is automatically wiped upon exiting the player to conserve storage"
-                    android:textColor="#94A3B8"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:lineSpacingExtra="3dp" />
             </LinearLayout>

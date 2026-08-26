@@ -1,9 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.CloudVault" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/accent_blue</item>
-        <item name="colorSecondary">@color/accent_cyan</item>
+    <style name="Theme.CloudVault" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/accent_cyan</item>
+        <item name="colorPrimaryVariant">@color/accent_blue</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">@color/accent_cyan_bright</item>
+        <item name="colorSecondaryVariant">@color/accent_cyan</item>
+        <item name="colorOnSecondary">#000000</item>
         <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
         <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="alertDialogTheme">@style/Theme.CloudVault.Dialog.Alert</item>
+        <item name="materialAlertDialogTheme">@style/Theme.CloudVault.Dialog.Alert</item>
+    </style>
+
+    <style name="Theme.CloudVault.Dialog.Alert" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:background">@color/card_bg</item>
+        <item name="backgroundTint">@color/card_bg</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.CloudVault.Dialog</item>
+        <item name="colorPrimary">@color/accent_cyan_bright</item>
+        <item name="colorSecondary">@color/accent_cyan</item>
+        <item name="colorSurface">@color/card_bg</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.CloudVault.Dialog.Button.Positive</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.CloudVault.Dialog.Button.Negative</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.CloudVault.Dialog.Button.Neutral</item>
+    </style>
+
+    <style name="ShapeAppearance.CloudVault.Dialog" parent="ShapeAppearance.MaterialComponents.LargeComponent">
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="Widget.CloudVault.Dialog.Button.Positive" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/accent_cyan_bright</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.CloudVault.Dialog.Button.Negative" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+    <style name="Widget.CloudVault.Dialog.Button.Neutral" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/accent_blue_light</item>
     </style>
 </resources>

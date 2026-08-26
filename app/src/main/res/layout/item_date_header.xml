@@ -15,9 +15,9 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="Aug 12"
-        android:textColor="#FFFFFF"
-        android:textSize="17sp"
+        android:text="Date Group"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
         android:textStyle="bold" />
 
     <!-- Selection Check Circle Container for Date Section -->

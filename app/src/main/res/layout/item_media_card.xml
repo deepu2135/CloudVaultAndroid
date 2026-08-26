@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
-    app:cardCornerRadius="10dp"
+    app:cardCornerRadius="14dp"
     app:cardElevation="0dp"
     app:cardBackgroundColor="@color/card_bg"
     app:strokeColor="@color/card_border"
@@ -20,7 +20,7 @@
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="125dp"
-            android:background="#0C1522">
+            android:background="@color/bg_surface_elevated">
 
             <ImageView
                 android:id="@+id/ivThumbnail"
@@ -45,10 +45,11 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|start"
                 android:layout_margin="6dp"
-                android:background="#99080E18"
+                android:background="@drawable/ic_launcher_background"
+                android:backgroundTint="#B3000000"
                 android:orientation="horizontal"
-                android:paddingStart="5dp"
-                android:paddingEnd="5dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
                 android:paddingTop="2dp"
                 android:paddingBottom="2dp"
                 android:gravity="center">
@@ -69,7 +70,8 @@
                 android:layout_height="32dp"
                 android:layout_gravity="center"
                 android:visibility="gone"
-                android:background="#80000000">
+                android:background="@drawable/ic_launcher_background"
+                android:backgroundTint="#B3000000">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -85,9 +87,10 @@
             <ProgressBar
                 android:id="@+id/pbThumbLoading"
                 style="?android:attr/progressBarStyleSmall"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
                 android:layout_gravity="center"
+                android:indeterminateTint="@color/accent_cyan"
                 android:visibility="gone" />
 
             <!-- Selection Overlay Dimmer -->
@@ -95,7 +98,7 @@
                 android:id="@+id/selectionDimOverlay"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="#4D2563EB"
+                android:background="@color/selection_dim"
                 android:visibility="gone" />
 
             <!-- Selection Check Circle Container -->
@@ -161,20 +164,21 @@
                     android:layout_weight="1"
                     android:maxLines="1"
                     android:ellipsize="end"
-                    android:text="Photo_178488..."
+                    android:text="Media File"
                     android:textColor="@color/text_primary"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/btnItemMenu"
-                    android:layout_width="20dp"
-                    android:layout_height="wrap_content"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
                     android:gravity="center"
                     android:text="⋮"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:background="?attr/selectableItemBackgroundBorderless" />
             </LinearLayout>
 
             <TextView
@@ -183,7 +187,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:maxLines="1"
-                android:text="212.8 KB"
+                android:text="0 B"
                 android:textColor="@color/text_secondary"
                 android:textSize="10sp" />
         </LinearLayout>

@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0A0F1D"
+    android:background="@color/bg_dark"
     android:orientation="vertical">
 
     <!-- Top App Bar -->
@@ -23,7 +23,7 @@
             android:layout_height="40dp"
             android:gravity="center"
             android:text="←"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/text_primary"
             android:textSize="22sp"
             android:textStyle="bold"
             android:background="?attr/selectableItemBackgroundBorderless" />
@@ -34,7 +34,7 @@
             android:layout_weight="1"
             android:layout_marginStart="12dp"
             android:text="Storage Usage"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -44,7 +44,7 @@
             android:layout_height="40dp"
             android:gravity="center"
             android:text="✕"
-            android:textColor="#94A3B8"
+            android:textColor="@color/text_secondary"
             android:textSize="18sp"
             android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
@@ -81,9 +81,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="Storage Usage"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
+                    android:text="Storage Breakdown"
+                    android:textColor="@color/text_primary"
+                    android:textSize="17sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -92,7 +92,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="CloudVault uses 2% of your device storage."
-                    android:textColor="#94A3B8"
+                    android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
             </LinearLayout>
 
@@ -113,8 +113,8 @@
                 android:layout_marginTop="8dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#0F172A"
-                app:strokeColor="#1E293B"
+                app:cardBackgroundColor="@color/card_bg"
+                app:strokeColor="@color/card_border"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -138,14 +138,14 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:checked="true"
-                            android:buttonTint="#3B82F6" />
+                            android:buttonTint="@color/accent_blue" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:text="Videos"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -155,7 +155,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:text="82%"
-                            android:textColor="#60A5FA"
+                            android:textColor="@color/accent_blue"
                             android:textSize="12sp" />
 
                         <TextView
@@ -165,7 +165,7 @@
                             android:layout_weight="1"
                             android:gravity="end"
                             android:text="0 B"
-                            android:textColor="#93C5FD"
+                            android:textColor="@color/accent_blue_light"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -174,7 +174,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="44dp"
-                        android:background="#1E293B" />
+                        android:background="@color/divider_color" />
 
                     <!-- Documents Category Row -->
                     <LinearLayout
@@ -198,7 +198,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:text="Documents"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -227,7 +227,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="44dp"
-                        android:background="#1E293B" />
+                        android:background="@color/divider_color" />
 
                     <!-- Photos & Thumbnails Category Row -->
                     <LinearLayout
@@ -251,7 +251,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:text="Photos &amp; Thumbnails"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -280,7 +280,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="44dp"
-                        android:background="#1E293B" />
+                        android:background="@color/divider_color" />
 
                     <!-- Other / App Cache Row -->
                     <LinearLayout
@@ -304,7 +304,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:text="Other &amp; App Cache"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -342,7 +342,7 @@
                         android:textColor="#FFFFFF"
                         android:textSize="15sp"
                         android:textStyle="bold"
-                        app:backgroundTint="#4A6572"
+                        app:backgroundTint="@color/accent_blue"
                         app:cornerRadius="26dp" />
 
                 </LinearLayout>
@@ -356,7 +356,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="All media will stay in the Telegram cloud and can be re-downloaded if you need them again."
-                android:textColor="#64748B"
+                android:textColor="@color/text_muted"
                 android:textSize="12sp"
                 android:lineSpacingExtra="2dp" />
 
@@ -367,7 +367,7 @@
                 android:layout_marginTop="24dp"
                 android:layout_marginStart="4dp"
                 android:text="AUTO-REMOVE CACHED MEDIA"
-                android:textColor="#64748B"
+                android:textColor="@color/text_muted"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.05" />
@@ -379,8 +379,8 @@
                 android:layout_marginTop="8dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#0F172A"
-                app:strokeColor="#1E293B"
+                app:cardBackgroundColor="@color/card_bg"
+                app:strokeColor="@color/card_border"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -416,7 +416,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Keep Media"
-                                android:textColor="#FFFFFF"
+                                android:textColor="@color/text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
 
@@ -425,7 +425,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Automatically delete local cache after"
-                                android:textColor="#94A3B8"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="12sp" />
                         </LinearLayout>
 
@@ -443,7 +443,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:text="›"
-                            android:textColor="#64748B"
+                            android:textColor="@color/text_muted"
                             android:textSize="20sp" />
                     </LinearLayout>
 
@@ -451,7 +451,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:layout_marginStart="44dp"
-                        android:background="#1E293B" />
+                        android:background="@color/divider_color" />
 
                     <!-- Maximum Cache Size Row -->
                     <LinearLayout
@@ -480,7 +480,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Maximum Cache Size"
-                                android:textColor="#FFFFFF"
+                                android:textColor="@color/text_primary"
                                 android:textSize="15sp"
                                 android:textStyle="bold" />
 
@@ -489,7 +489,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="Limit device storage used for cached media"
-                                android:textColor="#94A3B8"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="12sp" />
                         </LinearLayout>
 
@@ -507,7 +507,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:text="›"
-                            android:textColor="#64748B"
+                            android:textColor="@color/text_muted"
                             android:textSize="20sp" />
                     </LinearLayout>
 

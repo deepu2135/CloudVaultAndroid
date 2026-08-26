@@ -3,8 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="1dp"
-    android:background="#080E18">
+    android:layout_margin="1.5dp"
+    android:background="@color/bg_dark">
 
     <FrameLayout
         android:layout_width="0dp"
@@ -32,11 +32,11 @@
 
         <FrameLayout
             android:id="@+id/badgeVideoOverlay"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:layout_gravity="center"
             android:background="@drawable/ic_launcher_background"
-            android:backgroundTint="#80000000">
+            android:backgroundTint="#B3000000">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -51,8 +51,8 @@
         <ProgressBar
             android:id="@+id/pbThumbLoading"
             style="?android:attr/progressBarStyleSmall"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:layout_gravity="center"
             android:indeterminateTint="@color/accent_cyan"
             android:visibility="gone" />

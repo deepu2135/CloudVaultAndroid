@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0A0F1D"
+    android:background="@color/bg_dark"
     android:orientation="vertical">
 
     <!-- Top App Bar -->
@@ -23,7 +23,7 @@
             android:layout_height="40dp"
             android:gravity="center"
             android:text="←"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/text_primary"
             android:textSize="22sp"
             android:textStyle="bold"
             android:background="?attr/selectableItemBackgroundBorderless" />
@@ -39,7 +39,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="App Logs &amp; Diagnostics"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -49,7 +49,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="Live system and network activity"
-                android:textColor="#94A3B8"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -59,7 +59,7 @@
             android:layout_height="40dp"
             android:gravity="center"
             android:text="✕"
-            android:textColor="#94A3B8"
+            android:textColor="@color/text_secondary"
             android:textSize="18sp"
             android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
@@ -77,10 +77,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="10dp"
+            app:cardCornerRadius="12dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -107,8 +107,8 @@
                     android:layout_marginStart="8dp"
                     android:background="@null"
                     android:hint="Filter logs (e.g. upload, error, stream, tdlib)..."
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#64748B"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
                     android:textSize="13sp"
                     android:inputType="text"
                     android:maxLines="1" />
@@ -119,7 +119,7 @@
                     android:layout_height="28dp"
                     android:gravity="center"
                     android:text="✕"
-                    android:textColor="#64748B"
+                    android:textColor="@color/text_muted"
                     android:textSize="13sp"
                     android:visibility="gone" />
             </LinearLayout>
@@ -140,12 +140,12 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
                 android:text="📋 Copy All"
-                android:textColor="#38BDF8"
+                android:textColor="@color/accent_blue_light"
                 android:textSize="12sp"
-                app:backgroundTint="#16263D"
-                app:strokeColor="#0284C7"
+                app:backgroundTint="@color/bg_surface_elevated"
+                app:strokeColor="@color/accent_blue_light"
                 app:strokeWidth="1dp"
-                app:cornerRadius="8dp"
+                app:cornerRadius="10dp"
                 android:padding="0dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp" />
@@ -158,12 +158,12 @@
                 android:layout_marginStart="4dp"
                 android:layout_marginEnd="4dp"
                 android:text="🔄 Refresh"
-                android:textColor="#E2E8F0"
+                android:textColor="@color/text_primary"
                 android:textSize="12sp"
-                app:backgroundTint="#1E293B"
-                app:strokeColor="#334155"
+                app:backgroundTint="@color/bg_surface_elevated"
+                app:strokeColor="@color/card_border"
                 app:strokeWidth="1dp"
-                app:cornerRadius="8dp"
+                app:cornerRadius="10dp"
                 android:padding="0dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp" />
@@ -175,12 +175,12 @@
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
                 android:text="🗑️ Clear"
-                android:textColor="#EF4444"
+                android:textColor="@color/status_error"
                 android:textSize="12sp"
-                app:backgroundTint="#1F1318"
-                app:strokeColor="#7F1D1D"
+                app:backgroundTint="@color/status_error_bg"
+                app:strokeColor="@color/status_error"
                 app:strokeWidth="1dp"
-                app:cornerRadius="8dp"
+                app:cornerRadius="10dp"
                 android:padding="0dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp" />
@@ -192,10 +192,10 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="12dp"
+            app:cardCornerRadius="14dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#050811"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/bg_dark"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp">
 
             <FrameLayout
@@ -216,7 +216,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="monospace"
                         android:text="Loading logs..."
-                        android:textColor="#38BDF8"
+                        android:textColor="@color/accent_cyan_bright"
                         android:textSize="11sp"
                         android:lineSpacingExtra="3dp" />
                 </ScrollView>
@@ -228,7 +228,7 @@
                     android:layout_gravity="center"
                     android:gravity="center"
                     android:text="No diagnostic logs recorded yet."
-                    android:textColor="#64748B"
+                    android:textColor="@color/text_muted"
                     android:textSize="14sp"
                     android:visibility="gone" />
             </FrameLayout>

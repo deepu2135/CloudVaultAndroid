@@ -5,10 +5,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
-    app:cardBackgroundColor="#162234"
-    app:cardCornerRadius="10dp"
+    app:cardBackgroundColor="@color/bg_surface_elevated"
+    app:cardCornerRadius="12dp"
     app:cardElevation="0dp"
-    app:strokeColor="#1E293B"
+    app:strokeColor="@color/card_border"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -22,7 +22,7 @@
             android:id="@+id/cbFolder"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:buttonTint="#2563EB"
+            android:buttonTint="@color/accent_blue"
             android:clickable="false"
             android:focusable="false" />
 
@@ -44,7 +44,7 @@
                 android:id="@+id/tvFolderName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -52,15 +52,15 @@
                 android:id="@+id/tvFolderItemCount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#94A3B8"
+                android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text=">"
-            android:textColor="#475569"
-            android:textSize="18sp" />
+            android:text="›"
+            android:textColor="@color/text_muted"
+            android:textSize="20sp" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

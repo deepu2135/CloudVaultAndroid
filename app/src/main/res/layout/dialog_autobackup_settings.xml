@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#0A0F1D">
+    android:background="@color/bg_dark">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -24,7 +24,7 @@
                 android:layout_height="36dp"
                 android:gravity="center"
                 android:text="←"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:background="?attr/selectableItemBackgroundBorderless" />
@@ -35,7 +35,7 @@
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
                 android:text="Auto Backup &amp; Sync"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -45,10 +45,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            app:cardCornerRadius="14dp"
+            app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            app:cardBackgroundColor="#0F172A"
-            app:strokeColor="#1E293B"
+            app:cardBackgroundColor="@color/card_bg"
+            app:strokeColor="@color/card_border"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -68,7 +68,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="📸 Back Up Device Media"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -85,7 +85,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:text="Automatically syncs device photos and videos in chronological order"
-                    android:textColor="#94A3B8"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
 
                 <View
@@ -93,7 +93,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="14dp"
                     android:layout_marginBottom="14dp"
-                    android:background="#1E293B" />
+                    android:background="@color/divider_color" />
 
                 <!-- Video Backup Switch -->
                 <LinearLayout
@@ -107,7 +107,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="🎬 Back Up Videos"
-                        android:textColor="#E2E8F0"
+                        android:textColor="@color/text_primary"
                         android:textSize="14sp" />
 
                     <com.google.android.material.switchmaterial.SwitchMaterial
@@ -122,7 +122,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="14dp"
                     android:layout_marginBottom="14dp"
-                    android:background="#1E293B" />
+                    android:background="@color/divider_color" />
 
                 <!-- Wi-Fi Only Switch -->
                 <LinearLayout
@@ -136,7 +136,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="📶 Back Up on Wi-Fi Only"
-                        android:textColor="#E2E8F0"
+                        android:textColor="@color/text_primary"
                         android:textSize="14sp" />
 
                     <com.google.android.material.switchmaterial.SwitchMaterial
@@ -150,47 +150,52 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSelectFolders"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="16dp"
                     android:text="📁 Choose Folders to Back Up"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#1E293B"
-                    app:cornerRadius="10dp" />
+                    android:textColor="@color/text_primary"
+                    app:backgroundTint="@color/bg_surface_elevated"
+                    app:strokeColor="@color/card_border"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="12dp" />
 
                 <!-- Trigger Sync Now -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnBackupNow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_marginTop="8dp"
                     android:text="🔄 Back Up Now"
                     android:textColor="#000000"
+                    android:textStyle="bold"
                     app:backgroundTint="@color/accent_cyan"
-                    app:cornerRadius="10dp" />
+                    app:cornerRadius="12dp" />
 
                 <!-- Index / Match Cloud Vault Media -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnIndexCloudMedia"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_marginTop="8dp"
                     android:text="🔍 Index &amp; Match Cloud Vault"
-                    android:textColor="#FFFFFF"
-                    app:backgroundTint="#1E293B"
-                    app:cornerRadius="10dp" />
+                    android:textColor="@color/text_primary"
+                    app:backgroundTint="@color/bg_surface_elevated"
+                    app:strokeColor="@color/card_border"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="12dp" />
 
                 <!-- Mark All Existing Media As Backed Up -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnMarkAllBackedUp"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_marginTop="8dp"
                     android:text="✅ Mark Device Media as Backed Up"
-                    android:textColor="#94A3B8"
-                    app:backgroundTint="#0F172A"
-                    app:strokeColor="#334155"
+                    android:textColor="@color/text_secondary"
+                    app:backgroundTint="@color/card_bg"
+                    app:strokeColor="@color/card_border"
                     app:strokeWidth="1dp"
-                    app:cornerRadius="10dp" />
+                    app:cornerRadius="12dp" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
