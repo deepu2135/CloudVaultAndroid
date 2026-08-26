@@ -3,7 +3,6 @@ package com.cloudvault.app
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.content.Context
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
@@ -25,7 +24,6 @@ class FastScrollerView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    private val trackView: View
     private val thumbContainer: FrameLayout
     private val thumbPill: View
     private val bubbleView: TextView
@@ -37,53 +35,38 @@ class FastScrollerView @JvmOverloads constructor(
     private val hideHandler = Handler(Looper.getMainLooper())
     private val hideRunnable = Runnable {
         if (!isDragging) {
-            animateFade(targetAlpha = 0.25f)
+            animateFade(targetAlpha = 0f)
         }
     }
 
-    private val thumbHeightPx = (52 * resources.displayMetrics.density).toInt()
+    private val thumbHeightPx = (46 * resources.displayMetrics.density).toInt()
 
     init {
         clipChildren = false
         clipToPadding = false
 
-        // Vertical track line
-        trackView = View(context).apply {
-            val gd = GradientDrawable().apply {
-                setColor(Color.parseColor("#1FFFFFFF"))
-                cornerRadius = 2f * resources.displayMetrics.density
-            }
-            background = gd
-            val trackWidthPx = (3 * resources.displayMetrics.density).toInt()
-            layoutParams = LayoutParams(trackWidthPx, LayoutParams.MATCH_PARENT).apply {
-                gravity = Gravity.END
-                marginEnd = (6 * resources.displayMetrics.density).toInt()
-            }
-        }
-        addView(trackView)
-
-        // Draggable Thumb Container with generous touch area
+        // Draggable Thumb Container with 32dp touch area
         thumbContainer = FrameLayout(context).apply {
             clipChildren = false
             layoutParams = LayoutParams(
-                (40 * resources.displayMetrics.density).toInt(),
+                (32 * resources.displayMetrics.density).toInt(),
                 thumbHeightPx
             ).apply {
                 gravity = Gravity.END or Gravity.TOP
             }
         }
 
-        // Sleek visual pill inside the thumb container
+        // Sleek visual pill handle (5dp wide, rounded, cyan accent)
         thumbPill = View(context).apply {
-            val pillWidthPx = (7 * resources.displayMetrics.density).toInt()
+            val pillWidthPx = (5 * resources.displayMetrics.density).toInt()
             val gd = GradientDrawable().apply {
                 setColor(ContextCompat.getColor(context, R.color.accent_cyan))
-                cornerRadius = 10f * resources.displayMetrics.density
+                cornerRadius = 8f * resources.displayMetrics.density
             }
             background = gd
             layoutParams = LayoutParams(pillWidthPx, LayoutParams.MATCH_PARENT).apply {
                 gravity = Gravity.END or Gravity.CENTER_VERTICAL
-                marginEnd = (4 * resources.displayMetrics.density).toInt()
+                marginEnd = (6 * resources.displayMetrics.density).toInt()
             }
         }
         thumbContainer.addView(thumbPill)
@@ -107,19 +90,23 @@ class FastScrollerView @JvmOverloads constructor(
             visibility = View.GONE
             layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
                 gravity = Gravity.END or Gravity.TOP
-                marginEnd = (44 * resources.displayMetrics.density).toInt()
+                marginEnd = (38 * resources.displayMetrics.density).toInt()
             }
         }
         addView(bubbleView)
 
-        alpha = 0.25f
+        // Initially hidden until user scrolls or touches
+        alpha = 0f
     }
 
     fun attachRecyclerView(rv: RecyclerView) {
         this.recyclerView = rv
+        rv.isVerticalScrollBarEnabled = false
+        rv.isHorizontalScrollBarEnabled = false
+
         rv.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (!isDragging) {
+                if (!isDragging && (dx != 0 || dy != 0)) {
                     showScrollerBriefly()
                     updateThumbPositionFromList()
                 }
@@ -204,7 +191,7 @@ class FastScrollerView @JvmOverloads constructor(
                 animateFade(1.0f)
                 performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
 
-                // Highlight thumb pill
+                // Highlight & expand thumb pill slightly
                 thumbPill.animate().scaleX(1.4f).setDuration(120).start()
 
                 // Show bubble
@@ -277,10 +264,13 @@ class FastScrollerView @JvmOverloads constructor(
         val text = popupTextProvider?.invoke(targetPos)
         if (!text.isNullOrBlank()) {
             bubbleView.text = text
+            bubbleView.visibility = View.VISIBLE
             val bHeight = if (bubbleView.height > 0) bubbleView.height else (32 * resources.displayMetrics.density).toInt()
             val bubbleY = (thumbContainer.y + (thumbHeightPx / 2f) - (bHeight / 2f))
                 .coerceIn(paddingTop.toFloat(), (height - paddingBottom - bHeight).toFloat())
             bubbleView.y = bubbleY
+        } else {
+            bubbleView.visibility = View.GONE
         }
     }
 

@@ -442,6 +442,8 @@ class MainActivity : AppCompatActivity() {
         }
         rvMediaGrid.layoutManager = gridLayoutManager
         rvMediaGrid.adapter = mediaAdapter
+        rvMediaGrid.isVerticalScrollBarEnabled = false
+        rvMediaGrid.isHorizontalScrollBarEnabled = false
 
         fastScroller.attachRecyclerView(rvMediaGrid)
         fastScroller.setPopupTextProvider { position ->

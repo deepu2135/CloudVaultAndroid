@@ -431,7 +431,7 @@
         <!-- Vertical Fast Scroller with Draggable Thumb -->
         <com.cloudvault.app.FastScrollerView
             android:id="@+id/fastScroller"
-            android:layout_width="48dp"
+            android:layout_width="32dp"
             android:layout_height="match_parent"
             android:layout_gravity="end"
             android:paddingTop="8dp"
