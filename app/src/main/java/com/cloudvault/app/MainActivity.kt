@@ -488,32 +488,30 @@ class MainActivity : AppCompatActivity() {
             AudioPlayerManager.currentTrack.collectLatest { track ->
                 if (track != null) {
                     cardMiniPlayer.visibility = View.VISIBLE
-                    tvMiniPlayerTitle.text = track.title
-                    tvMiniPlayerSubtitle.text = "${track.mimeType} • ${track.formattedSize}"
+                    tvMiniPlayerTitle.text = AudioPlayerDialog.cleanAudioTitle(track.title)
+                    val ext = track.title.substringAfterLast('.', "").uppercase().ifBlank { "AUDIO" }
+                    tvMiniPlayerSubtitle.text = "$ext • ${track.formattedSize}"
 
-                    if (track.thumbnailFileId > 0) {
-                        val cached = MediaGridAdapter.bitmapCache.get(track.thumbnailFileId)
-                        if (cached != null) {
-                            ivMiniPlayerArt.setImageBitmap(cached)
-                            ivMiniPlayerArt.visibility = View.VISIBLE
-                            tvMiniPlayerArt.visibility = View.GONE
-                        } else {
-                            ivMiniPlayerArt.visibility = View.GONE
-                            tvMiniPlayerArt.visibility = View.VISIBLE
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                val thumbBmp = AudioThumbnailHelper.getThumbnailBitmap(track)
-                                withContext(Dispatchers.Main) {
-                                    if (thumbBmp != null && AudioPlayerManager.currentTrack.value?.fileId == track.fileId) {
-                                        ivMiniPlayerArt.setImageBitmap(thumbBmp)
-                                        ivMiniPlayerArt.visibility = View.VISIBLE
-                                        tvMiniPlayerArt.visibility = View.GONE
-                                    }
-                                }
-                            }
-                        }
+                    val cached = (if (track.thumbnailFileId > 0) MediaGridAdapter.bitmapCache.get(track.thumbnailFileId) else null)
+                        ?: (if (track.fileId > 0) MediaGridAdapter.bitmapCache.get(track.fileId) else null)
+
+                    if (cached != null) {
+                        ivMiniPlayerArt.setImageBitmap(cached)
+                        ivMiniPlayerArt.visibility = View.VISIBLE
+                        tvMiniPlayerArt.visibility = View.GONE
                     } else {
                         ivMiniPlayerArt.visibility = View.GONE
                         tvMiniPlayerArt.visibility = View.VISIBLE
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val thumbBmp = AudioThumbnailHelper.getThumbnailBitmap(track)
+                            withContext(Dispatchers.Main) {
+                                if (thumbBmp != null && AudioPlayerManager.currentTrack.value?.fileId == track.fileId) {
+                                    ivMiniPlayerArt.setImageBitmap(thumbBmp)
+                                    ivMiniPlayerArt.visibility = View.VISIBLE
+                                    tvMiniPlayerArt.visibility = View.GONE
+                                }
+                            }
+                        }
                     }
                 } else {
                     cardMiniPlayer.visibility = View.GONE

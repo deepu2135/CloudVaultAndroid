@@ -212,7 +212,7 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
         isPrepared = false
 
         val currentTrack = AudioPlayerManager.currentTrack.value
-        if (currentTrack != null && currentTrack.thumbnailFileId > 0) {
+        if (currentTrack != null) {
             serviceScope.launch(Dispatchers.IO) {
                 val bmp = AudioThumbnailHelper.getThumbnailBitmap(currentTrack)
                 if (bmp != null && currentFileId == fileId) {

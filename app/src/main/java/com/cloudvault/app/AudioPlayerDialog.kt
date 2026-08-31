@@ -29,6 +29,11 @@ import java.util.Locale
 
 object AudioPlayerDialog {
 
+    fun cleanAudioTitle(rawTitle: String): String {
+        val clean = rawTitle.replace(Regex("(?i)\\.(mp3|m4a|flac|wav|aac|ogg|opus|wma|alac|aiff)$"), "").trim()
+        return clean.ifBlank { rawTitle }
+    }
+
     fun show(activity: Activity) {
         if (activity.isFinishing || activity.isDestroyed) return
         val currentTrack = AudioPlayerManager.currentTrack.value ?: return
@@ -160,8 +165,10 @@ object AudioPlayerDialog {
                 if (track == null) {
                     dialog.dismiss()
                 } else {
-                    tvFullAudioTitle.text = track.title
-                    tvFullAudioSubtitle.text = "${track.mimeType} • ${track.formattedSize}"
+                    tvFullAudioTitle.text = cleanAudioTitle(track.title)
+                    val ext = track.title.substringAfterLast('.', "").uppercase().ifBlank { "AUDIO" }
+                    tvFullAudioSubtitle.text = "$ext • ${track.formattedSize} • Cloud Vault"
+
                     val queue = AudioPlayerManager.playlist.value
                     val idx = queue.indexOfFirst { it.fileId == track.fileId }
                     if (idx >= 0 && queue.isNotEmpty()) {
@@ -169,30 +176,27 @@ object AudioPlayerDialog {
                         btnAudioQueuePill.text = "📋 Queue (${queue.size})"
                     }
 
-                    // Load Thumbnail / Album Artwork if available
-                    if (track.thumbnailFileId > 0) {
-                        val cached = MediaGridAdapter.bitmapCache.get(track.thumbnailFileId)
-                        if (cached != null) {
-                            ivAudioArtwork.setImageBitmap(cached)
-                            ivAudioArtwork.visibility = View.VISIBLE
-                            layoutAudioPlaceholderArt.visibility = View.GONE
-                        } else {
-                            ivAudioArtwork.visibility = View.GONE
-                            layoutAudioPlaceholderArt.visibility = View.VISIBLE
-                            launch(Dispatchers.IO) {
-                                val thumbBmp = AudioThumbnailHelper.getThumbnailBitmap(track)
-                                withContext(Dispatchers.Main) {
-                                    if (thumbBmp != null && AudioPlayerManager.currentTrack.value?.fileId == track.fileId) {
-                                        ivAudioArtwork.setImageBitmap(thumbBmp)
-                                        ivAudioArtwork.visibility = View.VISIBLE
-                                        layoutAudioPlaceholderArt.visibility = View.GONE
-                                    }
-                                }
-                            }
-                        }
+                    // Check cached artwork or load asynchronously
+                    val cached = (if (track.thumbnailFileId > 0) MediaGridAdapter.bitmapCache.get(track.thumbnailFileId) else null)
+                        ?: (if (track.fileId > 0) MediaGridAdapter.bitmapCache.get(track.fileId) else null)
+
+                    if (cached != null) {
+                        ivAudioArtwork.setImageBitmap(cached)
+                        ivAudioArtwork.visibility = View.VISIBLE
+                        layoutAudioPlaceholderArt.visibility = View.GONE
                     } else {
                         ivAudioArtwork.visibility = View.GONE
                         layoutAudioPlaceholderArt.visibility = View.VISIBLE
+                        launch(Dispatchers.IO) {
+                            val thumbBmp = AudioThumbnailHelper.getThumbnailBitmap(track)
+                            withContext(Dispatchers.Main) {
+                                if (thumbBmp != null && AudioPlayerManager.currentTrack.value?.fileId == track.fileId) {
+                                    ivAudioArtwork.setImageBitmap(thumbBmp)
+                                    ivAudioArtwork.visibility = View.VISIBLE
+                                    layoutAudioPlaceholderArt.visibility = View.GONE
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -208,13 +212,19 @@ object AudioPlayerDialog {
 
         lifecycleOwner?.lifecycleScope?.launch {
             AudioPlayerManager.isShuffle.collectLatest { shuffle ->
-                btnAudioShuffle.alpha = if (shuffle) 1.0f else 0.4f
+                btnAudioShuffle.alpha = if (shuffle) 1.0f else 0.35f
+                btnAudioShuffle.setTextColor(
+                    if (shuffle) activity.getColor(R.color.accent_cyan_bright) else activity.getColor(R.color.text_secondary)
+                )
             }
         }
 
         lifecycleOwner?.lifecycleScope?.launch {
             AudioPlayerManager.isRepeat.collectLatest { repeat ->
-                btnAudioRepeat.alpha = if (repeat) 1.0f else 0.4f
+                btnAudioRepeat.alpha = if (repeat) 1.0f else 0.35f
+                btnAudioRepeat.setTextColor(
+                    if (repeat) activity.getColor(R.color.accent_cyan_bright) else activity.getColor(R.color.text_secondary)
+                )
             }
         }
 
@@ -365,38 +375,36 @@ object AudioPlayerDialog {
             holder.tvPlayingIndicator.visibility = if (isPlaying) View.VISIBLE else View.GONE
             holder.tvNowPlayingTag.visibility = if (isPlaying) View.VISIBLE else View.GONE
 
-            holder.tvQueueTrackTitle.text = item.title
+            holder.tvQueueTrackTitle.text = cleanAudioTitle(item.title)
             val durStr = if (item.durationSeconds > 0) {
                 val min = item.durationSeconds / 60
                 val sec = item.durationSeconds % 60
                 String.format(Locale.getDefault(), " • %d:%02d", min, sec)
             } else ""
-            holder.tvQueueTrackSubtitle.text = "${item.mimeType} • ${item.formattedSize}$durStr"
+            val ext = item.title.substringAfterLast('.', "").uppercase().ifBlank { "AUDIO" }
+            holder.tvQueueTrackSubtitle.text = "$ext • ${item.formattedSize}$durStr"
 
             // Thumbnail in queue row
-            if (item.thumbnailFileId > 0) {
-                val cached = MediaGridAdapter.bitmapCache.get(item.thumbnailFileId)
-                if (cached != null) {
-                    holder.ivQueueTrackThumb.setImageBitmap(cached)
-                    holder.ivQueueTrackThumb.visibility = View.VISIBLE
-                    holder.tvTrackIndex.visibility = View.GONE
-                } else {
-                    holder.ivQueueTrackThumb.visibility = View.GONE
-                    if (!isPlaying) holder.tvTrackIndex.visibility = View.VISIBLE
-                    scope.launch(Dispatchers.IO) {
-                        val thumb = AudioThumbnailHelper.getThumbnailBitmap(item)
-                        withContext(Dispatchers.Main) {
-                            if (thumb != null && holder.adapterPosition == position) {
-                                holder.ivQueueTrackThumb.setImageBitmap(thumb)
-                                holder.ivQueueTrackThumb.visibility = View.VISIBLE
-                                holder.tvTrackIndex.visibility = View.GONE
-                            }
-                        }
-                    }
-                }
+            val cached = (if (item.thumbnailFileId > 0) MediaGridAdapter.bitmapCache.get(item.thumbnailFileId) else null)
+                ?: (if (item.fileId > 0) MediaGridAdapter.bitmapCache.get(item.fileId) else null)
+
+            if (cached != null) {
+                holder.ivQueueTrackThumb.setImageBitmap(cached)
+                holder.ivQueueTrackThumb.visibility = View.VISIBLE
+                holder.tvTrackIndex.visibility = View.GONE
             } else {
                 holder.ivQueueTrackThumb.visibility = View.GONE
                 if (!isPlaying) holder.tvTrackIndex.visibility = View.VISIBLE
+                scope.launch(Dispatchers.IO) {
+                    val thumb = AudioThumbnailHelper.getThumbnailBitmap(item)
+                    withContext(Dispatchers.Main) {
+                        if (thumb != null && holder.adapterPosition == position) {
+                            holder.ivQueueTrackThumb.setImageBitmap(thumb)
+                            holder.ivQueueTrackThumb.visibility = View.VISIBLE
+                            holder.tvTrackIndex.visibility = View.GONE
+                        }
+                    }
+                }
             }
 
             val context = holder.itemView.context
