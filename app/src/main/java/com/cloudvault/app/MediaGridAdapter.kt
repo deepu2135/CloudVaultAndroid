@@ -262,6 +262,8 @@ class MediaGridAdapter(
         private val viewDateCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewDateCheckSelected)
 
         fun bind(header: VaultDisplayItem.Header) {
+            val palette = ThemePreferences.getPalette(itemView.context)
+            tvDateHeader.setTextColor(palette.textPrimary)
             tvDateHeader.text = header.dateTitle
 
             val dateItems = getItemsForDateHeader(header.dateTitle)
@@ -508,6 +510,8 @@ class MediaGridAdapter(
     }
 
     inner class FileViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val cardFile: com.google.android.material.card.MaterialCardView? = itemView.findViewById(R.id.cardFile)
+        private val layoutFileIconContainer: FrameLayout? = itemView.findViewById(R.id.layoutFileIconContainer)
         private val tvFileName: TextView = itemView.findViewById(R.id.tvFileName)
         private val tvFileIcon: TextView? = itemView.findViewById(R.id.tvFileIcon)
         private val tvFileBadge: TextView = itemView.findViewById(R.id.tvFileBadge)
@@ -520,6 +524,17 @@ class MediaGridAdapter(
         private val viewCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewCheckSelected)
 
         fun bind(item: VaultMediaItem) {
+            val palette = ThemePreferences.getPalette(itemView.context)
+            cardFile?.setCardBackgroundColor(palette.bgSurface)
+            cardFile?.strokeColor = palette.cardBorder
+            layoutFileIconContainer?.backgroundTintList = android.content.res.ColorStateList.valueOf(palette.bgSurfaceElevated)
+            tvFileBadge.setBackgroundColor(palette.bgSurfaceElevated)
+            tvFileBadge.setTextColor(palette.accentBright)
+            tvFileName.setTextColor(palette.textPrimary)
+            tvFileSize.setTextColor(palette.textSecondary)
+            tvFileDate.setTextColor(palette.textSecondary)
+            btnFileMenu.setTextColor(palette.textSecondary)
+
             val isSelected = selectedItemIds.contains(item.id)
 
             selectionDimOverlay?.visibility = if (isSelected) View.VISIBLE else View.GONE

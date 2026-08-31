@@ -268,17 +268,26 @@ object ThemePreferences {
         val palette = getPalette(activity)
         val decor = activity.window.decorView
 
-        // 1. Root background
+        // 1. Window and Root Backgrounds
+        activity.window.decorView.setBackgroundColor(palette.bgDark)
         decor.findViewById<View>(android.R.id.content)?.setBackgroundColor(palette.bgDark)
+        decor.findViewById<View>(R.id.layoutMainRoot)?.setBackgroundColor(palette.bgDark)
+        decor.findViewById<View>(R.id.layoutNormalTopBar)?.setBackgroundColor(palette.bgDark)
+        decor.findViewById<View>(R.id.layoutSelectionTopBar)?.setBackgroundColor(palette.bgSurface)
+        decor.findViewById<View>(R.id.rvMediaGrid)?.setBackgroundColor(palette.bgDark)
 
-        // 2. Status Banner
+        // 2. App Logo Container & Divider
+        decor.findViewById<android.widget.FrameLayout>(R.id.layoutLogoContainer)?.backgroundTintList = ColorStateList.valueOf(palette.bgSurfaceElevated)
+        decor.findViewById<View>(R.id.dividerTabs)?.setBackgroundColor(palette.cardBorder)
+
+        // 3. Status Banner
         decor.findViewById<MaterialCardView>(R.id.cardStatusBanner)?.let { card ->
             card.setCardBackgroundColor(palette.statusPillBg)
             card.strokeColor = palette.statusPillBorder
         }
         decor.findViewById<TextView>(R.id.tvStatus)?.setTextColor(palette.accentBright)
 
-        // 3. Search input & Top Action Bar Buttons
+        // 4. Search input & Top Action Bar Buttons
         decor.findViewById<EditText>(R.id.etSearch)?.let { et ->
             et.setTextColor(palette.textPrimary)
             et.setHintTextColor(palette.textMuted)
@@ -289,7 +298,7 @@ object ThemePreferences {
             btn.setTextColor(palette.textPrimary)
         }
 
-        // 4. Action bar buttons
+        // 5. Action bar buttons
         decor.findViewById<MaterialButton>(R.id.btnSortFilter)?.let { btn ->
             btn.backgroundTintList = ColorStateList.valueOf(palette.bgSurfaceElevated)
             btn.strokeColor = ColorStateList.valueOf(palette.cardBorder)
@@ -306,12 +315,12 @@ object ThemePreferences {
             btn.setTextColor(palette.textSecondary)
         }
 
-        // 5. FAB Upload button
+        // 6. FAB Upload button
         decor.findViewById<MaterialButton>(R.id.fabUpload)?.let { fab ->
             fab.backgroundTintList = ColorStateList.valueOf(palette.accentPrimary)
         }
 
-        // 6. Section Title
+        // 7. Section Title
         decor.findViewById<TextView>(R.id.tvSectionTitle)?.setTextColor(palette.textPrimary)
     }
 }
