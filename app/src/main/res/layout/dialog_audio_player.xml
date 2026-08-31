@@ -10,10 +10,13 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="24dp"
         android:gravity="center_horizontal">
 
-        <!-- Top Close Handle -->
+        <!-- Top Header Navigation Bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -30,16 +33,32 @@
                 android:textSize="18sp"
                 android:background="?attr/selectableItemBackgroundBorderless" />
 
-            <TextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="NOW PLAYING"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PLAYING FROM VAULT"
+                    android:textColor="@color/text_muted"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvAudioHeaderTrackIndex"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Track 1 of 1"
+                    android:textColor="@color/accent_cyan_bright"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/btnAudioQueue"
@@ -52,62 +71,102 @@
                 android:background="?attr/selectableItemBackgroundBorderless" />
         </LinearLayout>
 
-        <!-- Big Album Artwork Card -->
+        <!-- Modern Album Artwork Card -->
         <com.google.android.material.card.MaterialCardView
-            android:layout_width="240dp"
-            android:layout_height="240dp"
-            android:layout_marginTop="32dp"
-            app:cardCornerRadius="32dp"
-            app:cardElevation="12dp"
-            app:cardBackgroundColor="@color/bg_surface_elevated"
+            android:layout_width="250dp"
+            android:layout_height="250dp"
+            android:layout_marginTop="24dp"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="10dp"
+            app:cardBackgroundColor="@color/card_bg"
             app:strokeColor="@color/card_border"
-            app:strokeWidth="1dp">
+            app:strokeWidth="1.5dp">
 
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_search">
 
-                <TextView
-                    android:id="@+id/tvAudioArtEmoji"
+                <!-- Subtle Decorative Concentric Rings for Vinyl Feel -->
+                <View
+                    android:layout_width="190dp"
+                    android:layout_height="190dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_selection_circle_unselected"
+                    android:alpha="0.25" />
+
+                <View
+                    android:layout_width="120dp"
+                    android:layout_height="120dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_selection_circle_unselected"
+                    android:alpha="0.35" />
+
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:text="🎵"
-                    android:textSize="80sp" />
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvAudioArtEmoji"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🎵"
+                        android:textSize="72sp" />
+
+                    <TextView
+                        android:id="@+id/tvAudioVisualizerBars"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="ılı.lıllılı.ıllı"
+                        android:textColor="@color/accent_cyan_bright"
+                        android:textSize="14sp"
+                        android:letterSpacing="0.15" />
+                </LinearLayout>
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Track Title & Subtitle -->
+        <!-- Track Title & Subtitle Info -->
         <TextView
             android:id="@+id/tvFullAudioTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="26dp"
             android:gravity="center"
             android:text="Track Title"
             android:textColor="@color/text_primary"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textStyle="bold"
             android:maxLines="2"
-            android:ellipsize="middle" />
+            android:ellipsize="end" />
 
         <TextView
             android:id="@+id/tvFullAudioSubtitle"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:gravity="center"
-            android:text="CloudVault Audio Stream"
+            android:text="Audio • Cloud Vault"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:textSize="12.5sp"
+            android:background="@color/status_pill_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp" />
 
-        <!-- SeekBar & Timers -->
+        <!-- SeekBar & Time Progress -->
         <SeekBar
             android:id="@+id/sbAudioProgress"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="22dp"
             android:max="1000"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:progressTint="@color/accent_cyan"
             android:thumbTint="@color/accent_cyan_bright" />
 
@@ -115,8 +174,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:orientation="horizontal">
 
             <TextView
@@ -125,56 +184,71 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="0:00"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp" />
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvAudioTotalTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0:00"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp" />
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Playback Controls -->
+        <!-- Primary Playback Controls -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="16dp"
             android:orientation="horizontal"
             android:gravity="center_vertical|center_horizontal">
 
             <!-- Shuffle Button -->
             <TextView
                 android:id="@+id/btnAudioShuffle"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:gravity="center"
                 android:text="🔀"
                 android:textSize="18sp"
                 android:background="?attr/selectableItemBackgroundBorderless" />
 
+            <!-- Skip -10s Button -->
+            <TextView
+                android:id="@+id/btnAudioRewind10"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="4dp"
+                android:gravity="center"
+                android:text="-10s"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+
             <!-- Prev Button -->
             <TextView
                 android:id="@+id/btnAudioPrevTrack"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="12dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="4dp"
                 android:gravity="center"
                 android:text="⏮"
                 android:textColor="@color/text_primary"
                 android:textSize="22sp"
                 android:background="?attr/selectableItemBackgroundBorderless" />
 
-            <!-- Play/Pause Big Button -->
+            <!-- Big Central Play/Pause Circular FAB -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAudioPlayPause"
-                android:layout_width="68dp"
-                android:layout_height="68dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                app:cardCornerRadius="34dp"
+                android:layout_width="66dp"
+                android:layout_height="66dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="10dp"
+                app:cardCornerRadius="33dp"
                 app:cardElevation="8dp"
                 app:cardBackgroundColor="@color/accent_cyan"
                 android:clickable="true"
@@ -186,31 +260,111 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
                     android:text="▶"
-                    android:textColor="#000000"
+                    android:textColor="#FFFFFF"
                     android:textSize="26sp" />
             </com.google.android.material.card.MaterialCardView>
 
             <!-- Next Button -->
             <TextView
                 android:id="@+id/btnAudioNextTrack"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="12dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="4dp"
                 android:gravity="center"
                 android:text="⏭"
                 android:textColor="@color/text_primary"
                 android:textSize="22sp"
                 android:background="?attr/selectableItemBackgroundBorderless" />
 
+            <!-- Skip +10s Button -->
+            <TextView
+                android:id="@+id/btnAudioForward10"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="4dp"
+                android:gravity="center"
+                android:text="+10s"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:background="?attr/selectableItemBackgroundBorderless" />
+
             <!-- Repeat Button -->
             <TextView
                 android:id="@+id/btnAudioRepeat"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:gravity="center"
                 android:text="🔁"
                 android:textSize="18sp"
                 android:background="?attr/selectableItemBackgroundBorderless" />
+        </LinearLayout>
+
+        <!-- Secondary Utility Feature Pills (Playback Speed, Sleep Timer, Up Next) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <!-- Speed Selector Pill -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAudioSpeedPill"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:text="1.0x"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/card_bg"
+                app:strokeColor="@color/card_border"
+                app:strokeWidth="1dp"
+                app:cornerRadius="19dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                style="@style/Widget.MaterialComponents.Button" />
+
+            <!-- Sleep Timer Pill -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAudioSleepPill"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:text="🌙 Sleep"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                app:backgroundTint="@color/card_bg"
+                app:strokeColor="@color/card_border"
+                app:strokeWidth="1dp"
+                app:cornerRadius="19dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                style="@style/Widget.MaterialComponents.Button" />
+
+            <!-- Queue Pill -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAudioQueuePill"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:text="📋 Queue"
+                android:textColor="@color/accent_cyan_bright"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                app:backgroundTint="@color/status_pill_bg"
+                app:strokeColor="@color/status_pill_border"
+                app:strokeWidth="1dp"
+                app:cornerRadius="19dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                style="@style/Widget.MaterialComponents.Button" />
         </LinearLayout>
 
     </LinearLayout>

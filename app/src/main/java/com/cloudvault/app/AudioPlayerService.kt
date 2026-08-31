@@ -37,6 +37,8 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
         const val ACTION_PREV = "com.cloudvault.app.action.AUDIO_PREV"
         const val ACTION_NEXT = "com.cloudvault.app.action.AUDIO_NEXT"
         const val ACTION_SEEK = "com.cloudvault.app.action.AUDIO_SEEK"
+        const val ACTION_SEEK_RELATIVE = "com.cloudvault.app.action.AUDIO_SEEK_RELATIVE"
+        const val ACTION_SET_SPEED = "com.cloudvault.app.action.AUDIO_SET_SPEED"
         const val ACTION_STOP = "com.cloudvault.app.action.AUDIO_STOP"
 
         const val EXTRA_FILE_ID = "extra_file_id"
@@ -46,6 +48,8 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
         const val EXTRA_SIZE_BYTES = "extra_size_bytes"
         const val EXTRA_DURATION_SEC = "extra_duration_sec"
         const val EXTRA_SEEK_POSITION = "extra_seek_position"
+        const val EXTRA_SEEK_OFFSET_MS = "extra_seek_offset_ms"
+        const val EXTRA_SPEED = "extra_speed"
     }
 
     private var mediaPlayer: MediaPlayer? = null
@@ -56,6 +60,7 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
     private var currentFileId: Int = 0
     private var currentTitle: String = "Cloud Vault Audio"
     private var currentDurationMs: Long = 0L
+    private var currentSpeed: Float = 1.0f
     private var isPrepared = false
 
     private val handler = Handler(Looper.getMainLooper())
@@ -154,9 +159,34 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
                 val pos = intent.getLongExtra(EXTRA_SEEK_POSITION, 0L)
                 seekAudio(pos)
             }
+            ACTION_SEEK_RELATIVE -> {
+                val offset = intent.getLongExtra(EXTRA_SEEK_OFFSET_MS, 0L)
+                val currentPos = mediaPlayer?.currentPosition?.toLong() ?: 0L
+                val targetPos = (currentPos + offset).coerceIn(0L, currentDurationMs.coerceAtLeast(1000L))
+                seekAudio(targetPos)
+            }
+            ACTION_SET_SPEED -> {
+                val speed = intent.getFloatExtra(EXTRA_SPEED, 1.0f)
+                applySpeed(speed)
+            }
             ACTION_STOP -> stopAudio()
         }
         return START_NOT_STICKY
+    }
+
+    private fun applySpeed(speed: Float) {
+        currentSpeed = speed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            mediaPlayer?.let { player ->
+                if (isPrepared) {
+                    runCatching {
+                        val params = player.playbackParams
+                        params.speed = speed
+                        player.playbackParams = params
+                    }
+                }
+            }
+        }
     }
 
     private fun playTrack(
@@ -208,6 +238,15 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
 
     override fun onPrepared(mp: MediaPlayer?) {
         isPrepared = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && currentSpeed != 1.0f) {
+            runCatching {
+                val params = mp?.playbackParams
+                if (params != null) {
+                    params.speed = currentSpeed
+                    mp.playbackParams = params
+                }
+            }
+        }
         mp?.start()
         val dur = mp?.duration?.toLong() ?: currentDurationMs
         if (dur > 0) currentDurationMs = dur

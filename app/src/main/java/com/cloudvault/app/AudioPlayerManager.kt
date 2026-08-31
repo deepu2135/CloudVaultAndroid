@@ -41,7 +41,13 @@ object AudioPlayerManager {
     private val _isRepeat = MutableStateFlow(false)
     val isRepeat: StateFlow<Boolean> = _isRepeat.asStateFlow()
 
-    private var progressJob: Job? = null
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    private val _sleepTimerMinutes = MutableStateFlow<Int?>(null)
+    val sleepTimerMinutes: StateFlow<Int?> = _sleepTimerMinutes.asStateFlow()
+
+    private var sleepTimerJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
 
     fun play(context: Context, item: VaultMediaItem, queue: List<VaultMediaItem> = listOf(item)) {
@@ -62,6 +68,7 @@ object AudioPlayerManager {
             putExtra(AudioPlayerService.EXTRA_MESSAGE_ID, item.messageId)
             putExtra(AudioPlayerService.EXTRA_SIZE_BYTES, item.sizeBytes)
             putExtra(AudioPlayerService.EXTRA_DURATION_SEC, item.durationSeconds)
+            putExtra(AudioPlayerService.EXTRA_SPEED, _playbackSpeed.value)
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
@@ -100,6 +107,41 @@ object AudioPlayerManager {
         context.startService(intent)
     }
 
+    fun seekRelative(context: Context, offsetMs: Long) {
+        val current = _currentPositionMs.value
+        val dur = _durationMs.value.coerceAtLeast(1000L)
+        val target = (current + offsetMs).coerceIn(0L, dur)
+        seekTo(context, target)
+    }
+
+    fun setPlaybackSpeed(context: Context, speed: Float) {
+        _playbackSpeed.value = speed
+        val intent = Intent(context, AudioPlayerService::class.java).apply {
+            action = AudioPlayerService.ACTION_SET_SPEED
+            putExtra(AudioPlayerService.EXTRA_SPEED, speed)
+        }
+        context.startService(intent)
+    }
+
+    fun setSleepTimer(context: Context, minutes: Int?) {
+        sleepTimerJob?.cancel()
+        _sleepTimerMinutes.value = minutes
+        if (minutes != null && minutes > 0) {
+            sleepTimerJob = scope.launch {
+                var remainingSec = minutes * 60
+                while (isActive && remainingSec > 0) {
+                    delay(1000L)
+                    remainingSec--
+                    _sleepTimerMinutes.value = (remainingSec + 59) / 60
+                }
+                if (isActive) {
+                    _sleepTimerMinutes.value = null
+                    pause(context)
+                }
+            }
+        }
+    }
+
     fun playNext(context: Context) {
         val queue = _playlist.value
         if (queue.isEmpty()) return
@@ -120,7 +162,6 @@ object AudioPlayerManager {
         val queue = _playlist.value
         if (queue.isEmpty()) return
 
-        // If played more than 3 seconds, restart current track
         if (_currentPositionMs.value > 3000L) {
             seekTo(context, 0L)
             return
@@ -136,12 +177,27 @@ object AudioPlayerManager {
         }
     }
 
+    fun shuffleQueue(context: Context) {
+        val queue = _playlist.value.toMutableList()
+        val current = _currentTrack.value
+        if (queue.size > 1) {
+            queue.shuffle()
+            if (current != null) {
+                queue.remove(current)
+                queue.add(0, current)
+            }
+            _playlist.value = queue
+            _currentIndex.value = 0
+        }
+    }
+
     fun stop(context: Context) {
         _currentTrack.value = null
         _isPlaying.value = false
         _isBuffering.value = false
         _currentPositionMs.value = 0L
-        progressJob?.cancel()
+        sleepTimerJob?.cancel()
+        _sleepTimerMinutes.value = null
 
         val intent = Intent(context, AudioPlayerService::class.java).apply {
             action = AudioPlayerService.ACTION_STOP
