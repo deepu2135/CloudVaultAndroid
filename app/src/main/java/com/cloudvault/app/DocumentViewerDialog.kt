@@ -491,7 +491,7 @@ object DocumentViewerDialog {
                 scope.launch(Dispatchers.IO) {
                     val bitmap = renderPageBitmap(position)
                     withContext(Dispatchers.Main) {
-                        if (holder.bindingAdapterPosition == position) {
+                        if (holder.adapterPosition == position) {
                             holder.pbPageLoading.visibility = View.GONE
                             if (bitmap != null) {
                                 pageCache.put(position, bitmap)
