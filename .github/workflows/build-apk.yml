@@ -62,27 +62,23 @@ jobs:
           tag_name: v${{ steps.prepare_apks.outputs.version }}
           name: "CloudVault v${{ steps.prepare_apks.outputs.version }}"
           body: |
-            ## ☁️ CloudVault — Official Release
+            ### Downloads
 
-            ### 📦 Download & Installation
-            Choose the APK tailored for your device architecture:
-            - 🚀 **[`CloudVault-v${{ steps.prepare_apks.outputs.version }}-arm64-v8a.apk`](https://github.com/${{ github.repository }}/releases/download/v${{ steps.prepare_apks.outputs.version }}/CloudVault-v${{ steps.prepare_apks.outputs.version }}-arm64-v8a.apk)** — **Recommended** for modern 64-bit Android smartphones & tablets (~75% smaller).
-            - 📱 **[`CloudVault-v${{ steps.prepare_apks.outputs.version }}-universal.apk`](https://github.com/${{ github.repository }}/releases/download/v${{ steps.prepare_apks.outputs.version }}/CloudVault-v${{ steps.prepare_apks.outputs.version }}-universal.apk)** — All-in-one APK compatible with all devices.
-            - 📲 **[`CloudVault-v${{ steps.prepare_apks.outputs.version }}-armeabi-v7a.apk`](https://github.com/${{ github.repository }}/releases/download/v${{ steps.prepare_apks.outputs.version }}/CloudVault-v${{ steps.prepare_apks.outputs.version }}-armeabi-v7a.apk)** — 32-bit Android phones.
-            - 💻 **[`CloudVault-v${{ steps.prepare_apks.outputs.version }}-x86_64.apk`](https://github.com/${{ github.repository }}/releases/download/v${{ steps.prepare_apks.outputs.version }}/CloudVault-v${{ steps.prepare_apks.outputs.version }}-x86_64.apk)** — 64-bit Chromebooks & Emulators.
-            - 🖥️ **[`CloudVault-v${{ steps.prepare_apks.outputs.version }}-x86.apk`](https://github.com/${{ github.repository }}/releases/download/v${{ steps.prepare_apks.outputs.version }}/CloudVault-v${{ steps.prepare_apks.outputs.version }}-x86.apk)** — 32-bit Emulators.
+            - **`CloudVault-v${{ steps.prepare_apks.outputs.version }}-arm64-v8a.apk`** — Recommended for modern 64-bit Android smartphones & tablets.
+            - **`CloudVault-v${{ steps.prepare_apks.outputs.version }}-universal.apk`** — Universal build compatible with all devices.
+            - **`CloudVault-v${{ steps.prepare_apks.outputs.version }}-armeabi-v7a.apk`** — 32-bit Android devices.
+            - **`CloudVault-v${{ steps.prepare_apks.outputs.version }}-x86_64.apk`** — 64-bit Chromebooks and Emulators.
+            - **`CloudVault-v${{ steps.prepare_apks.outputs.version }}-x86.apk`** — 32-bit Emulators.
 
-            ---
+            ### What's New in v${{ steps.prepare_apks.outputs.version }}
 
-            ### ✨ Highlights & Features
-            - 🎬 **Instant 4K/1080p Video Streaming**: Direct playback from Telegram Cloud via LibVLC with subtitle & audio track switching, multi-part ZIP streaming.
-            - 📖 **In-App Document & PDF Reader**: Smooth book-style horizontal swiping (`ViewPager2`), pinch-to-zoom (up to 6x), double-tap, and orientation toggle.
-            - 🎵 **Background Audio & Mini-Player**: Floating mini-player bar, queue management, ID3 album artwork extraction, and sleep timer.
-            - 🎨 **9 Vibrant Themes**: Dynamic ThemePalette supporting Monet Material You, AMOLED Pure Black, Midnight Purple, Emerald Forest, and more.
-            - 🖼️ **Media Gallery & Grid Zoom**: Timeline view with Day, Month, and Year zoom modes.
-            - 🔄 **Auto-Backup & Sync**: Automatic camera folder sync to private Telegram Cloud.
-            - 🔍 **Duplicate Finder**: 1-tap deduplication scanner using file checksums.
-            - 📤 **Android System Share Target**: Backup files directly from your gallery or browser.
+            - Instant 4K/1080p video streaming powered by LibVLC with subtitle, audio track, and multi-part ZIP streaming
+            - PDF and document reader with horizontal page swiping (ViewPager2), pinch-to-zoom (up to 6x), and page jump
+            - Background audio player with floating mini-player, queue management, and ID3 album art
+            - 9 custom themes with full background, status bar, and card surface styling
+            - Smart media gallery with Day, Month, and Year timeline grid zoom
+            - Real-time automatic camera folder backup to private Telegram storage
+            - Checksum-based duplicate file scanner and cleaner
           files: release-apks/*.apk
           draft: false
           prerelease: false
