@@ -4,58 +4,70 @@
 
 <div align="center">
 
-**Free, unlimited, high-speed personal cloud storage on Android powered by Telegram.**
+**Free, unlimited personal cloud storage for Android powered by Telegram.**
 
 [![Platform](https://img.shields.io/badge/Platform-Android_8.0+-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/deepu2135/CloudVaultAndroid)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Engine](https://img.shields.io/badge/Engine-TDLib-2CA5E0?style=flat-square&logo=telegram&logoColor=white)](https://core.telegram.org/tdlib)
+[![Release](https://img.shields.io/github/v/release/deepu2135/CloudVaultAndroid?style=flat-square)](https://github.com/deepu2135/CloudVaultAndroid/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 </div>
 
 ---
 
-## ⚡ Highlights
+## Features
 
-* 🎬 **Instant Video Streaming** — Stream 4K/1080p MKV & MP4 videos directly from the cloud with hardware acceleration, subtitle switching, and multi-part archive support.
-* 📖 **In-App Document & PDF Reader** — Book-style horizontal page swiping, pinch-to-zoom (up to 6x), orientation toggle, and page jump.
-* 🎵 **Built-in Audio Mini-Player** — Background playback, lock screen controls, ID3 album art extraction, playlist queues, and sleep timer.
-* 🖼️ **Media Gallery & Grid Zoom** — Day, Month, and Year timeline views with interactive pinch-to-zoom and fast scrolling.
-* 🔄 **Auto-Backup** — Automatically syncs new camera photos and videos to your private Telegram storage.
-* 🔍 **Duplicate Finder** — Detects duplicate uploads by checksum and reclaims storage in one tap.
-* 📤 **Android Share Target** — Backup files directly from your phone's native Share menu into CloudVault.
-* 🎨 **9 Themes** — Material You Monet dynamic theming, AMOLED Pure Black, Midnight Neon, Emerald Forest, and more.
-
----
-
-## 🚀 Quick Start
-
-1. **Install**: Download the latest APK from the [Releases](https://github.com/deepu2135/CloudVaultAndroid/releases) page.
-2. **Login**: Enter your phone number and verify via the official Telegram login code.
-3. **Upload & Stream**: Upload any file or stream your cloud media instantly.
+- **Instant Video Streaming** — Stream 4K and 1080p MKV/MP4 videos directly from Telegram Cloud using LibVLC with subtitle selection, multi-audio tracks, and split archive streaming.
+- **In-App Document & PDF Reader** — Book-style horizontal page swiping (ViewPager2), pinch-to-zoom (up to 6x), orientation toggle, and page jump.
+- **Background Audio Player** — Bottom mini-player, queue management, ID3 album artwork, and sleep timer.
+- **Smart Media Gallery** — Timeline grid with Day, Month, and Year zoom modes plus fast scrolling.
+- **Automatic Backup** — Real-time camera folder sync to private Telegram storage.
+- **Duplicate Cleaner** — Checksum-based duplicate file scanner and one-tap remover.
+- **9 Custom Themes** — Material You Monet dynamic theming, AMOLED Pure Black, Midnight Purple, Emerald Forest, Sunset Amber, Dracula Crimson, and Ocean Sapphire.
+- **System Share Target** — Upload files directly to CloudVault from the native Android Share menu.
 
 ---
 
-## 🛠️ Tech Stack
+## Download & Install
 
-| Component | Technology |
+Get the latest release APK from the [Releases](https://github.com/deepu2135/CloudVaultAndroid/releases/latest) page:
+
+- **`CloudVault-v1.0.1-arm64-v8a.apk`** — **Recommended** for modern 64-bit Android smartphones and tablets (~75% smaller).
+- **`CloudVault-v1.0.1-universal.apk`** — All-in-one build compatible with all devices.
+- **`CloudVault-v1.0.1-armeabi-v7a.apk`** — Older 32-bit Android phones.
+- **`CloudVault-v1.0.1-x86_64.apk`** — 64-bit Chromebooks and emulators.
+
+---
+
+## Quick Start
+
+1. Install the APK matching your device architecture.
+2. Log in with your phone number and verify via the official Telegram code.
+3. Upload files or stream your cloud media instantly.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
 |---|---|
-| **Language** | Kotlin (100%) |
-| **Cloud Engine** | TDLib (Telegram Database Library) via JNI |
-| **Video Player** | LibVLC Android |
-| **Async / Streams** | Coroutines & StateFlow |
-| **UI** | Material 3 & ViewPager2 |
+| Language | Kotlin (100%) |
+| Cloud Engine | TDLib (Telegram Database Library) via JNI |
+| Video Engine | LibVLC Android |
+| Concurrency | Coroutines & StateFlow |
+| UI Framework | Material Components & ViewPager2 |
 
 ---
 
-## 🔒 Privacy
+## Privacy & Security
 
-* **Direct Connection**: Connects directly to official Telegram servers via TDLib.
-* **No Middlemen**: Zero third-party servers, tracking, or telemetry.
-* **Encrypted**: Inherits Telegram's MTProto cloud encryption.
+- **Direct Connection** — Connects directly to official Telegram servers via TDLib.
+- **Zero Intermediaries** — No third-party servers, tracking, or telemetry.
+- **Encrypted** — Inherits Telegram's MTProto cloud encryption.
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the [MIT License](LICENSE).
