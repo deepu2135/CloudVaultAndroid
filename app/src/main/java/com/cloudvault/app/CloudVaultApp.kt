@@ -14,6 +14,7 @@ class CloudVaultApp : Application() {
         super.onCreate()
         instance = this
         Log.d("CloudVaultApp", "Application starting...")
+        ThemePreferences.applyThemeOnAppStart(this)
 
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->

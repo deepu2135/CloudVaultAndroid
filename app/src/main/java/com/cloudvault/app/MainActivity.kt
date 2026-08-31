@@ -108,8 +108,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutEmptyState: LinearLayout
     private lateinit var tvEmptyEmoji: TextView
     private lateinit var tvEmptyTitle: TextView
-    private lateinit var tvEmptySubtitle: TextView
     private lateinit var pbLoading: ProgressBar
+
+    // Mini Audio Player views
+    private lateinit var cardMiniPlayer: MaterialCardView
+    private lateinit var layoutMiniPlayerContent: LinearLayout
+    private lateinit var tvMiniPlayerArt: TextView
+    private lateinit var tvMiniPlayerTitle: TextView
+    private lateinit var tvMiniPlayerSubtitle: TextView
+    private lateinit var btnMiniPlayerPrev: TextView
+    private lateinit var btnMiniPlayerPlayPause: TextView
+    private lateinit var btnMiniPlayerNext: TextView
+    private lateinit var btnMiniPlayerClose: TextView
+    private lateinit var pbMiniPlayerProgress: ProgressBar
 
     private lateinit var mediaAdapter: MediaGridAdapter
     private var currentCategory: MediaType = MediaType.PHOTO
@@ -175,6 +186,7 @@ class MainActivity : AppCompatActivity() {
     ) { /* result handled */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemePreferences.applyThemeToActivity(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -372,8 +384,139 @@ class MainActivity : AppCompatActivity() {
         observeAuthState()
         observeVaultItems()
 
+        setupMiniPlayer()
+
         // Initial tab
         switchCategory(MediaType.PHOTO)
+
+        // Handle incoming system share (Send / Send Multiple)
+        handleIncomingShareIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingShareIntent(intent)
+    }
+
+    private fun handleIncomingShareIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action ?: return
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
+
+        val urisToUpload = mutableListOf<Uri>()
+
+        if (action == Intent.ACTION_SEND) {
+            val uri = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            }
+            if (uri != null) {
+                urisToUpload.add(uri)
+            }
+        } else if (action == Intent.ACTION_SEND_MULTIPLE) {
+            val list = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+            }
+            if (!list.isNullOrEmpty()) {
+                urisToUpload.addAll(list)
+            }
+        }
+
+        if (urisToUpload.isNotEmpty()) {
+            val firstUri = urisToUpload.first()
+            val mime = contentResolver.getType(firstUri).orEmpty().lowercase()
+            val detectedType = when {
+                mime.startsWith("image/") -> MediaType.PHOTO
+                mime.startsWith("video/") -> MediaType.VIDEO
+                mime.startsWith("audio/") -> MediaType.AUDIO
+                else -> MediaType.DOCUMENT
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("Upload to CloudVault?")
+                .setMessage("Would you like to back up ${urisToUpload.size} shared item(s) to your Telegram Cloud Vault?")
+                .setPositiveButton("Upload Now") { _, _ ->
+                    handleBatchMediaUpload(urisToUpload, detectedType)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun setupMiniPlayer() {
+        cardMiniPlayer = findViewById(R.id.cardMiniPlayer)
+        layoutMiniPlayerContent = findViewById(R.id.layoutMiniPlayerContent)
+        tvMiniPlayerArt = findViewById(R.id.tvMiniPlayerArt)
+        tvMiniPlayerTitle = findViewById(R.id.tvMiniPlayerTitle)
+        tvMiniPlayerSubtitle = findViewById(R.id.tvMiniPlayerSubtitle)
+        btnMiniPlayerPrev = findViewById(R.id.btnMiniPlayerPrev)
+        btnMiniPlayerPlayPause = findViewById(R.id.btnMiniPlayerPlayPause)
+        btnMiniPlayerNext = findViewById(R.id.btnMiniPlayerNext)
+        btnMiniPlayerClose = findViewById(R.id.btnMiniPlayerClose)
+        pbMiniPlayerProgress = findViewById(R.id.pbMiniPlayerProgress)
+
+        layoutMiniPlayerContent.setOnClickListener {
+            AudioPlayerDialog.show(this)
+        }
+
+        btnMiniPlayerPlayPause.setOnClickListener {
+            AudioPlayerManager.togglePlayPause(this)
+        }
+
+        btnMiniPlayerPrev.setOnClickListener {
+            AudioPlayerManager.playPrevious(this)
+        }
+
+        btnMiniPlayerNext.setOnClickListener {
+            AudioPlayerManager.playNext(this)
+        }
+
+        btnMiniPlayerClose.setOnClickListener {
+            AudioPlayerManager.stop(this)
+        }
+
+        lifecycleScope.launch {
+            AudioPlayerManager.currentTrack.collectLatest { track ->
+                if (track != null) {
+                    cardMiniPlayer.visibility = View.VISIBLE
+                    tvMiniPlayerTitle.text = track.title
+                    tvMiniPlayerSubtitle.text = "${track.mimeType} • ${track.formattedSize}"
+                } else {
+                    cardMiniPlayer.visibility = View.GONE
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            AudioPlayerManager.isPlaying.collectLatest { playing ->
+                btnMiniPlayerPlayPause.text = if (playing) "⏸" else "▶"
+            }
+        }
+
+        lifecycleScope.launch {
+            AudioPlayerManager.isBuffering.collectLatest { buffering ->
+                if (buffering) {
+                    tvMiniPlayerSubtitle.text = "Buffering from Cloud..."
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            AudioPlayerManager.currentPositionMs.collectLatest { pos ->
+                val dur = AudioPlayerManager.durationMs.value
+                if (dur > 0L) {
+                    pbMiniPlayerProgress.progress = ((pos * 1000L) / dur).toInt().coerceIn(0, 1000)
+                } else {
+                    pbMiniPlayerProgress.progress = 0
+                }
+            }
+        }
     }
 
     private fun showSortDialog() {
@@ -383,7 +526,8 @@ class MainActivity : AppCompatActivity() {
             "🔤 Name (A to Z)",
             "🔠 Name (Z to A)",
             "📊 Size (Largest First)",
-            "📉 Size (Smallest First)"
+            "📉 Size (Smallest First)",
+            "⚡ Clean Duplicate Media..."
         )
         val sortOrders = arrayOf(
             VaultSortOrder.NEWEST,
@@ -395,11 +539,15 @@ class MainActivity : AppCompatActivity() {
         )
 
         AlertDialog.Builder(this)
-            .setTitle("Sort Items By")
+            .setTitle("Sort & Clean Items")
             .setItems(options) { _, which ->
-                currentSortOrder = sortOrders[which]
-                btnSortFilter.text = currentSortOrder.label
-                updateDisplayedItems()
+                if (which == 6) {
+                    DuplicatesDialog.show(this)
+                } else {
+                    currentSortOrder = sortOrders[which]
+                    btnSortFilter.text = currentSortOrder.label
+                    updateDisplayedItems()
+                }
             }
             .show()
     }
@@ -882,6 +1030,8 @@ class MainActivity : AppCompatActivity() {
             popup.menu.add(0, 4, 3, "▶ Play Video")
         } else if (item.type == MediaType.AUDIO) {
             popup.menu.add(0, 4, 3, "▶ Play Audio")
+        } else if (item.type == MediaType.DOCUMENT && DocumentViewerDialog.isViewableDocument(item.title, item.mimeType)) {
+            popup.menu.add(0, 5, 3, "👁 View Document")
         }
 
         popup.setOnMenuItemClickListener { menuItem ->
@@ -914,7 +1064,17 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
                 4 -> {
-                    playVideoViaProxy(item)
+                    if (item.type == MediaType.AUDIO) {
+                        val queue = TelegramRepository.audios.value
+                        val playlist = if (queue.any { it.fileId == item.fileId }) queue else listOf(item)
+                        AudioPlayerManager.play(this, item, playlist)
+                    } else {
+                        playVideoViaProxy(item)
+                    }
+                    true
+                }
+                5 -> {
+                    DocumentViewerDialog.show(this, item)
                     true
                 }
                 else -> false
@@ -927,8 +1087,18 @@ class MainActivity : AppCompatActivity() {
         when (item.type) {
             MediaType.PHOTO -> showPhotoViewerDialog(item)
             MediaType.VIDEO -> playVideoViaProxy(item)
-            MediaType.AUDIO -> playVideoViaProxy(item)
-            MediaType.DOCUMENT -> showFileDownloadPrompt(item)
+            MediaType.AUDIO -> {
+                val queue = TelegramRepository.audios.value
+                val playlist = if (queue.any { it.fileId == item.fileId }) queue else listOf(item)
+                AudioPlayerManager.play(this, item, playlist)
+            }
+            MediaType.DOCUMENT -> {
+                if (DocumentViewerDialog.isViewableDocument(item.title, item.mimeType)) {
+                    DocumentViewerDialog.show(this, item)
+                } else {
+                    showFileDownloadPrompt(item)
+                }
+            }
         }
     }
 
@@ -1161,6 +1331,15 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing || isDestroyed) return
 
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_settings, null)
+        val cardOptionTheme: MaterialCardView = dialogView.findViewById(R.id.cardOptionTheme)
+        val tvSettingsThemeIcon: TextView = dialogView.findViewById(R.id.tvSettingsThemeIcon)
+        val tvSettingsThemeBadge: TextView = dialogView.findViewById(R.id.tvSettingsThemeBadge)
+        val tvSettingsThemeSummary: TextView = dialogView.findViewById(R.id.tvSettingsThemeSummary)
+
+        val cardOptionDuplicates: MaterialCardView = dialogView.findViewById(R.id.cardOptionDuplicates)
+        val tvSettingsDuplicatesSummary: TextView = dialogView.findViewById(R.id.tvSettingsDuplicatesSummary)
+        val tvSettingsDuplicatesBadge: TextView = dialogView.findViewById(R.id.tvSettingsDuplicatesBadge)
+
         val cardOptionAutoBackup: MaterialCardView = dialogView.findViewById(R.id.cardOptionAutoBackup)
         val tvSettingsAutoBackupSummary: TextView = dialogView.findViewById(R.id.tvSettingsAutoBackupSummary)
         val tvSettingsAutoBackupBadge: TextView = dialogView.findViewById(R.id.tvSettingsAutoBackupBadge)
@@ -1193,6 +1372,34 @@ class MainActivity : AppCompatActivity() {
 
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
+        fun updateThemeSummary() {
+            val currentTheme = ThemePreferences.getTheme(this@MainActivity)
+            tvSettingsThemeIcon.text = currentTheme.icon
+            tvSettingsThemeBadge.text = when (currentTheme) {
+                AppTheme.SYSTEM_DEFAULT -> "MONET"
+                AppTheme.OBSIDIAN_DARK -> "DARK"
+                AppTheme.AMOLED_BLACK -> "AMOLED"
+                AppTheme.LIGHT -> "LIGHT"
+            }
+            tvSettingsThemeSummary.text = currentTheme.displayName
+        }
+
+        fun updateDuplicatesSummary() {
+            val dupes = DuplicateFinderHelper.findDuplicates(
+                TelegramRepository.photos.value,
+                TelegramRepository.videos.value,
+                TelegramRepository.audios.value,
+                TelegramRepository.files.value
+            )
+            val wasted = dupes.sumOf { it.wastedSizeBytes }
+            tvSettingsDuplicatesBadge.text = if (dupes.isNotEmpty()) "${dupes.size} SETS" else "CLEAN"
+            tvSettingsDuplicatesSummary.text = if (dupes.isNotEmpty()) {
+                "${dupes.size} duplicate sets • ${CacheManager.formatBytes(wasted)} recoverable"
+            } else {
+                "No duplicates found • Vault is clean"
+            }
+        }
+
         fun updateBackupSummary() {
             val isBackupOn = AutoBackupPreferences.isEnabled(this)
             tvSettingsAutoBackupBadge.text = if (isBackupOn) "ON" else "OFF"
@@ -1222,10 +1429,36 @@ class MainActivity : AppCompatActivity() {
             tvSettingsVideoBadge.text = "$sizeMb MB"
         }
 
+        updateThemeSummary()
+        updateDuplicatesSummary()
         updateBackupSummary()
         updateCacheSummary()
         updateLogsSummary()
         updateVideoSummary()
+
+        cardOptionTheme.setOnClickListener {
+            val themes = AppTheme.entries.toTypedArray()
+            val themeNames = themes.map { "${it.icon} ${it.displayName}" }.toTypedArray()
+            val currentIdx = themes.indexOf(ThemePreferences.getTheme(this@MainActivity)).coerceAtLeast(0)
+
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Select App Theme")
+                .setSingleChoiceItems(themeNames, currentIdx) { themeDialog, which ->
+                    val selectedTheme = themes[which]
+                    ThemePreferences.setTheme(this@MainActivity, selectedTheme)
+                    ThemePreferences.applyThemeOnAppStart(application as CloudVaultApp)
+                    themeDialog.dismiss()
+                    dialog.dismiss()
+                    recreate()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        cardOptionDuplicates.setOnClickListener {
+            dialog.dismiss()
+            DuplicatesDialog.show(this@MainActivity)
+        }
 
         cardOptionAutoBackup.setOnClickListener {
             showAutoBackupSettingsDialog {

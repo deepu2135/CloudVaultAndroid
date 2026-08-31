@@ -40,4 +40,18 @@
     <color name="ripple_color">#2638BDF8</color>
     <color name="selection_dim">#3338BDF8</color>
     <color name="selection_check">#38BDF8</color>
+
+    <!-- AMOLED Pure Black Colors -->
+    <color name="bg_amoled">#000000</color>
+    <color name="bg_amoled_surface">#0A0A0A</color>
+    <color name="bg_amoled_elevated">#141414</color>
+    <color name="card_amoled_border">#222222</color>
+
+    <!-- Light Theme Colors -->
+    <color name="bg_light">#F8FAFC</color>
+    <color name="bg_light_surface">#FFFFFF</color>
+    <color name="bg_light_elevated">#F1F5F9</color>
+    <color name="card_light_border">#E2E8F0</color>
+    <color name="text_light_primary">#0F172A</color>
+    <color name="text_light_secondary">#64748B</color>
 </resources>

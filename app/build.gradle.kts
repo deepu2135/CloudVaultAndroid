@@ -74,6 +74,9 @@ dependencies {
     // TDLib (AAR containing matched TdApi and native libtdjni.so)
     implementation(files("libs/tdlib.aar"))
 
+    // MediaSession & Audio
+    implementation("androidx.media:media:1.7.0")
+
     // WorkManager for background auto-backup
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 }

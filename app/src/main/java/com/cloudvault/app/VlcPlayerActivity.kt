@@ -118,6 +118,7 @@ class VlcPlayerActivity : AppCompatActivity() {
     private lateinit var gestureDetector: GestureDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemePreferences.applyThemeToActivity(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_vlc_player)
 
