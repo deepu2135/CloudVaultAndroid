@@ -101,7 +101,7 @@ object DocumentViewerDialog {
             else -> tvDocIcon.text = "📄"
         }
 
-        val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dialog = Dialog(activity, R.style.Theme_CloudVault_Dialog_Fullscreen)
         dialog.setContentView(view)
 
         btnDocClose.setOnClickListener { dialog.dismiss() }
@@ -292,14 +292,17 @@ object DocumentViewerDialog {
                             withContext(Dispatchers.Main) {
                                 layoutDocLoading.visibility = View.GONE
                                 wvDocWeb.visibility = View.VISIBLE
-                                wvDocWeb.setBackgroundColor(Color.parseColor("#080E18"))
+                                val bgColor = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.bg_dark))
+                                val textColor = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.text_primary))
+                                val accentColor = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.accent_cyan))
+                                wvDocWeb.setBackgroundColor(activity.getColor(R.color.bg_dark))
                                 val styledHtml = """
                                     <html>
                                     <head>
                                     <meta name="viewport" content="width=device-width, initial-scale=1">
                                     <style>
-                                        body { background-color: #080E18; color: #E2E8F0; font-family: sans-serif; padding: 16px; line-height: 1.6; }
-                                        h1, h2, h3 { color: #38BDF8; }
+                                        body { background-color: $bgColor; color: $textColor; font-family: sans-serif; padding: 16px; line-height: 1.6; }
+                                        h1, h2, h3 { color: $accentColor; }
                                         p { margin-bottom: 12px; }
                                     </style>
                                     </head>
@@ -315,16 +318,21 @@ object DocumentViewerDialog {
                             withContext(Dispatchers.Main) {
                                 layoutDocLoading.visibility = View.GONE
                                 wvDocWeb.visibility = View.VISIBLE
-                                wvDocWeb.setBackgroundColor(Color.parseColor("#080E18"))
+                                val bgColor = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.bg_dark))
+                                val surfaceElevated = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.bg_surface_elevated))
+                                val cardBg = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.card_bg))
+                                val textColor = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.text_primary))
+                                val accentColor = String.format("#%06X", 0xFFFFFF and activity.getColor(R.color.accent_cyan))
+                                wvDocWeb.setBackgroundColor(activity.getColor(R.color.bg_dark))
                                 val styledHtml = """
                                     <html>
                                     <head>
                                     <meta name="viewport" content="width=device-width, initial-scale=1">
                                     <style>
-                                        body { background-color: #080E18; color: #E2E8F0; font-family: sans-serif; padding: 16px; line-height: 1.6; }
-                                        h1, h2, h3 { color: #38BDF8; }
-                                        code { background-color: #1E2E44; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
-                                        pre { background-color: #0F172A; padding: 12px; border-radius: 8px; overflow-x: auto; }
+                                        body { background-color: $bgColor; color: $textColor; font-family: sans-serif; padding: 16px; line-height: 1.6; }
+                                        h1, h2, h3 { color: $accentColor; }
+                                        code { background-color: $surfaceElevated; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+                                        pre { background-color: $cardBg; padding: 12px; border-radius: 8px; overflow-x: auto; }
                                     </style>
                                     </head>
                                     <body><pre>${text.replace("<", "&lt;").replace(">", "&gt;")}</pre></body>

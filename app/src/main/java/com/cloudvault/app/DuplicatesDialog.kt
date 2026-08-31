@@ -41,7 +41,7 @@ object DuplicatesDialog {
         val layoutEmptyDuplicates: LinearLayout = view.findViewById(R.id.layoutEmptyDuplicates)
         val btnDeleteDuplicates: MaterialButton = view.findViewById(R.id.btnDeleteDuplicates)
 
-        val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dialog = Dialog(activity, R.style.Theme_CloudVault_Dialog_Fullscreen)
         dialog.setContentView(view)
         btnCloseDuplicates.setOnClickListener { dialog.dismiss() }
 
@@ -235,7 +235,7 @@ object DuplicatesDialog {
 
                 val tvInfo = TextView(context).apply {
                     text = label
-                    setTextColor(if (isOldest) Color.parseColor("#7DD3FC") else Color.parseColor("#E2E8F0"))
+                    setTextColor(if (isOldest) context.getColor(R.color.accent_cyan_bright) else context.getColor(R.color.text_primary))
                     textSize = 12.5f
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
                 }

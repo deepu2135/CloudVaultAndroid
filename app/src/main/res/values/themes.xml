@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.CloudVault" parent="Theme.MaterialComponents.NoActionBar">
+    <style name="Theme.CloudVault" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/accent_cyan</item>
         <item name="colorPrimaryVariant">@color/accent_blue</item>
         <item name="colorOnPrimary">#FFFFFF</item>
@@ -10,8 +10,8 @@
         <item name="android:statusBarColor">@color/bg_dark</item>
         <item name="android:navigationBarColor">@color/bg_dark</item>
         <item name="android:windowBackground">@color/bg_dark</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
         <item name="alertDialogTheme">@style/Theme.CloudVault.Dialog.Alert</item>
         <item name="materialAlertDialogTheme">@style/Theme.CloudVault.Dialog.Alert</item>
     </style>
@@ -48,42 +48,28 @@
         <item name="android:textColor">@color/accent_blue_light</item>
     </style>
 
+    <!-- Fullscreen Dialog Theme for modals -->
+    <style name="Theme.CloudVault.Dialog.Fullscreen" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
     <!-- AMOLED Pure Black Theme -->
     <style name="Theme.CloudVault.Amoled" parent="Theme.CloudVault">
         <item name="android:statusBarColor">@color/bg_amoled</item>
         <item name="android:navigationBarColor">@color/bg_amoled</item>
         <item name="android:windowBackground">@color/bg_amoled</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
-    <!-- Light Theme -->
-    <style name="Theme.CloudVault.Light" parent="Theme.MaterialComponents.NoActionBar">
-        <item name="colorPrimary">@color/accent_blue_dark</item>
-        <item name="colorPrimaryVariant">@color/accent_blue</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">@color/accent_cyan</item>
-        <item name="colorSecondaryVariant">@color/accent_blue_dark</item>
-        <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="android:statusBarColor">@color/bg_light</item>
-        <item name="android:navigationBarColor">@color/bg_light</item>
-        <item name="android:windowBackground">@color/bg_light</item>
+    <!-- Light Theme Explicit -->
+    <style name="Theme.CloudVault.Light" parent="Theme.CloudVault">
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
-        <item name="alertDialogTheme">@style/Theme.CloudVault.Dialog.Alert.Light</item>
-        <item name="materialAlertDialogTheme">@style/Theme.CloudVault.Dialog.Alert.Light</item>
-    </style>
-
-    <style name="Theme.CloudVault.Dialog.Alert.Light" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
-        <item name="android:background">@color/bg_light_surface</item>
-        <item name="backgroundTint">@color/bg_light_surface</item>
-        <item name="shapeAppearance">@style/ShapeAppearance.CloudVault.Dialog</item>
-        <item name="colorPrimary">@color/accent_blue_dark</item>
-        <item name="colorSecondary">@color/accent_cyan</item>
-        <item name="colorSurface">@color/bg_light_surface</item>
-        <item name="colorOnSurface">@color/text_light_primary</item>
-        <item name="android:textColorPrimary">@color/text_light_primary</item>
-        <item name="android:textColorSecondary">@color/text_light_secondary</item>
-        <item name="buttonBarPositiveButtonStyle">@style/Widget.CloudVault.Dialog.Button.Positive</item>
-        <item name="buttonBarNegativeButtonStyle">@style/Widget.CloudVault.Dialog.Button.Negative</item>
-        <item name="buttonBarNeutralButtonStyle">@style/Widget.CloudVault.Dialog.Button.Neutral</item>
     </style>
 </resources>

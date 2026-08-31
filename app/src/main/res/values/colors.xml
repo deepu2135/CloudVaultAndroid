@@ -1,57 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Deep Obsidian Backgrounds & Surfaces -->
-    <color name="bg_dark">#080E18</color>
-    <color name="bg_surface">#0F172A</color>
-    <color name="bg_surface_elevated">#162234</color>
-    <color name="bg_surface_highlight">#1E2E44</color>
-    <color name="bg_surface_glass">#D90A0F1D</color>
-    <color name="card_bg">#0F172A</color>
-    <color name="card_border">#1E2C3F</color>
-    <color name="card_border_glow">#3338BDF8</color>
-    <color name="divider_color">#162234</color>
+    <!-- Light Mode Backgrounds & Surfaces (Default) -->
+    <color name="bg_dark">#F8FAFC</color>
+    <color name="bg_surface">#FFFFFF</color>
+    <color name="bg_surface_elevated">#F1F5F9</color>
+    <color name="bg_surface_highlight">#E2E8F0</color>
+    <color name="bg_surface_glass">#F2FFFFFF</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="card_border">#E2E8F0</color>
+    <color name="card_border_glow">#330284C7</color>
+    <color name="divider_color">#E2E8F0</color>
     
-    <!-- Lite & Bright Accent Colors (Soft Sky Blue & Cyan) -->
-    <color name="accent_cyan">#38BDF8</color>
-    <color name="accent_cyan_bright">#7DD3FC</color>
-    <color name="accent_cyan_glow">#2638BDF8</color>
-    <color name="accent_blue">#38BDF8</color>
-    <color name="accent_blue_light">#BAE6FD</color>
-    <color name="accent_blue_dark">#0284C7</color>
+    <!-- Accent Colors (Vibrant Sky Blue & Navy) -->
+    <color name="accent_cyan">#0284C7</color>
+    <color name="accent_cyan_bright">#0369A1</color>
+    <color name="accent_cyan_glow">#200284C7</color>
+    <color name="accent_blue">#0284C7</color>
+    <color name="accent_blue_light">#0369A1</color>
+    <color name="accent_blue_dark">#0369A1</color>
     
     <!-- Status Pill & Indicator Colors -->
-    <color name="status_pill_bg">#102A45</color>
-    <color name="status_pill_border">#38BDF8</color>
+    <color name="status_pill_bg">#E0F2FE</color>
+    <color name="status_pill_border">#7DD3FC</color>
     <color name="status_success">#10B981</color>
-    <color name="status_success_bg">#132E27</color>
-    <color name="status_warning">#F59E0B</color>
-    <color name="status_warning_bg">#2E1C0C</color>
-    <color name="status_error">#EF4444</color>
-    <color name="status_error_bg">#2D1519</color>
+    <color name="status_success_bg">#D1FAE5</color>
+    <color name="status_warning">#D97706</color>
+    <color name="status_warning_bg">#FEF3C7</color>
+    <color name="status_error">#DC2626</color>
+    <color name="status_error_bg">#FEE2E2</color>
     
     <!-- Typography Colors -->
-    <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#94A3B8</color>
-    <color name="text_muted">#64748B</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#475569</color>
+    <color name="text_muted">#94A3B8</color>
     <color name="tab_inactive">#64748B</color>
-    <color name="bottom_nav_bg">#0D1624</color>
+    <color name="bottom_nav_bg">#FFFFFF</color>
     
     <!-- Interactive & Selection Overlays -->
-    <color name="ripple_color">#2638BDF8</color>
-    <color name="selection_dim">#3338BDF8</color>
-    <color name="selection_check">#38BDF8</color>
+    <color name="ripple_color">#1A0284C7</color>
+    <color name="selection_dim">#200284C7</color>
+    <color name="selection_check">#0284C7</color>
 
     <!-- AMOLED Pure Black Colors -->
     <color name="bg_amoled">#000000</color>
     <color name="bg_amoled_surface">#0A0A0A</color>
     <color name="bg_amoled_elevated">#141414</color>
     <color name="card_amoled_border">#222222</color>
-
-    <!-- Light Theme Colors -->
-    <color name="bg_light">#F8FAFC</color>
-    <color name="bg_light_surface">#FFFFFF</color>
-    <color name="bg_light_elevated">#F1F5F9</color>
-    <color name="card_light_border">#E2E8F0</color>
-    <color name="text_light_primary">#0F172A</color>
-    <color name="text_light_secondary">#64748B</color>
 </resources>

@@ -32,17 +32,17 @@ class StorageDonutChartView @JvmOverloads constructor(
 
     private val bgRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.parseColor("#1E293B")
+        color = context.getColor(R.color.divider_color)
     }
 
     private val centerMainTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = context.getColor(R.color.text_primary)
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }
 
     private val centerUnitTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#94A3B8")
+        color = context.getColor(R.color.text_secondary)
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }

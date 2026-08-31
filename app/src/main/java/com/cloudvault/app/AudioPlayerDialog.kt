@@ -36,7 +36,7 @@ object AudioPlayerDialog {
         val btnAudioNextTrack: TextView = view.findViewById(R.id.btnAudioNextTrack)
         val btnAudioRepeat: TextView = view.findViewById(R.id.btnAudioRepeat)
 
-        val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dialog = Dialog(activity, R.style.Theme_CloudVault_Dialog_Fullscreen)
         dialog.setContentView(view)
 
         btnCloseAudioPlayer.setOnClickListener { dialog.dismiss() }

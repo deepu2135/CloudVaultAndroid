@@ -1619,11 +1619,11 @@ class MainActivity : AppCompatActivity() {
             val btnClearLogs: MaterialButton = dialogView.findViewById(R.id.btnClearLogs)
             val scrollLogs: ScrollView = dialogView.findViewById(R.id.scrollLogs)
 
-            val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+            val dialog = Dialog(this, R.style.Theme_CloudVault_Dialog_Fullscreen)
             dialog.setContentView(dialogView)
             dialog.window?.apply {
                 setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-                setBackgroundDrawable(ColorDrawable(Color.parseColor("#0A0F1D")))
+                setBackgroundDrawable(ColorDrawable(getColor(R.color.bg_dark)))
             }
 
             fun refreshLogDisplay() {
@@ -1747,11 +1747,11 @@ class MainActivity : AppCompatActivity() {
         val rowMaxCacheSize: LinearLayout = dialogView.findViewById(R.id.rowMaxCacheSize)
         val tvMaxCacheValue: TextView = dialogView.findViewById(R.id.tvMaxCacheValue)
 
-        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dialog = Dialog(this, R.style.Theme_CloudVault_Dialog_Fullscreen)
         dialog.setContentView(dialogView)
         dialog.window?.apply {
             setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-            setBackgroundDrawable(ColorDrawable(Color.parseColor("#0A0F1D")))
+            setBackgroundDrawable(ColorDrawable(getColor(R.color.bg_dark)))
         }
 
         btnCacheBack.setOnClickListener { dialog.dismiss() }

@@ -3,7 +3,6 @@ package com.cloudvault.app
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
-import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import com.google.android.material.color.DynamicColors
 
@@ -62,17 +61,22 @@ object ThemePreferences {
         val theme = getTheme(activity)
         when (theme) {
             AppTheme.SYSTEM_DEFAULT -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                activity.setTheme(R.style.Theme_CloudVault)
                 if (DynamicColors.isDynamicColorAvailable()) {
                     DynamicColors.applyIfAvailable(activity)
                 }
             }
             AppTheme.AMOLED_BLACK -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
                 activity.setTheme(R.style.Theme_CloudVault_Amoled)
             }
             AppTheme.LIGHT -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
                 activity.setTheme(R.style.Theme_CloudVault_Light)
             }
             AppTheme.OBSIDIAN_DARK -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
                 activity.setTheme(R.style.Theme_CloudVault)
             }
         }

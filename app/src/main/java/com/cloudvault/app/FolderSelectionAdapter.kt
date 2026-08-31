@@ -32,12 +32,13 @@ class FolderSelectionAdapter(
         holder.tvFolderItemCount.text = "${folder.totalCount} items"
         holder.cbFolder.isChecked = folder.isSelected
 
+        val context = holder.itemView.context
         if (folder.isSelected) {
-            holder.cardFolder.strokeColor = Color.parseColor("#2563EB") // Blue border
-            holder.cardFolder.setCardBackgroundColor(Color.parseColor("#172554")) // Darker blue background
+            holder.cardFolder.strokeColor = context.getColor(R.color.accent_cyan)
+            holder.cardFolder.setCardBackgroundColor(context.getColor(R.color.status_pill_bg))
         } else {
-            holder.cardFolder.strokeColor = Color.parseColor("#1E293B") // Default border
-            holder.cardFolder.setCardBackgroundColor(Color.parseColor("#162234")) // Default background
+            holder.cardFolder.strokeColor = context.getColor(R.color.card_border)
+            holder.cardFolder.setCardBackgroundColor(context.getColor(R.color.bg_surface_elevated))
         }
 
         holder.cardFolder.setOnClickListener {
