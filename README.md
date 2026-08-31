@@ -1,8 +1,8 @@
+<p align="center">
+  <img src="assets/featureGraphic.png" alt="CloudVault" width="100%" />
+</p>
+
 <div align="center">
-
-<img src="assets/logo.png" alt="CloudVault Logo" width="130" style="border-radius: 26px;" />
-
-# CloudVault
 
 **Free, unlimited, high-speed personal cloud storage on Android powered by Telegram.**
 
