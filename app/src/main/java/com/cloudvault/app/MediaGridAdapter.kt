@@ -511,7 +511,8 @@ class MediaGridAdapter(
 
     inner class FileViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val cardFile: com.google.android.material.card.MaterialCardView? = itemView.findViewById(R.id.cardFile)
-        private val layoutFileIconContainer: FrameLayout? = itemView.findViewById(R.id.layoutFileIconContainer)
+        private val layoutFileIconContainer: com.google.android.material.card.MaterialCardView? = itemView.findViewById(R.id.layoutFileIconContainer)
+        private val ivFileThumbnail: ImageView? = itemView.findViewById(R.id.ivFileThumbnail)
         private val tvFileName: TextView = itemView.findViewById(R.id.tvFileName)
         private val tvFileIcon: TextView? = itemView.findViewById(R.id.tvFileIcon)
         private val tvFileBadge: TextView = itemView.findViewById(R.id.tvFileBadge)
@@ -523,11 +524,15 @@ class MediaGridAdapter(
         private val viewCheckUnselected: View? = itemView.findViewById(R.id.viewCheckUnselected)
         private val viewCheckSelected: FrameLayout? = itemView.findViewById(R.id.viewCheckSelected)
 
+        private var loadJob: Job? = null
+
         fun bind(item: VaultMediaItem) {
+            loadJob?.cancel()
+
             val palette = ThemePreferences.getPalette(itemView.context)
             cardFile?.setCardBackgroundColor(palette.bgSurface)
             cardFile?.strokeColor = palette.cardBorder
-            layoutFileIconContainer?.backgroundTintList = android.content.res.ColorStateList.valueOf(palette.bgSurfaceElevated)
+            layoutFileIconContainer?.setCardBackgroundColor(palette.bgSurfaceElevated)
             tvFileBadge.setBackgroundColor(palette.bgSurfaceElevated)
             tvFileBadge.setTextColor(palette.accentBright)
             tvFileName.setTextColor(palette.textPrimary)
@@ -555,6 +560,52 @@ class MediaGridAdapter(
                     item.title.endsWith(".pdf", ignoreCase = true) -> "📄"
                     TelegramRepository.isZipArchiveFilename(item.title) -> "📦"
                     else -> "📄"
+                }
+            }
+
+            // Thumbnail Loading for Audio, PDF, and Documents
+            ivFileThumbnail?.setImageDrawable(null)
+            ivFileThumbnail?.visibility = View.GONE
+            tvFileIcon?.visibility = View.VISIBLE
+
+            if (item.thumbnailFileId > 0) {
+                val cached = bitmapCache.get(item.thumbnailFileId)
+                if (cached != null) {
+                    ivFileThumbnail?.setImageBitmap(cached)
+                    ivFileThumbnail?.visibility = View.VISIBLE
+                    tvFileIcon?.visibility = View.GONE
+                } else {
+                    loadJob = scope.launch(Dispatchers.IO) {
+                        val bmp = loadOrDownloadThumbnail(item.thumbnailFileId, item)
+                        if (bmp != null) {
+                            withContext(Dispatchers.Main) {
+                                bitmapCache.put(item.thumbnailFileId, bmp)
+                                if (item.fileId > 0) bitmapCache.put(item.fileId, bmp)
+                                ivFileThumbnail?.setImageBitmap(bmp)
+                                ivFileThumbnail?.visibility = View.VISIBLE
+                                tvFileIcon?.visibility = View.GONE
+                            }
+                        }
+                    }
+                }
+            } else if (isAudio) {
+                val cached = if (item.fileId > 0) bitmapCache.get(item.fileId) else null
+                if (cached != null) {
+                    ivFileThumbnail?.setImageBitmap(cached)
+                    ivFileThumbnail?.visibility = View.VISIBLE
+                    tvFileIcon?.visibility = View.GONE
+                } else {
+                    loadJob = scope.launch(Dispatchers.IO) {
+                        val bmp = AudioThumbnailHelper.getThumbnailBitmap(item)
+                        if (bmp != null) {
+                            withContext(Dispatchers.Main) {
+                                if (item.fileId > 0) bitmapCache.put(item.fileId, bmp)
+                                ivFileThumbnail?.setImageBitmap(bmp)
+                                ivFileThumbnail?.visibility = View.VISIBLE
+                                tvFileIcon?.visibility = View.GONE
+                            }
+                        }
+                    }
                 }
             }
 
