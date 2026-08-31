@@ -276,8 +276,7 @@ object ThemePreferences {
         decor.findViewById<View>(R.id.layoutSelectionTopBar)?.setBackgroundColor(palette.bgSurface)
         decor.findViewById<View>(R.id.rvMediaGrid)?.setBackgroundColor(palette.bgDark)
 
-        // 2. App Logo Container & Divider
-        decor.findViewById<android.widget.FrameLayout>(R.id.layoutLogoContainer)?.backgroundTintList = ColorStateList.valueOf(palette.bgSurfaceElevated)
+        // 2. Divider
         decor.findViewById<View>(R.id.dividerTabs)?.setBackgroundColor(palette.cardBorder)
 
         // 3. Status Banner
