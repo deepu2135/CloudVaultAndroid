@@ -388,6 +388,9 @@ class MainActivity : AppCompatActivity() {
 
         setupMiniPlayer()
 
+        // Apply theme palette to all views
+        ThemePreferences.applyThemeToMainActivity(this)
+
         // Initial tab
         switchCategory(MediaType.PHOTO)
 
@@ -817,23 +820,24 @@ class MainActivity : AppCompatActivity() {
         }
         currentCategory = category
 
-        val cyanBright = getColor(R.color.accent_cyan_bright)
-        val tabInactive = getColor(R.color.tab_inactive)
-        val cyanColor = getColor(R.color.accent_cyan)
+        val palette = ThemePreferences.getPalette(this)
+        val accentBright = palette.accentBright
+        val accentPrimary = palette.accentPrimary
+        val tabInactive = palette.textMuted
         val transparent = getColor(android.R.color.transparent)
 
         // Reset Tab Styles
-        tvTabPhotosLabel.setTextColor(if (category == MediaType.PHOTO) cyanBright else tabInactive)
-        tabPhotosIndicator.setBackgroundColor(if (category == MediaType.PHOTO) cyanColor else transparent)
+        tvTabPhotosLabel.setTextColor(if (category == MediaType.PHOTO) accentBright else tabInactive)
+        tabPhotosIndicator.setBackgroundColor(if (category == MediaType.PHOTO) accentPrimary else transparent)
 
-        tvTabVideosLabel.setTextColor(if (category == MediaType.VIDEO) cyanBright else tabInactive)
-        tabVideosIndicator.setBackgroundColor(if (category == MediaType.VIDEO) cyanColor else transparent)
+        tvTabVideosLabel.setTextColor(if (category == MediaType.VIDEO) accentBright else tabInactive)
+        tabVideosIndicator.setBackgroundColor(if (category == MediaType.VIDEO) accentPrimary else transparent)
 
-        tvTabAudiosLabel.setTextColor(if (category == MediaType.AUDIO) cyanBright else tabInactive)
-        tabAudiosIndicator.setBackgroundColor(if (category == MediaType.AUDIO) cyanColor else transparent)
+        tvTabAudiosLabel.setTextColor(if (category == MediaType.AUDIO) accentBright else tabInactive)
+        tabAudiosIndicator.setBackgroundColor(if (category == MediaType.AUDIO) accentPrimary else transparent)
 
-        tvTabFilesLabel.setTextColor(if (category == MediaType.DOCUMENT) cyanBright else tabInactive)
-        tabFilesIndicator.setBackgroundColor(if (category == MediaType.DOCUMENT) cyanColor else transparent)
+        tvTabFilesLabel.setTextColor(if (category == MediaType.DOCUMENT) accentBright else tabInactive)
+        tabFilesIndicator.setBackgroundColor(if (category == MediaType.DOCUMENT) accentPrimary else transparent)
 
         tvSectionTitle.text = when (category) {
             MediaType.PHOTO -> "Photos"
