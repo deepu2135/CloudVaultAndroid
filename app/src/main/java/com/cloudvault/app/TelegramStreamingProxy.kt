@@ -1409,6 +1409,9 @@ object TelegramStreamingProxy {
     private suspend fun deleteFile(fileId: Int) {
         if (fileId <= 0 || DownloadManager.isFileIdActive(fileId)) return
         val target = resolveFileId(fileId)
+        val fileInfo = getFileInfo(fileId) ?: if (target != fileId) getFileInfo(target) else null
+        val localPath = fileInfo?.first
+
         lastDownloadRequestOffset.remove(fileId)
         lastDownloadRequestTime.remove(fileId)
         lastDownloadRequestOffset.remove(target)
@@ -1435,6 +1438,12 @@ object TelegramStreamingProxy {
         if (target != fileId) {
             runCatching {
                 TelegramClient.sendRequest(TdApi.DeleteFile(target))
+            }
+        }
+        if (!localPath.isNullOrBlank()) {
+            runCatching {
+                val f = java.io.File(localPath)
+                if (f.exists()) f.delete()
             }
         }
     }
