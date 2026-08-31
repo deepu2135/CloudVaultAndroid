@@ -320,7 +320,7 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
             PlaybackStateCompat.STATE_PAUSED
         }
 
-        val pos = runCatching { mediaPlayer?.currentPosition?.toLong() }.getOrDefault(0L)
+        val pos: Long = runCatching { mediaPlayer?.currentPosition?.toLong() ?: 0L }.getOrDefault(0L)
         val playbackState = PlaybackStateCompat.Builder()
             .setActions(
                 PlaybackStateCompat.ACTION_PLAY or

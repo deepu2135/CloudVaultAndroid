@@ -218,7 +218,6 @@ object DuplicatesDialog {
                 val isOldest = item == oldest
                 val dateStr = dateFormat.format(Date(item.dateAdded))
                 val label = if (isOldest) "$dateStr  (Original)" else "$dateStr  (Duplicate)"
-                rowView.text = label
 
                 val rowLayout = LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL

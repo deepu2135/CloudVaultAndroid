@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutEmptyState: LinearLayout
     private lateinit var tvEmptyEmoji: TextView
     private lateinit var tvEmptyTitle: TextView
+    private lateinit var tvEmptySubtitle: TextView
     private lateinit var pbLoading: ProgressBar
 
     // Mini Audio Player views

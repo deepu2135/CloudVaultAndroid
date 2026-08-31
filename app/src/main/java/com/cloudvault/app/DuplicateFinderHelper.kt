@@ -27,21 +27,9 @@ object DuplicateFinderHelper {
 
         for (item in allItems) {
             val key = when (item.type) {
-                MediaType.PHOTO -> {
-                    if (item.width > 0 && item.height > 0) {
-                        "photo_${item.sizeBytes}_${item.width}x${item.height}"
-                    } else {
-                        "photo_${item.sizeBytes}_${normalizeTitle(item.title)}"
-                    }
-                }
-                MediaType.VIDEO -> {
-                    if (item.width > 0 && item.height > 0) {
-                        "video_${item.sizeBytes}_${item.width}x${item.height}_${item.durationSeconds}"
-                    } else {
-                        "video_${item.sizeBytes}_${normalizeTitle(item.title)}"
-                    }
-                }
-                MediaType.AUDIO -> "audio_${item.sizeBytes}_${normalizeTitle(item.title)}"
+                MediaType.PHOTO -> "photo_${item.sizeBytes}_${normalizeTitle(item.title)}"
+                MediaType.VIDEO -> "video_${item.sizeBytes}_${item.durationSeconds}_${normalizeTitle(item.title)}"
+                MediaType.AUDIO -> "audio_${item.sizeBytes}_${item.durationSeconds}_${normalizeTitle(item.title)}"
                 MediaType.DOCUMENT -> "doc_${item.sizeBytes}_${normalizeTitle(item.title)}"
             }
 
