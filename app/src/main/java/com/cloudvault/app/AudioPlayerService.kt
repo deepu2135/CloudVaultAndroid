@@ -21,6 +21,12 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
     MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener,
@@ -64,6 +70,7 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
     private var currentThumbnailBmp: android.graphics.Bitmap? = null
     private var isPrepared = false
 
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val handler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -206,11 +213,11 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
 
         val currentTrack = AudioPlayerManager.currentTrack.value
         if (currentTrack != null && currentTrack.thumbnailFileId > 0) {
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            serviceScope.launch(Dispatchers.IO) {
                 val bmp = AudioThumbnailHelper.getThumbnailBitmap(currentTrack)
                 if (bmp != null && currentFileId == fileId) {
                     currentThumbnailBmp = bmp
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    withContext(Dispatchers.Main) {
                         updateMetadata()
                         if (isPrepared && mediaPlayer?.isPlaying == true) {
                             startForeground(NOTIFICATION_ID, buildNotification(isPlaying = true, isBuffering = false))
@@ -520,6 +527,7 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceScope.cancel()
         handler.removeCallbacks(progressRunnable)
         releasePlayer()
         abandonAudioFocus()
