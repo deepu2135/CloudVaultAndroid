@@ -72,4 +72,64 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <!-- Midnight Purple Theme -->
+    <style name="Theme.CloudVault.MidnightPurple" parent="Theme.CloudVault">
+        <item name="colorPrimary">#A855F7</item>
+        <item name="colorPrimaryVariant">#9333EA</item>
+        <item name="colorSecondary">#C084FC</item>
+        <item name="android:statusBarColor">#0B0819</item>
+        <item name="android:navigationBarColor">#0B0819</item>
+        <item name="android:windowBackground">#0B0819</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Emerald Forest Theme -->
+    <style name="Theme.CloudVault.EmeraldNord" parent="Theme.CloudVault">
+        <item name="colorPrimary">#10B981</item>
+        <item name="colorPrimaryVariant">#059669</item>
+        <item name="colorSecondary">#34D399</item>
+        <item name="android:statusBarColor">#061811</item>
+        <item name="android:navigationBarColor">#061811</item>
+        <item name="android:windowBackground">#061811</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Sunset Amber Theme -->
+    <style name="Theme.CloudVault.SunsetAmber" parent="Theme.CloudVault">
+        <item name="colorPrimary">#F59E0B</item>
+        <item name="colorPrimaryVariant">#D97706</item>
+        <item name="colorSecondary">#FBBF24</item>
+        <item name="android:statusBarColor">#181109</item>
+        <item name="android:navigationBarColor">#181109</item>
+        <item name="android:windowBackground">#181109</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Crimson Rose Theme -->
+    <style name="Theme.CloudVault.CrimsonRose" parent="Theme.CloudVault">
+        <item name="colorPrimary">#F43F5E</item>
+        <item name="colorPrimaryVariant">#E11D48</item>
+        <item name="colorSecondary">#FB7185</item>
+        <item name="android:statusBarColor">#18080C</item>
+        <item name="android:navigationBarColor">#18080C</item>
+        <item name="android:windowBackground">#18080C</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <!-- Ocean Sapphire Theme -->
+    <style name="Theme.CloudVault.OceanSapphire" parent="Theme.CloudVault">
+        <item name="colorPrimary">#2563EB</item>
+        <item name="colorPrimaryVariant">#1D4ED8</item>
+        <item name="colorSecondary">#60A5FA</item>
+        <item name="android:statusBarColor">#0A1128</item>
+        <item name="android:navigationBarColor">#0A1128</item>
+        <item name="android:windowBackground">#0A1128</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
 </resources>

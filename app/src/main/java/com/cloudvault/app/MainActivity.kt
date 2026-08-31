@@ -1406,6 +1406,11 @@ class MainActivity : AppCompatActivity() {
                 AppTheme.OBSIDIAN_DARK -> "DARK"
                 AppTheme.AMOLED_BLACK -> "AMOLED"
                 AppTheme.LIGHT -> "LIGHT"
+                AppTheme.MIDNIGHT_PURPLE -> "NEON"
+                AppTheme.EMERALD_NORD -> "EMERALD"
+                AppTheme.SUNSET_AMBER -> "AMBER"
+                AppTheme.CRIMSON_ROSE -> "ROSE"
+                AppTheme.OCEAN_SAPPHIRE -> "OCEAN"
             }
             tvSettingsThemeSummary.text = currentTheme.displayName
         }

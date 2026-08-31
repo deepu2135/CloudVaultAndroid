@@ -10,7 +10,12 @@ enum class AppTheme(val id: String, val displayName: String, val icon: String) {
     SYSTEM_DEFAULT("system", "System Default / Material You", "🎨"),
     OBSIDIAN_DARK("obsidian", "Obsidian Dark (Default)", "🌌"),
     AMOLED_BLACK("amoled", "AMOLED Pure Black", "⬛"),
-    LIGHT("light", "Light Mode", "☀️");
+    LIGHT("light", "Light Mode", "☀️"),
+    MIDNIGHT_PURPLE("midnight_purple", "Midnight Neon Purple", "🔮"),
+    EMERALD_NORD("emerald_nord", "Emerald Forest Green", "🌲"),
+    SUNSET_AMBER("sunset_amber", "Sunset Amber Gold", "🌅"),
+    CRIMSON_ROSE("crimson_rose", "Dracula Crimson Rose", "🌹"),
+    OCEAN_SAPPHIRE("ocean_sapphire", "Ocean Sapphire Blue", "🌊");
 
     companion object {
         fun fromId(id: String): AppTheme {
@@ -45,14 +50,12 @@ object ThemePreferences {
                     DynamicColors.applyToActivitiesIfAvailable(app)
                 }
             }
-            AppTheme.OBSIDIAN_DARK -> {
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            }
-            AppTheme.AMOLED_BLACK -> {
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            }
             AppTheme.LIGHT -> {
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            }
+            else -> {
+                // All dark variants
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
             }
         }
     }
@@ -74,6 +77,26 @@ object ThemePreferences {
             AppTheme.LIGHT -> {
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
                 activity.setTheme(R.style.Theme_CloudVault_Light)
+            }
+            AppTheme.MIDNIGHT_PURPLE -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                activity.setTheme(R.style.Theme_CloudVault_MidnightPurple)
+            }
+            AppTheme.EMERALD_NORD -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                activity.setTheme(R.style.Theme_CloudVault_EmeraldNord)
+            }
+            AppTheme.SUNSET_AMBER -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                activity.setTheme(R.style.Theme_CloudVault_SunsetAmber)
+            }
+            AppTheme.CRIMSON_ROSE -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                activity.setTheme(R.style.Theme_CloudVault_CrimsonRose)
+            }
+            AppTheme.OCEAN_SAPPHIRE -> {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                activity.setTheme(R.style.Theme_CloudVault_OceanSapphire)
             }
             AppTheme.OBSIDIAN_DARK -> {
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
