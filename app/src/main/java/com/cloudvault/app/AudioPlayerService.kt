@@ -61,6 +61,7 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
     private var currentTitle: String = "Cloud Vault Audio"
     private var currentDurationMs: Long = 0L
     private var currentSpeed: Float = 1.0f
+    private var currentThumbnailBmp: android.graphics.Bitmap? = null
     private var isPrepared = false
 
     private val handler = Handler(Looper.getMainLooper())
@@ -200,7 +201,24 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
         currentFileId = fileId
         currentTitle = title
         currentDurationMs = (durationSec * 1000L).coerceAtLeast(0L)
+        currentThumbnailBmp = null
         isPrepared = false
+
+        val currentTrack = AudioPlayerManager.currentTrack.value
+        if (currentTrack != null && currentTrack.thumbnailFileId > 0) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                val bmp = AudioThumbnailHelper.getThumbnailBitmap(currentTrack)
+                if (bmp != null && currentFileId == fileId) {
+                    currentThumbnailBmp = bmp
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        updateMetadata()
+                        if (isPrepared && mediaPlayer?.isPlaying == true) {
+                            startForeground(NOTIFICATION_ID, buildNotification(isPlaying = true, isBuffering = false))
+                        }
+                    }
+                }
+            }
+        }
 
         handler.removeCallbacks(progressRunnable)
         releasePlayer()
@@ -342,12 +360,16 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
     }
 
     private fun updateMetadata() {
-        val metadata = MediaMetadataCompat.Builder()
+        val builder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "CloudVault Audio")
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, currentDurationMs)
-            .build()
-        mediaSession?.setMetadata(metadata)
+
+        currentThumbnailBmp?.let { bmp ->
+            builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bmp)
+            builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, bmp)
+        }
+        mediaSession?.setMetadata(builder.build())
     }
 
     private fun updatePlaybackState() {
@@ -431,6 +453,10 @@ class AudioPlayerService : Service(), MediaPlayer.OnPreparedListener,
                     .setShowCancelButton(true)
                     .setCancelButtonIntent(stopIntent)
             )
+
+        currentThumbnailBmp?.let { bmp ->
+            builder.setLargeIcon(bmp)
+        }
 
         return builder.build()
     }

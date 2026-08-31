@@ -87,45 +87,60 @@
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_search">
 
-                <!-- Subtle Decorative Concentric Rings for Vinyl Feel -->
-                <View
-                    android:layout_width="190dp"
-                    android:layout_height="190dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_selection_circle_unselected"
-                    android:alpha="0.25" />
+                <!-- Placeholder Decorative Vinyl Rings when no thumbnail -->
+                <FrameLayout
+                    android:id="@+id/layoutAudioPlaceholderArt"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
 
-                <View
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_selection_circle_unselected"
-                    android:alpha="0.35" />
+                    <View
+                        android:layout_width="190dp"
+                        android:layout_height="190dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_selection_circle_unselected"
+                        android:alpha="0.25" />
 
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    <View
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_selection_circle_unselected"
+                        android:alpha="0.35" />
 
-                    <TextView
-                        android:id="@+id/tvAudioArtEmoji"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🎵"
-                        android:textSize="72sp" />
+                        android:layout_gravity="center"
+                        android:gravity="center"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/tvAudioVisualizerBars"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="ılı.lıllılı.ıllı"
-                        android:textColor="@color/accent_cyan_bright"
-                        android:textSize="14sp"
-                        android:letterSpacing="0.15" />
-                </LinearLayout>
+                        <TextView
+                            android:id="@+id/tvAudioArtEmoji"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🎵"
+                            android:textSize="72sp" />
+
+                        <TextView
+                            android:id="@+id/tvAudioVisualizerBars"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="ılı.lıllılı.ıllı"
+                            android:textColor="@color/accent_cyan_bright"
+                            android:textSize="14sp"
+                            android:letterSpacing="0.15" />
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- Thumbnail Album Cover Image -->
+                <ImageView
+                    android:id="@+id/ivAudioArtwork"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 

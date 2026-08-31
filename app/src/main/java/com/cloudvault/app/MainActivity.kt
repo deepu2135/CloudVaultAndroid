@@ -115,6 +115,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cardMiniPlayer: MaterialCardView
     private lateinit var layoutMiniPlayerContent: LinearLayout
     private lateinit var tvMiniPlayerArt: TextView
+    private lateinit var ivMiniPlayerArt: ImageView
     private lateinit var tvMiniPlayerTitle: TextView
     private lateinit var tvMiniPlayerSubtitle: TextView
     private lateinit var btnMiniPlayerPrev: TextView
@@ -454,6 +455,7 @@ class MainActivity : AppCompatActivity() {
         cardMiniPlayer = findViewById(R.id.cardMiniPlayer)
         layoutMiniPlayerContent = findViewById(R.id.layoutMiniPlayerContent)
         tvMiniPlayerArt = findViewById(R.id.tvMiniPlayerArt)
+        ivMiniPlayerArt = findViewById(R.id.ivMiniPlayerArt)
         tvMiniPlayerTitle = findViewById(R.id.tvMiniPlayerTitle)
         tvMiniPlayerSubtitle = findViewById(R.id.tvMiniPlayerSubtitle)
         btnMiniPlayerPrev = findViewById(R.id.btnMiniPlayerPrev)
@@ -488,6 +490,31 @@ class MainActivity : AppCompatActivity() {
                     cardMiniPlayer.visibility = View.VISIBLE
                     tvMiniPlayerTitle.text = track.title
                     tvMiniPlayerSubtitle.text = "${track.mimeType} • ${track.formattedSize}"
+
+                    if (track.thumbnailFileId > 0) {
+                        val cached = MediaGridAdapter.bitmapCache.get(track.thumbnailFileId)
+                        if (cached != null) {
+                            ivMiniPlayerArt.setImageBitmap(cached)
+                            ivMiniPlayerArt.visibility = View.VISIBLE
+                            tvMiniPlayerArt.visibility = View.GONE
+                        } else {
+                            ivMiniPlayerArt.visibility = View.GONE
+                            tvMiniPlayerArt.visibility = View.VISIBLE
+                            lifecycleScope.launch(Dispatchers.IO) {
+                                val thumbBmp = AudioThumbnailHelper.getThumbnailBitmap(track)
+                                withContext(Dispatchers.Main) {
+                                    if (thumbBmp != null && AudioPlayerManager.currentTrack.value?.fileId == track.fileId) {
+                                        ivMiniPlayerArt.setImageBitmap(thumbBmp)
+                                        ivMiniPlayerArt.visibility = View.VISIBLE
+                                        tvMiniPlayerArt.visibility = View.GONE
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        ivMiniPlayerArt.visibility = View.GONE
+                        tvMiniPlayerArt.visibility = View.VISIBLE
+                    }
                 } else {
                     cardMiniPlayer.visibility = View.GONE
                 }

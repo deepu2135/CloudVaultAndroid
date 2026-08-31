@@ -27,8 +27,8 @@
         <!-- Track Number or Playing Equalizer Badge -->
         <FrameLayout
             android:id="@+id/layoutTrackBadge"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:background="@drawable/bg_search">
 
             <TextView
@@ -49,6 +49,13 @@
                 android:text="▶"
                 android:textColor="@color/accent_cyan_bright"
                 android:textSize="14sp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/ivQueueTrackThumb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
                 android:visibility="gone" />
         </FrameLayout>
 

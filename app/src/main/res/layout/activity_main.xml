@@ -544,15 +544,35 @@
                     android:paddingEnd="8dp"
                     android:background="?attr/selectableItemBackground">
 
-                    <TextView
-                        android:id="@+id/tvMiniPlayerArt"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:gravity="center"
-                        android:text="🎵"
-                        android:textSize="20sp"
-                        android:background="@drawable/bg_dialog_folder"
-                        android:backgroundTint="@color/status_pill_bg" />
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        app:cardCornerRadius="10dp"
+                        app:cardElevation="0dp"
+                        app:cardBackgroundColor="@color/status_pill_bg"
+                        app:strokeColor="@color/card_border"
+                        app:strokeWidth="1dp">
+
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent">
+
+                            <TextView
+                                android:id="@+id/tvMiniPlayerArt"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:text="🎵"
+                                android:textSize="20sp" />
+
+                            <ImageView
+                                android:id="@+id/ivMiniPlayerArt"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="centerCrop"
+                                android:visibility="gone" />
+                        </FrameLayout>
+                    </com.google.android.material.card.MaterialCardView>
 
                     <LinearLayout
                         android:layout_width="0dp"
