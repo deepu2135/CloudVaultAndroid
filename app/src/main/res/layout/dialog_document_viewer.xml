@@ -13,9 +13,9 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
         android:background="@color/bg_surface">
 
         <TextView
@@ -29,8 +29,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="6dp"
             android:orientation="vertical">
 
             <TextView
@@ -39,7 +39,7 @@
                 android:layout_height="wrap_content"
                 android:text="Document Title"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="14.5sp"
                 android:textStyle="bold"
                 android:maxLines="1"
                 android:ellipsize="middle" />
@@ -51,60 +51,73 @@
                 android:layout_marginTop="2dp"
                 android:text="PDF • 2.4 MB"
                 android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:textSize="11.5sp" />
         </LinearLayout>
+
+        <!-- Horizontal / Vertical Orientation Toggle (PDF only) -->
+        <TextView
+            android:id="@+id/btnDocOrientation"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:text="↔"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone" />
 
         <!-- Search Button -->
         <TextView
             android:id="@+id/btnDocSearch"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:gravity="center"
             android:text="🔍"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <!-- Wrap Toggle Button (Code/Text) -->
         <TextView
             android:id="@+id/btnDocWrap"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:gravity="center"
             android:text="↩"
             android:textColor="@color/text_primary"
-            android:textSize="18sp"
+            android:textSize="17sp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <!-- Copy All Button -->
         <TextView
             android:id="@+id/btnDocCopy"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:gravity="center"
             android:text="📋"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <!-- Download Button -->
         <TextView
             android:id="@+id/btnDocDownload"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:gravity="center"
             android:text="⬇"
             android:textColor="@color/accent_cyan_bright"
-            android:textSize="18sp"
+            android:textSize="17sp"
             android:background="?attr/selectableItemBackgroundBorderless" />
 
         <!-- Close Button -->
         <TextView
             android:id="@+id/btnDocClose"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:gravity="center"
             android:text="✕"
             android:textColor="@color/text_secondary"
-            android:textSize="18sp"
+            android:textSize="17sp"
             android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 
@@ -184,41 +197,27 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- 1. PDF Page Rendering Container -->
+        <!-- 1. PDF Page Rendering Container (ViewPager2 for Horizontal Swiping & Zoom) -->
         <FrameLayout
             android:id="@+id/layoutPdfContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:visibility="gone">
 
-            <ScrollView
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/vpPdfPages"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:fillViewport="true">
+                android:layout_height="match_parent" />
 
-                <HorizontalScrollView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <ImageView
-                        android:id="@+id/ivPdfPage"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center"
-                        android:adjustViewBounds="true"
-                        android:scaleType="fitCenter" />
-                </HorizontalScrollView>
-            </ScrollView>
-
-            <!-- PDF Page Navigation Bar -->
+            <!-- PDF Page & Zoom Navigation Floating Pill -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardPdfNavigation"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|center_horizontal"
-                android:layout_marginBottom="20dp"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="8dp"
+                android:layout_marginBottom="24dp"
+                app:cardCornerRadius="22dp"
+                app:cardElevation="10dp"
                 app:cardBackgroundColor="@color/bg_surface"
                 app:strokeColor="@color/card_border"
                 app:strokeWidth="1dp">
@@ -228,11 +227,12 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
                     android:paddingTop="4dp"
                     android:paddingBottom="4dp">
 
+                    <!-- Prev Page -->
                     <TextView
                         android:id="@+id/btnPdfPrevPage"
                         android:layout_width="36dp"
@@ -243,17 +243,24 @@
                         android:textSize="14sp"
                         android:background="?attr/selectableItemBackgroundBorderless" />
 
+                    <!-- Page Indicator (Clickable to jump) -->
                     <TextView
                         android:id="@+id/tvPdfPageIndicator"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:layout_marginEnd="8dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="6dp"
                         android:text="Page 1 / 1"
                         android:textColor="@color/text_primary"
                         android:textSize="13sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        android:background="?attr/selectableItemBackground"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp" />
 
+                    <!-- Next Page -->
                     <TextView
                         android:id="@+id/btnPdfNextPage"
                         android:layout_width="36dp"
@@ -262,6 +269,52 @@
                         android:text="▶"
                         android:textColor="@color/accent_cyan_bright"
                         android:textSize="14sp"
+                        android:background="?attr/selectableItemBackgroundBorderless" />
+
+                    <!-- Divider -->
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:background="@color/card_border" />
+
+                    <!-- Zoom Out -->
+                    <TextView
+                        android:id="@+id/btnPdfZoomOut"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:gravity="center"
+                        android:text="−"
+                        android:textColor="@color/text_primary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:background="?attr/selectableItemBackgroundBorderless" />
+
+                    <!-- Zoom Reset (100%) -->
+                    <TextView
+                        android:id="@+id/btnPdfZoomReset"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:gravity="center"
+                        android:text="100%"
+                        android:textColor="@color/accent_cyan_bright"
+                        android:textSize="11.5sp"
+                        android:textStyle="bold"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp" />
+
+                    <!-- Zoom In -->
+                    <TextView
+                        android:id="@+id/btnPdfZoomIn"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:gravity="center"
+                        android:text="+"
+                        android:textColor="@color/text_primary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
                         android:background="?attr/selectableItemBackgroundBorderless" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

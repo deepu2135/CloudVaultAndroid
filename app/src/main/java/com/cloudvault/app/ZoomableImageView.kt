@@ -22,7 +22,7 @@ class ZoomableImageView @JvmOverloads constructor(
     private val last = PointF()
     private val start = PointF()
     private var minScale = 1f
-    private var maxScale = 5f
+    private var maxScale = 6f
     private val m = FloatArray(9)
 
     private var viewWidth = 0
@@ -51,6 +51,7 @@ class ZoomableImageView @JvmOverloads constructor(
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
             mode = ZOOM
+            parent?.requestDisallowInterceptTouchEvent(true)
             return true
         }
 
@@ -76,11 +77,18 @@ class ZoomableImageView @JvmOverloads constructor(
             invalidate()
             return true
         }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            super.onScaleEnd(detector)
+            if (saveScale <= 1.05f) {
+                resetZoom()
+            }
+        }
     }
 
     private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            if (saveScale > minScale) {
+            if (saveScale > 1.05f) {
                 resetZoom()
             } else {
                 val targetScale = 2.5f
@@ -94,9 +102,34 @@ class ZoomableImageView @JvmOverloads constructor(
         }
     }
 
+    fun zoomIn(step: Float = 1.35f) {
+        val targetScale = (saveScale * step).coerceAtMost(maxScale)
+        val factor = targetScale / saveScale
+        saveScale = targetScale
+        val focusX = viewWidth / 2f
+        val focusY = viewHeight / 2f
+        mMatrix.postScale(factor, factor, focusX, focusY)
+        fixTrans()
+        invalidate()
+    }
+
+    fun zoomOut(step: Float = 1.35f) {
+        val targetScale = (saveScale / step).coerceAtLeast(minScale)
+        val factor = targetScale / saveScale
+        saveScale = targetScale
+        val focusX = viewWidth / 2f
+        val focusY = viewHeight / 2f
+        mMatrix.postScale(factor, factor, focusX, focusY)
+        fixTrans()
+        invalidate()
+    }
+
+    fun getScale(): Float = saveScale
+
     fun resetZoom() {
         saveScale = 1f
         fitToScreen()
+        parent?.requestDisallowInterceptTouchEvent(false)
     }
 
     private fun fixTrans() {
@@ -119,11 +152,9 @@ class ZoomableImageView @JvmOverloads constructor(
 
     private fun getFixTranslation(trans: Float, viewSize: Float, contentSize: Float): Float {
         if (contentSize <= viewSize) {
-            // Keep centered in view
             val targetCenter = (viewSize - contentSize) / 2f
             return targetCenter - trans
         }
-        // Clamped inside bounds
         val minTrans = viewSize - contentSize
         val maxTrans = 0f
 
@@ -207,6 +238,9 @@ class ZoomableImageView @JvmOverloads constructor(
                 last.set(curr)
                 start.set(last)
                 mode = DRAG
+                if (saveScale > 1.05f) {
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
             }
             MotionEvent.ACTION_MOVE -> {
                 if (mode == DRAG) {
@@ -216,6 +250,12 @@ class ZoomableImageView @JvmOverloads constructor(
                     val totalScale = baseScale * saveScale
                     val contentW = origWidth * totalScale
                     val contentH = origHeight * totalScale
+
+                    if (saveScale > 1.05f) {
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                    } else {
+                        parent?.requestDisallowInterceptTouchEvent(false)
+                    }
 
                     val dragX = if (contentW <= viewWidth) 0f else deltaX
                     val dragY = if (contentH <= viewHeight) 0f else deltaY
@@ -228,6 +268,13 @@ class ZoomableImageView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 mode = NONE
+                if (saveScale <= 1.05f) {
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                mode = NONE
+                parent?.requestDisallowInterceptTouchEvent(false)
             }
         }
         return true
